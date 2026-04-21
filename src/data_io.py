@@ -1,7 +1,7 @@
 """Raw data access for the heatwave analysis pipeline.
 
 Pipeline role:
-- Stage 1: open source datasets while keeping them close to source form.
+- Workflow layer: raw data access within top-level Stage 1.
 
 Responsibilities:
 - Open raw source datasets.

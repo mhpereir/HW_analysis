@@ -1,7 +1,7 @@
 """Composite generation for the heatwave analysis pipeline.
 
 Pipeline role:
-- Stage 4: derive event-centered composite products from harmonized datasets.
+- Workflow layer: composite generation within top-level Stage 2.
 
 Responsibilities:
 - Build peak-aligned composites.

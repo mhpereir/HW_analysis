@@ -72,10 +72,27 @@ The current working scope includes the following variables.
 
 ## Main architectural decision
 
-The recommended architecture is a **two-stage pipeline**:
+The recommended architecture is a **two-stage top-level pipeline**:
 
 1. **Build an analysis-ready regional dataset** which contains all of the necessary variables for analysis, in a uniform timeseries.
 2. **Run selectors, event detection, composites, and plotting against that dataset**
+
+To avoid ambiguity:
+
+- **Stage** should refer only to these two top-level pipeline stages.
+- **Workflow layer** should refer to the finer-grained internal modules and processing steps inside those stages.
+
+In other words, the `src/` package is not defining more than two top-level stages. It is defining the reusable workflow layers that implement those two stages.
+
+Practical module mapping:
+
+- **Top-level Stage 1: build the analysis-ready regional dataset**
+  - primary modules: `data_io.py`, `preprocess.py`, `harmonize.py`
+  - handoff/storage module: `analysis_io.py`
+  - supporting modules: `config.py`, selected utilities from `diagnostics.py` when they contribute derived analysis variables
+- **Top-level Stage 2: analyze that dataset**
+  - primary modules: `analysis_io.py`, `selectors.py`, `events.py`, `composites.py`, `plotting.py`
+  - supporting modules: `config.py`, selected utilities from `diagnostics.py`
 
 ---
 
@@ -88,6 +105,7 @@ HW_analysis/
 ├── src/
 │   ├── config.py
 │   ├── data_io.py
+│   ├── analysis_io.py
 │   ├── preprocess.py
 │   ├── harmonize.py
 │   ├── selectors.py
@@ -137,6 +155,19 @@ This module should be responsible for:
 - preserving xarray-native lazy loading
 
 This layer should not perform major transformations beyond what is necessary to return valid, source-consistent data objects.
+
+### `analysis_io.py`
+
+This module should handle IO for internal pipeline products, especially the handoff between the two top-level stages.
+
+Responsibilities should include:
+
+- saving the harmonized analysis-ready regional dataset produced by Stage 1
+- reopening the saved analysis-ready regional dataset for Stage 2 workflows
+- validating required metadata and dataset conventions on read
+- managing filenames or paths for stable internal products
+
+This module should not contain source-specific raw data loading logic. That boundary should remain in `data_io.py`.
 
 ### `preprocess.py`
 
@@ -233,9 +264,11 @@ This is a strict design goal. Plotting should be a consumer, not a hidden analys
 
 ---
 
-## Core pipeline stages
+## Detailed workflow layers
 
-## Stage 1: Raw data access
+These layers are internal to the two-stage pipeline above.
+
+### Workflow layer 1: Raw data access
 
 Raw datasets are opened from:
 
@@ -243,9 +276,9 @@ Raw datasets are opened from:
 - threshold products from previous workflows
 - ARCO-backed variables
 
-At this stage, data remain close to source form.
+At this layer, data remain close to source form.
 
-## Stage 2: Harmonization
+### Workflow layer 2: Harmonization
 
 All variables are standardized into a common internal representation.
 
@@ -257,9 +290,9 @@ This should include:
 - shared naming conventions
 - source metadata retention
 
-The output of this stage should be the main analysis-ready dataset.
+The output of this layer is the main analysis-ready dataset, which completes top-level Stage 1.
 
-## Stage 3: Event selection
+### Workflow layer 3: Event selection
 
 Event masks are built from threshold-based or ranked criteria.
 
@@ -273,7 +306,7 @@ Examples:
 
 These are then converted into event IDs and event-level summary information.
 
-## Stage 4: Composite generation
+### Workflow layer 4: Composite generation
 
 Given an analysis dataset and an event definition, the code should produce:
 
@@ -282,7 +315,9 @@ Given an analysis dataset and an event definition, the code should produce:
 - percentile envelopes across events
 - individual-event extracts for selected top events
 
-## Stage 5: Plotting and export
+This layer is part of top-level Stage 2.
+
+### Workflow layer 5: Plotting and export
 
 Prepared composite products are rendered into:
 
@@ -290,6 +325,8 @@ Prepared composite products are rendered into:
 - top-event individual traces
 - optional future map composites
 - optional summary tables or serialized outputs
+
+This layer is also part of top-level Stage 2.
 
 ---
 

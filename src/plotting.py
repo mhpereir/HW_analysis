@@ -1,7 +1,7 @@
 """Plotting functions for the heatwave analysis pipeline.
 
 Pipeline role:
-- Stage 5: render prepared outputs into figures and exported visual products.
+- Workflow layer: plotting and export within top-level Stage 2.
 
 Responsibilities:
 - Accept prepared datasets, composites, or tables.

@@ -1,7 +1,7 @@
 """Reusable selection logic for the heatwave analysis pipeline.
 
 Pipeline role:
-- Stage 3: build masks or filtered subsets used to define events.
+- Workflow layer: selection logic within top-level Stage 2.
 
 Responsibilities:
 - Compute heatwave threshold exceedance masks.

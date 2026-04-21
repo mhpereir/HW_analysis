@@ -1,7 +1,7 @@
 """Harmonization of heterogeneous source data into a common analysis dataset.
 
 Pipeline role:
-- Stage 2: transform raw variables into a stable, analysis-ready regional dataset.
+- Workflow layer: dataset harmonization within top-level Stage 1.
 
 Responsibilities:
 - Map variables from different sources to shared internal names.
