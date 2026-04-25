@@ -336,29 +336,48 @@ The most important intermediate product should be a regional time series dataset
 
 ### Recommended dimensions
 
-- `time`
+- `daily_time`
+- `hourly_time`
 - optional `member`
 - optional `event`
 - optional `lag`
 
+The initial ERA5 workflow should keep daily event-definition products and hourly diagnostic products on separate time axes. This avoids merging daily and hourly variables onto a single mixed-frequency `time` coordinate.
+
 ### Candidate variables
 
-- `t_mean`
-- `volume`
-- `dTdt`
-- `adv_net`
-- `adiabatic`
-- `diabatic`
-- `cloud_frac`
-- `rad_sw_net_sfc`
-- `rad_lw_net_sfc`
-- `lwa_a`
-- `lwa_c`
-- `pbl_p`
-- `hw_flag`
-- `lwa_flag`
-- `hw_event_id`
-- `lwa_event_id`
+Daily event-definition variables:
+
+- `tas_region(daily_time)`
+- `hw_threshold(daily_time)` or `hw_threshold(year, dayofyear)` before expansion
+- `lwa_a_region(daily_time)`
+- `lwa_c_region(daily_time)`
+- `lwa_a_threshold(dayofyear)`
+- `lwa_c_threshold(dayofyear)`
+- `hw_flag(daily_time)`
+- `lwa_flag(daily_time)`
+- `hw_event_id(daily_time)`
+- `lwa_event_id(daily_time)`
+
+Hourly diagnostic variables:
+
+- `t_mean(hourly_time)`
+- `volume(hourly_time)`
+- `dTdt(hourly_time)`
+- `adv_net(hourly_time)`
+- `adiabatic(hourly_time)`
+- `diabatic(hourly_time)`
+- `cloud_frac(hourly_time)`
+- `rad_sw_net_sfc(hourly_time)`
+- `rad_lw_net_sfc(hourly_time)`
+- `pbl_p(hourly_time)`
+
+Projected hourly event labels:
+
+- `hw_event_id_hourly(hourly_time)`
+- `lwa_event_id_hourly(hourly_time)`
+
+The projected hourly event labels are produced by flooring each `hourly_time` timestamp to its calendar day and looking up the corresponding daily event ID. Every hour on an event day receives the same event ID; hours on non-event days receive `0`.
 
 This dataset should also carry metadata describing:
 
@@ -384,23 +403,26 @@ Some variables currently exist at daily resolution, while others are hourly. The
 
 For version 1 of the pipeline:
 
-- prioritize a **daily analysis pipeline**
-- aggregate hourly variables to daily diagnostics
-- keep the door open for future hourly-mode support
+- define event masks and event IDs on a **daily** axis
+- preserve hourly Eulerian heat-budget diagnostics on an **hourly** axis
+- project daily event IDs onto hourly diagnostics using calendar-day lookup
+- avoid aggregating hourly heat-budget variables to daily unless a specific analysis requires it
 
-### Why daily-first
+### Why daily event definitions with hourly targets
 
-- the event and threshold logic is already daily-oriented
-- daily mode is substantially simpler to validate
-- it avoids premature complexity during the first implementation phase
+- the threshold logic for HW and LWA is daily-oriented
+- the Eulerian heat-budget diagnostics are naturally hourly and should remain available at native cadence
+- a daily-to-hourly event-ID projection is easier to validate than a mixed-frequency merge on one `time` coordinate
+- this keeps future daily composites and hourly composites both possible
 
 ### Future support
 
-Hourly analysis can be added later by:
+Hourly event definitions can be added later by:
 
 - introducing hourly-compatible selectors
 - revisiting LWA temporal resolution
-- adding explicit policies for upsampling or holding daily quantities
+- defining explicit policies for upsampling or holding daily quantities
+- adding separate hourly event-ID products when thresholds are truly hourly
 
 ---
 
@@ -561,7 +583,7 @@ The following decisions should be treated as the current default architecture:
 
 - **Primary analysis unit:** regional time series
 - **Primary event definition:** contiguous events, not isolated selected days
-- **Primary cadence for v1:** daily
+- **Primary cadence for v1:** daily event definitions projected onto hourly diagnostics
 - **Primary alignment for composites:** event peak
 - **Primary comparison mode:** ERA5 reference versus CanESM ensemble summary
 - **Primary design pattern:** build once, analyze many times
@@ -575,7 +597,7 @@ These defaults can be revised later, but they provide a stable starting point.
 The following questions remain open and should be revisited during implementation:
 
 1. Should LWA ultimately be recomputed at hourly resolution?
-2. What is the best temporal aggregation method for hourly variables in daily mode?
+2. Which analyses, if any, should aggregate hourly diagnostics to daily summaries?
 3. Should the first analysis dataset be saved as NetCDF, Zarr, or both?
 4. How should top events be ranked:
    - selector maximum

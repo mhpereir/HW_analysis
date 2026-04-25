@@ -17,7 +17,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from src import data_io
+from src import data_io, preprocess
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,6 +47,12 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         default=None,
         help="Optional list of years to restrict tas and heat-budget loading.",
+    )
+    parser.add_argument(
+        "--threshold-variable",
+        default="tas",
+        help="Variable used for thresholding.",
+        choices=["tas", "lwa", "lwa_a", "lwa_c"],
     )
     return parser.parse_args()
 
@@ -91,6 +97,17 @@ def main() -> int:
     print("Loaded ERA5 inputs:")
     for name, ds in datasets.items():
         describe_dataset(name, ds)
+
+    tas_region = preprocess.compute_region_mean(datasets["tas"]["tas"], args.region) # type: ignore[index]
+    print("Preprocessed regional inputs:")
+    print(f"tas_region:")
+    print(f"  dims: {', '.join(f'{dim}={size}' for dim, size in tas_region.sizes.items())}")
+    print(f"  name: {tas_region.name}")
+    print(f"  region: {tas_region.attrs.get('region')}")
+
+    datasets["tas_region"] = tas_region
+
+    
 
     return 0
 

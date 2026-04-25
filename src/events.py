@@ -53,7 +53,7 @@ def mask_to_event_ids(
 def _label_1d_events(mask_1d: np.ndarray, min_duration: int) -> np.ndarray:
     """Label contiguous true runs in a 1D mask, filtering short events."""
     mask_array = np.asarray(mask_1d)
-    mask_bool = np.where(mask_array == True, True, False)  # noqa: E712
+    mask_bool = np.where(mask_array == True, True, False)  
     event_ids = np.zeros(mask_bool.shape, dtype=np.int64)
 
     next_event_id = 1
