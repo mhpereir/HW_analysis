@@ -28,10 +28,10 @@ from . import config
 
 
 def floor_daily_time(
-    obj: xr.DataArray | xr.Dataset,
+    obj: xr.DataArray,
     *,
     time_dim: str = "time",
-) -> xr.DataArray | xr.Dataset:
+) -> xr.DataArray:
     """Floor a Dataset or DataArray time coordinate to calendar days."""
     if time_dim not in obj.coords:
         raise ValueError(f"Object is missing required time coordinate {time_dim!r}.")
