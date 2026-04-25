@@ -20,6 +20,10 @@ ARCO_TOKEN = "anon"
 ARCO_OPEN_MAX_ATTEMPTS: int = 4
 ARCO_OPEN_RETRY_BASE_DELAY_SECONDS: float = 15.0
 
+REGIONS: dict[str, tuple[slice, slice]] = {
+    "pnw_bartusek": (slice(40, 60), slice(-130.0, -110.0)),
+}
+
 #standard grid, daily
 # CANESM_LWA_ROOT: str   = "/home/mhpereir/data-mhpereir/LWA_calculation/outputs/CanESM5/historical"
 ERA5_LWA_ROOT: str     = "/home/mhpereir/data-mhpereir/LWA_calculation/outputs/ERA5"
@@ -120,5 +124,4 @@ mass_flux_contribution_south (time)
 mass_flux_contribution_top (time)
 abs_mass_advection_residual_fraction (time) - diagnostic quantity, not necessary
 '''
-
 
