@@ -4,6 +4,7 @@ Pipeline role:
 - Convert selection masks into first-class event definitions.
 
 Responsibilities:
+- Build first-class daily event-ID products from threshold exceedance inputs.
 - Convert boolean masks into contiguous event IDs.
 - Filter events by duration.
 - Identify event peaks.
@@ -11,15 +12,19 @@ Responsibilities:
 - Extract event-level summary metadata.
 
 Out of scope:
-- Building selection masks.
+- Combining, ranking, or filtering events for a specific analysis selection.
 - Composite computation.
 - Plotting.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import numpy as np
 import xarray as xr
+
+from . import preprocess
 
 
 def mask_to_event_ids(
@@ -50,10 +55,85 @@ def mask_to_event_ids(
     )
 
 
+def build_hw_event_ids(
+    tas: xr.DataArray,
+    hw_threshold: xr.DataArray,
+    *,
+    region: str,
+    min_duration: int = 1,
+) -> dict[str, xr.DataArray]:
+    """Build daily heatwave threshold mask and event IDs from regional tas.
+
+    This is an ERA5-style regional time-series helper. It keeps event definition
+    logic in this module while leaving later event combinations/ranking to
+    ``selectors.py``.
+    """
+    tas_region = preprocess.compute_region_mean(tas, region)
+    tas_region = preprocess.floor_daily_time(tas_region)
+    threshold_time = preprocess.threshold_to_time(
+        hw_threshold,
+        tas_region["time"],
+        name="hw_threshold",
+    )
+    mask = preprocess.exceedance_mask(
+        tas_region,
+        threshold_time,
+        mode="above",
+        name="hw_exceedance_mask",
+    )
+    event_id = mask_to_event_ids(
+        mask,
+        min_duration=min_duration,
+        name="hw_event_id",
+    )
+    return {
+        "tas_region": tas_region,
+        "hw_threshold": threshold_time,
+        "hw_exceedance_mask": mask,
+        "hw_event_id": event_id,
+    }
+
+
+def build_lwa_a_event_ids(
+    lwa_a: xr.DataArray,
+    lwa_a_threshold: xr.DataArray,
+    *,
+    region: str,
+    years: Sequence[int] | None = None,
+    min_duration: int = 1,
+) -> dict[str, xr.DataArray]:
+    """Build daily LWA_a threshold mask and event IDs from regional LWA_a."""
+    lwa_a = _select_years(lwa_a, years)
+    lwa_a_region = preprocess.compute_region_mean(lwa_a, region)
+    lwa_a_region = preprocess.floor_daily_time(lwa_a_region)
+    threshold_time = preprocess.threshold_to_time(
+        lwa_a_threshold,
+        lwa_a_region["time"],
+        name="lwa_a_threshold",
+    )
+    mask = preprocess.exceedance_mask(
+        lwa_a_region,
+        threshold_time,
+        mode="above",
+        name="lwa_a_exceedance_mask",
+    )
+    event_id = mask_to_event_ids(
+        mask,
+        min_duration=min_duration,
+        name="lwa_a_event_id",
+    )
+    return {
+        "lwa_a_region": lwa_a_region,
+        "lwa_a_threshold": threshold_time,
+        "lwa_a_exceedance_mask": mask,
+        "lwa_a_event_id": event_id,
+    }
+
+
 def _label_1d_events(mask_1d: np.ndarray, min_duration: int) -> np.ndarray:
     """Label contiguous true runs in a 1D mask, filtering short events."""
     mask_array = np.asarray(mask_1d)
-    mask_bool = np.where(mask_array == True, True, False)  
+    mask_bool = np.where(mask_array == True, True, False)
     event_ids = np.zeros(mask_bool.shape, dtype=np.int64)
 
     next_event_id = 1
@@ -93,3 +173,18 @@ def _validate_event_id_inputs(
 
     if min_duration < 1:
         raise ValueError("min_duration must be >= 1.")
+
+
+def _select_years(da: xr.DataArray, years: Sequence[int] | None) -> xr.DataArray:
+    """Restrict a time-indexed DataArray to requested years when provided."""
+    if years is None:
+        return da
+
+    return da.where(da["time"].dt.year.isin(years), drop=True)
+
+
+__all__ = [
+    "build_hw_event_ids",
+    "build_lwa_a_event_ids",
+    "mask_to_event_ids",
+]
