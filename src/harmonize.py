@@ -27,10 +27,10 @@ import xarray as xr
 
 
 HEAT_BUDGET_VARIABLE_MAP: dict[str, str] = {
-    "T_domain_avg": "t_mean",
+    "T_domain_avg": "T_mean",
     "domain_volume": "volume",
     "dT_dt": "dTdt",
-    "advection_term": "adv_net",
+    "advection_term": "advection",
     "adiabatic_term": "adiabatic",
     "diabatic_term": "diabatic",
 }
@@ -122,6 +122,15 @@ def project_daily_to_hourly(
     if daily_days.has_duplicates:
         raise ValueError(
             "Daily input has duplicate dates after flooring; projection would be ambiguous."
+        )
+
+    missing_days = pd.DatetimeIndex(hourly_days.unique()).difference(daily_days)
+    if len(missing_days) > 0:
+        preview = ", ".join(day.strftime("%Y-%m-%d") for day in missing_days[:5])
+        suffix = "" if len(missing_days) <= 5 else f", ... ({len(missing_days)} total)"
+        raise ValueError(
+            "Daily input is missing dates required by the hourly target: "
+            f"{preview}{suffix}."
         )
 
     projected = daily.assign_coords({daily_time_dim: daily_days}).reindex(
@@ -272,8 +281,3 @@ def _infer_lwa_product_prefix(products: Mapping[str, xr.DataArray]) -> str:
         )
     return prefixes[0]
 
-
-__all__ = [
-    "build_regional_analysis_dataset",
-    "project_daily_to_hourly",
-]

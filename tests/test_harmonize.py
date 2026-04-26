@@ -26,7 +26,7 @@ def test_project_daily_to_hourly_replicates_daily_values_by_date():
     np.testing.assert_allclose(out.values, [10.0, 10.0, 20.0])
 
 
-def test_project_daily_to_hourly_preserves_missing_daily_dates_as_nan():
+def test_project_daily_to_hourly_raises_for_missing_daily_dates():
     daily = xr.DataArray(
         [10.0],
         dims=("time",),
@@ -38,10 +38,8 @@ def test_project_daily_to_hourly_preserves_missing_daily_dates_as_nan():
         dims=("hourly_time",),
     )
 
-    out = harmonize.project_daily_to_hourly(daily, hourly_time)
-
-    assert out.values[0] == 10.0
-    assert np.isnan(out.values[1])
+    with pytest.raises(ValueError, match="missing dates required by the hourly target"):
+        harmonize.project_daily_to_hourly(daily, hourly_time)
 
 
 def test_project_daily_to_hourly_preserves_original_hourly_timestamps():
@@ -157,16 +155,18 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
     assert out.attrs["pipeline_stage"] == "stage_1_harmonized_regional_timeseries"
     assert out.attrs["analysis_time_resolution"] == "hourly"
     assert out.attrs["region"] == "pnw_bartusek"
-    assert {"t_mean", "volume", "dTdt", "adv_net", "adiabatic", "diabatic"} <= set(out)
+    assert {"T_mean", "volume", "dTdt", "advection", "adiabatic", "diabatic"} <= set(out)
     np.testing.assert_allclose(out["tas_region"].values, [280.0, 280.0, 285.0])
     np.testing.assert_array_equal(out["hw_event_id"].values, [0, 0, 1])
     np.testing.assert_array_equal(out["lwa_a_flag"].values, [False, False, True])
+    assert np.issubdtype(out["hw_event_id"].dtype, np.integer)
+    assert out["lwa_a_flag"].dtype == bool
     assert out["tas_region"].attrs["native_time_resolution"] == "daily"
     assert out["tas_region"].attrs["analysis_time_resolution"] == "hourly"
-    assert out["t_mean"].attrs["native_time_resolution"] == "hourly"
+    assert out["T_mean"].attrs["native_time_resolution"] == "hourly"
 
 
-def test_build_regional_analysis_dataset_fills_missing_projected_event_labels():
+def test_build_regional_analysis_dataset_raises_for_missing_daily_dates():
     hourly_time = np.array(
         ["2000-01-01T00:00", "2000-01-02T00:00"],
         dtype="datetime64[m]",
@@ -179,16 +179,11 @@ def test_build_regional_analysis_dataset_fills_missing_projected_event_labels():
         "hw_event_id": _daily_array([0], name="hw_event_id"),
     }
 
-    out = harmonize.build_regional_analysis_dataset(
-        heat_budget=heat_budget,
-        hw_event_products=hw_products,
-    )
-
-    np.testing.assert_array_equal(out["hw_event_id"].values, [0, 0])
-    np.testing.assert_array_equal(out["hw_flag"].values, [False, False])
-    assert np.issubdtype(out["hw_event_id"].dtype, np.integer)
-    assert out["hw_flag"].dtype == bool
-    assert np.isnan(out["tas_region"].values[1])
+    with pytest.raises(ValueError, match="missing dates required by the hourly target"):
+        harmonize.build_regional_analysis_dataset(
+            heat_budget=heat_budget,
+            hw_event_products=hw_products,
+        )
 
 
 def test_build_regional_analysis_dataset_raises_for_missing_heat_budget_variable():
