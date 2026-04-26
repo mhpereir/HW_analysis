@@ -336,27 +336,29 @@ The most important intermediate product should be a regional time series dataset
 
 ### Recommended dimensions
 
-- `hourly_time`
+- `time` #hourly
 - optional `member`
 - optional `event`
-- optional `lag`
+- optional `lag_tas`   #day relative to peak tas within an event ID; set to 0 when event ID = 0
+- optional `lag_lwa_a` #day relative to peak lwa_a during within an event ID; set to 0 when event ID = 0
+- optional `lag_lwa_c` #day relative to peak lwa_c during within an event ID; set to 0 when event ID = 0
 
-The initial ERA5 workflow should keep daily event-definition products and hourly diagnostic products on separate time axes. This avoids merging daily and hourly variables onto a single mixed-frequency `time` coordinate.
+The initial ERA5 workflow should transform all input variables into a standardized hourly_time axis, which will keep the simple name `time`.
 
 ### Candidate variables
 
 Daily event-definition variables:
 
-- `tas_region(daily_time)`
-- `hw_threshold(daily_time)`
-- `lwa_a_region(daily_time)`
-- `lwa_c_region(daily_time)`
-- `lwa_a_threshold(dayofyear)`
-- `lwa_c_threshold(dayofyear)`
-- `hw_flag(daily_time)`
-- `lwa_flag(daily_time)`
-- `hw_event_id(daily_time)`
-- `lwa_event_id(daily_time)`
+- `tas_region(daily_time -> hourly_time)`
+- `hw_threshold(daily_time -> hourly_time)`
+- `lwa_a_region(daily_time -> hourly_time)`
+- `lwa_c_region(daily_time -> hourly_time)`
+- `lwa_a_threshold(dayofyear -> hourly_time)`
+- `lwa_c_threshold(dayofyear -> hourly_time)`
+- `hw_flag(daily_time -> hourly_time)`
+- `lwa_flag(daily_time -> hourly_time)`
+- `hw_event_id(daily_time -> hourly_time)`
+- `lwa_event_id(daily_time -> hourly_time)`
 
 Hourly diagnostic variables:
 
