@@ -94,39 +94,46 @@ def build_hw_event_ids(
     }
 
 
-def build_lwa_a_event_ids(
-    lwa_a: xr.DataArray,
-    lwa_a_threshold: xr.DataArray,
+def build_lwa_event_ids(
+    lwa: xr.DataArray,
+    lwa_threshold: xr.DataArray,
     *,
     region: str,
+    variable: str = "LWA_a",
     years: Sequence[int] | None = None,
     min_duration: int = 1,
 ) -> dict[str, xr.DataArray]:
-    """Build daily LWA_a threshold mask and event IDs from regional LWA_a."""
-    lwa_a = _select_years(lwa_a, years)
-    lwa_a_region = preprocess.compute_region_mean(lwa_a, region)
-    lwa_a_region = preprocess.floor_daily_time(lwa_a_region)
+    """Build daily LWA-family threshold mask and event IDs.
+
+    ``variable`` controls output names and keys for LWA variants such as
+    ``LWA``, ``LWA_a``, and ``LWA_c``. The input arrays should already be the
+    matching source and threshold variables.
+    """
+    key = _lwa_variable_key(variable)
+    lwa = _select_years(lwa, years)
+    lwa_region = preprocess.compute_region_mean(lwa, region)
+    lwa_region = preprocess.floor_daily_time(lwa_region)
     threshold_time = preprocess.threshold_to_time(
-        lwa_a_threshold,
-        lwa_a_region["time"],
-        name="lwa_a_threshold",
+        lwa_threshold,
+        lwa_region["time"],
+        name=f"{key}_threshold",
     )
     mask = preprocess.exceedance_mask(
-        lwa_a_region,
+        lwa_region,
         threshold_time,
         mode="above",
-        name="lwa_a_exceedance_mask",
+        name=f"{key}_exceedance_mask",
     )
     event_id = mask_to_event_ids(
         mask,
         min_duration=min_duration,
-        name="lwa_a_event_id",
+        name=f"{key}_event_id",
     )
     return {
-        "lwa_a_region": lwa_a_region,
-        "lwa_a_threshold": threshold_time,
-        "lwa_a_exceedance_mask": mask,
-        "lwa_a_event_id": event_id,
+        f"{key}_region": lwa_region,
+        f"{key}_threshold": threshold_time,
+        f"{key}_exceedance_mask": mask,
+        f"{key}_event_id": event_id,
     }
 
 
@@ -183,8 +190,12 @@ def _select_years(da: xr.DataArray, years: Sequence[int] | None) -> xr.DataArray
     return da.where(da["time"].dt.year.isin(years), drop=True)
 
 
-__all__ = [
-    "build_hw_event_ids",
-    "build_lwa_a_event_ids",
-    "mask_to_event_ids",
-]
+def _lwa_variable_key(variable: str) -> str:
+    """Return the lower-case output key prefix for an LWA-family variable."""
+    valid = {"LWA", "LWA_a", "LWA_c"}
+    if variable not in valid:
+        available = ", ".join(sorted(valid))
+        raise ValueError(f"Unsupported LWA variable {variable!r}. Expected one of: {available}.")
+
+    return variable.lower()
+

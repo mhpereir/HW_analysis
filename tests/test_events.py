@@ -93,3 +93,139 @@ def test_mask_to_event_ids_raises_for_invalid_min_duration():
 
     with pytest.raises(ValueError, match="min_duration must be >= 1"):
         events.mask_to_event_ids(mask, min_duration=0)
+
+
+def test_build_hw_event_ids_returns_regional_mask_and_event_ids():
+    times = np.array(["2001-01-01", "2001-01-02", "2001-01-03"], dtype="datetime64[D]")
+    tas = xr.DataArray(
+        np.array(
+            [
+                [[1.0, 1.0], [1.0, 1.0]],
+                [[3.0, 3.0], [3.0, 3.0]],
+                [[4.0, 4.0], [4.0, 4.0]],
+            ]
+        ),
+        dims=("time", "lat", "lon"),
+        coords={"time": times, "lat": [42.0, 44.0], "lon": [-124.0, -122.0]},
+        name="tas",
+    )
+    threshold = xr.DataArray(
+        [[2.0, 2.0, 2.0]],
+        dims=("year", "dayofyear"),
+        coords={"year": [2001], "dayofyear": [1, 2, 3]},
+        name="threshold",
+    )
+
+    out = events.build_hw_event_ids(tas, threshold, region="pnw_bartusek", min_duration=2)
+
+    assert set(out) == {"tas_region", "hw_threshold", "hw_exceedance_mask", "hw_event_id"}
+    np.testing.assert_array_equal(out["hw_exceedance_mask"].values, [False, True, True])
+    np.testing.assert_array_equal(out["hw_event_id"].values, [0, 1, 1])
+    assert out["tas_region"].attrs["region"] == "pnw_bartusek"
+
+
+def test_build_lwa_a_event_ids_filters_years_and_uses_lwa_threshold():
+    times = np.array(
+        ["2001-01-01", "2001-01-02", "2002-01-01", "2002-01-02"],
+        dtype="datetime64[D]",
+    )
+    lwa_a = xr.DataArray(
+        np.array(
+            [
+                [[5.0, 5.0], [5.0, 5.0]],
+                [[1.0, 1.0], [1.0, 1.0]],
+                [[5.0, 5.0], [5.0, 5.0]],
+                [[6.0, 6.0], [6.0, 6.0]],
+            ]
+        ),
+        dims=("time", "lat", "lon"),
+        coords={"time": times, "lat": [42.0, 44.0], "lon": [-124.0, -122.0]},
+        name="LWA_a",
+    )
+    threshold = xr.DataArray(
+        [4.0, 4.0],
+        dims=("dayofyear",),
+        coords={"dayofyear": [1, 2]},
+        name="LWA_a",
+    )
+
+    out = events.build_lwa_a_event_ids(
+        lwa_a,
+        threshold,
+        region="pnw_bartusek",
+        years=[2002],
+        min_duration=1,
+    )
+
+    assert set(out) == {
+        "lwa_a_region",
+        "lwa_a_threshold",
+        "lwa_a_exceedance_mask",
+        "lwa_a_event_id",
+    }
+    np.testing.assert_array_equal(
+        out["lwa_a_region"]["time"].values,
+        np.array(["2002-01-01", "2002-01-02"], dtype="datetime64[D]"),
+    )
+    np.testing.assert_array_equal(out["lwa_a_exceedance_mask"].values, [True, True])
+    np.testing.assert_array_equal(out["lwa_a_event_id"].values, [1, 1])
+
+
+def test_build_lwa_event_ids_supports_lwa_c_variant():
+    times = np.array(["2001-01-01", "2001-01-02"], dtype="datetime64[D]")
+    lwa_c = xr.DataArray(
+        np.array(
+            [
+                [[1.0, 1.0], [1.0, 1.0]],
+                [[5.0, 5.0], [5.0, 5.0]],
+            ]
+        ),
+        dims=("time", "lat", "lon"),
+        coords={"time": times, "lat": [42.0, 44.0], "lon": [-124.0, -122.0]},
+        name="LWA_c",
+    )
+    threshold = xr.DataArray(
+        [3.0, 3.0],
+        dims=("dayofyear",),
+        coords={"dayofyear": [1, 2]},
+        name="LWA_c",
+    )
+
+    out = events.build_lwa_event_ids(
+        lwa_c,
+        threshold,
+        region="pnw_bartusek",
+        variable="LWA_c",
+    )
+
+    assert set(out) == {
+        "lwa_c_region",
+        "lwa_c_threshold",
+        "lwa_c_exceedance_mask",
+        "lwa_c_event_id",
+    }
+    np.testing.assert_array_equal(out["lwa_c_exceedance_mask"].values, [False, True])
+    np.testing.assert_array_equal(out["lwa_c_event_id"].values, [0, 1])
+
+
+def test_build_lwa_event_ids_rejects_unknown_lwa_variant():
+    times = np.array(["2001-01-01"], dtype="datetime64[D]")
+    lwa = xr.DataArray(
+        np.ones((1, 2, 2)),
+        dims=("time", "lat", "lon"),
+        coords={"time": times, "lat": [42.0, 44.0], "lon": [-124.0, -122.0]},
+        name="other",
+    )
+    threshold = xr.DataArray(
+        [0.0],
+        dims=("dayofyear",),
+        coords={"dayofyear": [1]},
+    )
+
+    with pytest.raises(ValueError, match="Unsupported LWA variable"):
+        events.build_lwa_event_ids(
+            lwa,
+            threshold,
+            region="pnw_bartusek",
+            variable="other",
+        )
