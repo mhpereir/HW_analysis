@@ -336,7 +336,6 @@ The most important intermediate product should be a regional time series dataset
 
 ### Recommended dimensions
 
-- `daily_time`
 - `hourly_time`
 - optional `member`
 - optional `event`
@@ -349,7 +348,7 @@ The initial ERA5 workflow should keep daily event-definition products and hourly
 Daily event-definition variables:
 
 - `tas_region(daily_time)`
-- `hw_threshold(daily_time)` or `hw_threshold(year, dayofyear)` before expansion
+- `hw_threshold(daily_time)`
 - `lwa_a_region(daily_time)`
 - `lwa_c_region(daily_time)`
 - `lwa_a_threshold(dayofyear)`
@@ -361,13 +360,13 @@ Daily event-definition variables:
 
 Hourly diagnostic variables:
 
-- `t_mean(hourly_time)`
+- `T_mean(hourly_time)`
 - `volume(hourly_time)`
 - `dTdt(hourly_time)`
-- `adv_net(hourly_time)`
+- `advection(hourly_time)`
 - `adiabatic(hourly_time)`
 - `diabatic(hourly_time)`
-- `cloud_frac(hourly_time)`
+- `cloud_frac(hourly_time)` #pending implementation
 - `rad_sw_net_sfc(hourly_time)`
 - `rad_lw_net_sfc(hourly_time)`
 - `pbl_p(hourly_time)`
@@ -375,7 +374,8 @@ Hourly diagnostic variables:
 Projected hourly event labels:
 
 - `hw_event_id_hourly(hourly_time)`
-- `lwa_event_id_hourly(hourly_time)`
+- `lwa_a_event_id_hourly(hourly_time)`
+- `lwa_c_event_id_hourly(hourly_time)`
 
 The projected hourly event labels are produced by flooring each `hourly_time` timestamp to its calendar day and looking up the corresponding daily event ID. Every hour on an event day receives the same event ID; hours on non-event days receive `0`.
 
