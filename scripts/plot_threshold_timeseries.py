@@ -129,10 +129,11 @@ def build_lwa_a_plot_products(
     min_duration: int,
 ) -> dict[str, xr.DataArray]:
     """Build regional LWA_a plot inputs from LWA_a and LWA threshold products."""
-    products = events.build_lwa_a_event_ids(
+    products = events.build_lwa_event_ids(
         lwa_a,
         lwa_a_threshold,
         region=region,
+        variable="LWA_a",
         years=years,
         min_duration=min_duration,
     )
