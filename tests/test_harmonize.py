@@ -125,3 +125,114 @@ def test_project_daily_to_hourly_raises_for_missing_daily_time_coordinate():
 
     with pytest.raises(ValueError, match="missing required time coordinate"):
         harmonize.project_daily_to_hourly(daily, hourly_time)
+
+
+def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time():
+    hourly_time = np.array(
+        ["2000-01-01T00:00", "2000-01-01T12:00", "2000-01-02T00:00"],
+        dtype="datetime64[m]",
+    )
+    heat_budget = _make_heat_budget(hourly_time)
+    hw_products = {
+        "tas_region": _daily_array([280.0, 285.0], name="tas"),
+        "hw_threshold": _daily_array([282.0, 282.0], name="hw_threshold"),
+        "hw_exceedance_mask": _daily_array([False, True], name="hw_exceedance_mask"),
+        "hw_event_id": _daily_array([0, 1], name="hw_event_id"),
+    }
+    lwa_a_products = {
+        "lwa_a_region": _daily_array([1.0, 2.0], name="LWA_a"),
+        "lwa_a_threshold": _daily_array([1.5, 1.5], name="lwa_a_threshold"),
+        "lwa_a_exceedance_mask": _daily_array([False, True], name="lwa_a_exceedance_mask"),
+        "lwa_a_event_id": _daily_array([0, 1], name="lwa_a_event_id"),
+    }
+
+    out = harmonize.build_regional_analysis_dataset(
+        heat_budget=heat_budget,
+        hw_event_products=hw_products,
+        lwa_event_products=[lwa_a_products],
+        attrs={"region": "pnw_bartusek"},
+    )
+
+    assert out.sizes == {"time": 3}
+    assert out.attrs["pipeline_stage"] == "stage_1_harmonized_regional_timeseries"
+    assert out.attrs["analysis_time_resolution"] == "hourly"
+    assert out.attrs["region"] == "pnw_bartusek"
+    assert {"t_mean", "volume", "dTdt", "adv_net", "adiabatic", "diabatic"} <= set(out)
+    np.testing.assert_allclose(out["tas_region"].values, [280.0, 280.0, 285.0])
+    np.testing.assert_array_equal(out["hw_event_id"].values, [0, 0, 1])
+    np.testing.assert_array_equal(out["lwa_a_flag"].values, [False, False, True])
+    assert out["tas_region"].attrs["native_time_resolution"] == "daily"
+    assert out["tas_region"].attrs["analysis_time_resolution"] == "hourly"
+    assert out["t_mean"].attrs["native_time_resolution"] == "hourly"
+
+
+def test_build_regional_analysis_dataset_fills_missing_projected_event_labels():
+    hourly_time = np.array(
+        ["2000-01-01T00:00", "2000-01-02T00:00"],
+        dtype="datetime64[m]",
+    )
+    heat_budget = _make_heat_budget(hourly_time)
+    hw_products = {
+        "tas_region": _daily_array([280.0], name="tas"),
+        "hw_threshold": _daily_array([282.0], name="hw_threshold"),
+        "hw_exceedance_mask": _daily_array([False], name="hw_exceedance_mask"),
+        "hw_event_id": _daily_array([0], name="hw_event_id"),
+    }
+
+    out = harmonize.build_regional_analysis_dataset(
+        heat_budget=heat_budget,
+        hw_event_products=hw_products,
+    )
+
+    np.testing.assert_array_equal(out["hw_event_id"].values, [0, 0])
+    np.testing.assert_array_equal(out["hw_flag"].values, [False, False])
+    assert np.issubdtype(out["hw_event_id"].dtype, np.integer)
+    assert out["hw_flag"].dtype == bool
+    assert np.isnan(out["tas_region"].values[1])
+
+
+def test_build_regional_analysis_dataset_raises_for_missing_heat_budget_variable():
+    hourly_time = np.array(["2000-01-01T00:00"], dtype="datetime64[m]")
+    heat_budget = _make_heat_budget(hourly_time).drop_vars("advection_term")
+    hw_products = {
+        "tas_region": _daily_array([280.0], name="tas"),
+        "hw_threshold": _daily_array([282.0], name="hw_threshold"),
+        "hw_exceedance_mask": _daily_array([False], name="hw_exceedance_mask"),
+        "hw_event_id": _daily_array([0], name="hw_event_id"),
+    }
+
+    with pytest.raises(ValueError, match="missing required variables"):
+        harmonize.build_regional_analysis_dataset(
+            heat_budget=heat_budget,
+            hw_event_products=hw_products,
+        )
+
+
+def _daily_array(values, *, name: str) -> xr.DataArray:
+    return xr.DataArray(
+        values,
+        dims=("time",),
+        coords={
+            "time": np.array(
+                ["2000-01-01", "2000-01-02"][: len(values)],
+                dtype="datetime64[D]",
+            )
+        },
+        name=name,
+    )
+
+
+def _make_heat_budget(hourly_time: np.ndarray) -> xr.Dataset:
+    coords = {"time": hourly_time}
+    data = np.arange(hourly_time.size, dtype=float)
+    return xr.Dataset(
+        {
+            "T_domain_avg": ("time", data + 1.0),
+            "domain_volume": ("time", data + 2.0),
+            "dT_dt": ("time", data + 3.0),
+            "advection_term": ("time", data + 4.0),
+            "adiabatic_term": ("time", data + 5.0),
+            "diabatic_term": ("time", data + 6.0),
+        },
+        coords=coords,
+    )

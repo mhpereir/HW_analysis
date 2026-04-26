@@ -12,14 +12,16 @@ import argparse
 import sys
 from pathlib import Path
 
-import xarray as xr
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from src import data_io, events
+import xarray as xr
+
+from src import data_io, events, harmonize
 
 
 def parse_args() -> argparse.Namespace:
@@ -110,6 +112,19 @@ def describe_event_ids(name: str, mask: xr.DataArray, event_id: xr.DataArray) ->
     print(f"  events: {n_events}")
 
 
+def describe_analysis_dataset(ds: xr.Dataset) -> None:
+    """Print a compact summary of the assembled hourly analysis dataset."""
+    dims_str = ", ".join(f"{dim}={size}" for dim, size in ds.sizes.items())
+    vars_str = ", ".join(ds.data_vars) #type: ignore
+    print("Harmonized Stage-1 regional dataset:")
+    print(f"  dims: {dims_str}")
+    print(f"  vars: {vars_str}")
+
+def require_dataset(value: Any) -> xr.Dataset:
+    if not isinstance(value, xr.Dataset):
+        raise TypeError(f"Expected xr.Dataset, got {type(value).__name__}")
+    return value
+
 def main() -> int:
     """Load the configured ERA5 products and print a summary."""
     args = parse_args()
@@ -135,9 +150,19 @@ def main() -> int:
         min_duration=min_duration,
     )
 
+    lwa_c_products = events.build_lwa_event_ids(
+        datasets["lwa"]["LWA_c"],  # type: ignore[index]
+        datasets["lwa_threshold"]["LWA_c"],  # type: ignore[index]
+        region=args.region,
+        variable="LWA_c",
+        years=args.years,
+        min_duration=min_duration,
+    )
+
     print("Preprocessed regional inputs:")
     describe_dataarray("tas_region", hw_products["tas_region"])
     describe_dataarray("lwa_a_region", lwa_a_products["lwa_a_region"])
+    describe_dataarray("lwa_c_region", lwa_c_products["lwa_c_region"])
 
     print("Daily event-ID products:")
     describe_event_ids(
@@ -150,8 +175,26 @@ def main() -> int:
         lwa_a_products["lwa_a_exceedance_mask"],
         lwa_a_products["lwa_a_event_id"],
     )
+    describe_event_ids(
+        "lwa_c_event_id",
+        lwa_c_products["lwa_c_exceedance_mask"],
+        lwa_c_products["lwa_c_event_id"],
+    )
 
-    
+    heat_budget_dataset = require_dataset(datasets["heat_budget"]) #ensuring correct type
+    analysis_ds = harmonize.build_regional_analysis_dataset(
+        heat_budget=heat_budget_dataset,
+        hw_event_products=hw_products,
+        lwa_event_products=[lwa_a_products, lwa_c_products],
+        attrs={
+            "region": args.region,
+            "quantile": str(args.quantile),
+            "zg_level": args.zg_level,
+            "min_duration": min_duration,
+        },
+    )
+    describe_analysis_dataset(analysis_ds)
+
 
     return 0
 

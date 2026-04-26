@@ -149,10 +149,11 @@ def test_build_lwa_a_event_ids_filters_years_and_uses_lwa_threshold():
         name="LWA_a",
     )
 
-    out = events.build_lwa_a_event_ids(
+    out = events.build_lwa_event_ids(
         lwa_a,
         threshold,
         region="pnw_bartusek",
+        variable="LWA_a",
         years=[2002],
         min_duration=1,
     )
