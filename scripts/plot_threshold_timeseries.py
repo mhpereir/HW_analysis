@@ -123,17 +123,13 @@ def build_hw_plot_products(
     products = events.build_hw_event_ids(
         tas,
         hw_threshold,
+        hw_climatology,
         region=region,
         min_duration=min_duration,
     )
-    climatology_time = preprocess.threshold_to_time(
-        hw_climatology,
-        products["tas_region"]["time"],
-        name="tas_climatology",
-    )
     return {
         "series": products["tas_region"],
-        "climatology": climatology_time,
+        "climatology": products["tas_climatology"],
         "threshold": products["hw_threshold"],
         "mask": products["hw_exceedance_mask"],
         "event_id": products["hw_event_id"],

@@ -158,6 +158,7 @@ def main() -> int:
     hw_products = events.build_hw_event_ids(
         datasets["tas"]["tas"],  # type: ignore[index]
         datasets["hw_threshold"]["threshold"],  # type: ignore[index]
+        datasets["hw_threshold"]["climatology"],  # type: ignore[index]
         region=args.region,
         min_duration=min_duration,
     )

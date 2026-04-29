@@ -41,6 +41,7 @@ REQUIRED_HARMONIZED_VARIABLES: frozenset[str] = frozenset(
         "adiabatic",
         "diabatic",
         "tas_region",
+        "tas_climatology",
         "hw_threshold",
         "hw_flag",
         "hw_event_id",

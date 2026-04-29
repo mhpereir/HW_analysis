@@ -62,6 +62,7 @@ def build_regional_analysis_dataset(
             hourly_time,
             specs={
                 "tas_region": ("tas_region", "continuous"),
+                "tas_climatology": ("tas_climatology", "continuous"),
                 "hw_threshold": ("hw_threshold", "continuous"),
                 "hw_exceedance_mask": ("hw_flag", "flag"),
                 "hw_event_id": ("hw_event_id", "event_id"),
