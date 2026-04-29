@@ -72,6 +72,7 @@ def _make_harmonized_dataset() -> xr.Dataset:
             "adiabatic": ("time", values),
             "diabatic": ("time", values),
             "tas_region": ("time", values),
+            "tas_climatology": ("time", values),
             "hw_threshold": ("time", values),
             "hw_flag": ("time", flags, {"projected_from_daily": True}),
             "hw_event_id": ("time", event_ids),

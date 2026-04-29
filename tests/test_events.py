@@ -115,12 +115,31 @@ def test_build_hw_event_ids_returns_regional_mask_and_event_ids():
         coords={"year": [2001], "dayofyear": [1, 2, 3]},
         name="threshold",
     )
+    climatology = xr.DataArray(
+        [[0.5, 1.5, 2.5]],
+        dims=("year", "dayofyear"),
+        coords={"year": [2001], "dayofyear": [1, 2, 3]},
+        name="climatology",
+    )
 
-    out = events.build_hw_event_ids(tas, threshold, region="pnw_bartusek", min_duration=2)
+    out = events.build_hw_event_ids(
+        tas,
+        threshold,
+        climatology,
+        region="pnw_bartusek",
+        min_duration=2,
+    )
 
-    assert set(out) == {"tas_region", "hw_threshold", "hw_exceedance_mask", "hw_event_id"}
+    assert set(out) == {
+        "tas_region",
+        "tas_climatology",
+        "hw_threshold",
+        "hw_exceedance_mask",
+        "hw_event_id",
+    }
     np.testing.assert_array_equal(out["hw_exceedance_mask"].values, [False, True, True])
     np.testing.assert_array_equal(out["hw_event_id"].values, [0, 1, 1])
+    np.testing.assert_allclose(out["tas_climatology"].values, [0.5, 1.5, 2.5])
     assert out["tas_region"].attrs["region"] == "pnw_bartusek"
 
 

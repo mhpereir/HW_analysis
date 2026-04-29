@@ -133,6 +133,7 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
     heat_budget = _make_heat_budget(hourly_time)
     hw_products = {
         "tas_region": _daily_array([280.0, 285.0], name="tas"),
+        "tas_climatology": _daily_array([279.0, 281.0], name="tas_climatology"),
         "hw_threshold": _daily_array([282.0, 282.0], name="hw_threshold"),
         "hw_exceedance_mask": _daily_array([False, True], name="hw_exceedance_mask"),
         "hw_event_id": _daily_array([0, 1], name="hw_event_id"),
@@ -157,6 +158,7 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
     assert out.attrs["region"] == "pnw_bartusek"
     assert {"T_mean", "volume", "dTdt", "advection", "adiabatic", "diabatic"} <= set(out)
     np.testing.assert_allclose(out["tas_region"].values, [280.0, 280.0, 285.0])
+    np.testing.assert_allclose(out["tas_climatology"].values, [279.0, 279.0, 281.0])
     np.testing.assert_array_equal(out["hw_event_id"].values, [0, 0, 1])
     np.testing.assert_array_equal(out["lwa_a_flag"].values, [0, 0, 1])
     assert np.issubdtype(out["hw_event_id"].dtype, np.integer)
@@ -174,6 +176,7 @@ def test_build_regional_analysis_dataset_raises_for_missing_daily_dates():
     heat_budget = _make_heat_budget(hourly_time)
     hw_products = {
         "tas_region": _daily_array([280.0], name="tas"),
+        "tas_climatology": _daily_array([279.0], name="tas_climatology"),
         "hw_threshold": _daily_array([282.0], name="hw_threshold"),
         "hw_exceedance_mask": _daily_array([False], name="hw_exceedance_mask"),
         "hw_event_id": _daily_array([0], name="hw_event_id"),
@@ -191,6 +194,7 @@ def test_build_regional_analysis_dataset_raises_for_missing_heat_budget_variable
     heat_budget = _make_heat_budget(hourly_time).drop_vars("advection_term")
     hw_products = {
         "tas_region": _daily_array([280.0], name="tas"),
+        "tas_climatology": _daily_array([279.0], name="tas_climatology"),
         "hw_threshold": _daily_array([282.0], name="hw_threshold"),
         "hw_exceedance_mask": _daily_array([False], name="hw_exceedance_mask"),
         "hw_event_id": _daily_array([0], name="hw_event_id"),

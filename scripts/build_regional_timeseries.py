@@ -140,6 +140,27 @@ def describe_analysis_dataset(ds: xr.Dataset) -> None:
     print(f"  dims: {dims_str}")
     print(f"  vars: {vars_str}")
 
+
+def describe_event_summary_table(ds: xr.Dataset) -> None:
+    """Print a compact summary of the event summary table."""
+    dims_str = ", ".join(f"{dim}={size}" for dim, size in ds.sizes.items())
+    vars_str = ", ".join(ds.data_vars) #type: ignore
+    print("Heatwave event summary table:")
+    print(f"  dims: {dims_str}")
+    print(f"  vars: {vars_str}")
+
+
+def append_hw_event_summary_table(ds: xr.Dataset) -> xr.Dataset:
+    """Return the harmonized dataset with the heatwave event summary table attached."""
+    hw_event_summary = events.build_event_summary_table(
+        ds,
+        "hw_event_id",
+        peak_variable="tas_region",
+    )
+    describe_event_summary_table(hw_event_summary)
+    return xr.merge([ds, hw_event_summary])
+
+
 def require_dataset(value: Any) -> xr.Dataset:
     if not isinstance(value, xr.Dataset):
         raise TypeError(f"Expected xr.Dataset, got {type(value).__name__}")
@@ -215,6 +236,8 @@ def main() -> int:
         },
     )
     describe_analysis_dataset(analysis_ds)
+
+    analysis_ds = append_hw_event_summary_table(analysis_ds)
 
     saved_path = analysis_io.save_harmonized_timeseries(analysis_ds, args.output_path)
     print(f"Saved harmonized Stage-1 regional dataset: {saved_path}")
