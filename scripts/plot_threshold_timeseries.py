@@ -56,7 +56,12 @@ def parse_args() -> argparse.Namespace:
         type=int,
         nargs="+",
         default=None,
-        help="Optional list of years to plot. If omitted, all loaded years are plotted.",
+        metavar="YEAR",
+        help=(
+            "Optional year selection. Pass one year for a single-year run, or two "
+            "years as START END to plot the inclusive range. If omitted, all "
+            "loaded years are plotted."
+        ),
     )
     parser.add_argument(
         "--min-duration",
@@ -70,7 +75,19 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_OUTPUT_DIR,
         help="Directory where diagnostic PNG files will be written.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.years is not None:
+        if len(args.years) == 1:
+            args.years = [args.years[0]]
+        elif len(args.years) == 2:
+            start_year, end_year = args.years
+            if start_year > end_year:
+                parser.error("--years START END requires START to be less than or equal to END.")
+            args.years = list(range(start_year, end_year + 1))
+        else:
+            parser.error("--years accepts either one year or two years: START END.")
+
+    return args
 
 
 def load_plot_inputs(args: argparse.Namespace) -> dict[str, xr.Dataset]:
@@ -150,6 +167,44 @@ def build_lwa_a_plot_products(
     }
 
 
+def transform_lwa_a_for_plot(product: dict[str, xr.DataArray]) -> dict[str, xr.DataArray]:
+    """Return LWA_a plot products with magnitude variables transformed to sqrt scale."""
+    return {
+        **product,
+        "series": _sqrt_nonnegative(product["series"], name="sqrt_lwa_a"),
+        "climatology": _sqrt_nonnegative(
+            product["climatology"],
+            name="sqrt_lwa_a_climatology",
+        ),
+        "threshold": _sqrt_nonnegative(
+            product["threshold"],
+            name="sqrt_lwa_a_threshold",
+        ),
+    }
+
+
+def _sqrt_nonnegative(
+    da: xr.DataArray,
+    *,
+    name: str,
+    tolerance: float = 0,
+) -> xr.DataArray:
+    """Apply sqrt while preserving xarray metadata and rejecting invalid negatives."""
+    minimum = da.min(skipna=True)
+    if bool((minimum < -tolerance).compute()):
+        raise ValueError(
+            f"{da.name or 'DataArray'} contains negative values; cannot plot sqrt scale."
+        )
+
+    transformed = da ** 0.5 #square root of non-negative values
+    transformed.name = name
+    attrs = da.attrs.copy()
+    if "units" in attrs:
+        attrs["units"] = f"sqrt({attrs['units']})"
+    transformed.attrs = attrs
+    return transformed
+
+
 def write_threshold_timeseries_plots(
     hw: dict[str, xr.DataArray],
     lwa_a: dict[str, xr.DataArray],
@@ -182,7 +237,7 @@ def write_threshold_timeseries_plots(
             year=year,
             title="LWA_a events from regional LWA_a",
             product=lwa_a,
-            ylabel="LWA_a",
+            ylabel=r"$\sqrt{LWA\ [m\ hPa]}$",
         )
         fig.suptitle(f"{region} q{quantile} event diagnostics, {year}")
         path = output_dir / f"{region}_q{quantile}_{year}_event_diagnostics.png"
@@ -332,6 +387,7 @@ def main() -> int:
         years=args.years,
         min_duration=args.min_duration,
     )
+    lwa_a = transform_lwa_a_for_plot(lwa_a)
 
     written = write_threshold_timeseries_plots(
         hw,
