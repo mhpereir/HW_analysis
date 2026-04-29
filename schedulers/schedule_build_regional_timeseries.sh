@@ -18,7 +18,7 @@ mamba activate dev_env
 
 set -euo pipefail
 
-TIME_START=1980
+TIME_START=2000
 TIME_END=2014
 
 cd /home/mhpereir/HW_analysis/scripts

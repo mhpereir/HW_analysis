@@ -253,7 +253,7 @@ def _project_daily_analysis_variable(
     if kind == "event_id":
         projected = projected.fillna(0).astype(np.int64)
     elif kind == "flag":
-        projected = projected.fillna(False).astype(bool)
+        projected = projected.fillna(False).astype(np.int8)
     elif kind != "continuous":
         raise ValueError(f"Unsupported daily projection kind {kind!r}.")
 
@@ -280,4 +280,3 @@ def _infer_lwa_product_prefix(products: Mapping[str, xr.DataArray]) -> str:
             f"{', '.join(sorted(products))}"
         )
     return prefixes[0]
-

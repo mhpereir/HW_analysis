@@ -158,9 +158,9 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
     assert {"T_mean", "volume", "dTdt", "advection", "adiabatic", "diabatic"} <= set(out)
     np.testing.assert_allclose(out["tas_region"].values, [280.0, 280.0, 285.0])
     np.testing.assert_array_equal(out["hw_event_id"].values, [0, 0, 1])
-    np.testing.assert_array_equal(out["lwa_a_flag"].values, [False, False, True])
+    np.testing.assert_array_equal(out["lwa_a_flag"].values, [0, 0, 1])
     assert np.issubdtype(out["hw_event_id"].dtype, np.integer)
-    assert out["lwa_a_flag"].dtype == bool
+    assert out["lwa_a_flag"].dtype == np.int8
     assert out["tas_region"].attrs["native_time_resolution"] == "daily"
     assert out["tas_region"].attrs["analysis_time_resolution"] == "hourly"
     assert out["T_mean"].attrs["native_time_resolution"] == "hourly"

@@ -87,6 +87,9 @@ def parse_args() -> argparse.Namespace:
         else:
             parser.error("--years accepts either one year or two years: START END.")
 
+    if args.output_dir == DEFAULT_OUTPUT_DIR:
+        args.output_dir = DEFAULT_OUTPUT_DIR / f"q{args.quantile}"
+
     return args
 
 

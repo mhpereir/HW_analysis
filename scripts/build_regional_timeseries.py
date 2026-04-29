@@ -21,7 +21,7 @@ if str(REPO_ROOT) not in sys.path:
 
 import xarray as xr
 
-from src import data_io, events, harmonize
+from src import analysis_io, data_io, events, harmonize
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,6 +62,12 @@ def parse_args() -> argparse.Namespace:
         default="tas",
         help="Variable used for thresholding.",
         choices=["tas", "lwa", "lwa_a", "lwa_c"],
+    )
+    parser.add_argument(
+        "--output-path",
+        type=Path,
+        default=analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH,
+        help="Path where the harmonized Stage-1 regional dataset will be saved.",
     )
     args = parser.parse_args()
     if args.start_year > args.end_year:
@@ -209,6 +215,8 @@ def main() -> int:
     )
     describe_analysis_dataset(analysis_ds)
 
+    saved_path = analysis_io.save_harmonized_timeseries(analysis_ds, args.output_path)
+    print(f"Saved harmonized Stage-1 regional dataset: {saved_path}")
 
     return 0
 
