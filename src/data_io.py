@@ -40,7 +40,7 @@ def open_era5_tas(
     chunks: Mapping[str, int] | None = None,
 ) -> xr.Dataset:
     """Open ERA5 daily surface air temperature on the standard grid."""
-    pattern = f"{config.ERA5_TAS_ROOT}/tas_daily_ERA_*_2x2_bil.nc"
+    pattern = f"{config.ERA5_TAS_ROOT}/tas_daily_ERA5_*_2x2_bil.nc"
     paths = _glob_required(pattern)
     paths = _filter_yearly_files(paths, years)
     ds = _open_multiple_datasets(
@@ -54,13 +54,15 @@ def open_era5_tas(
 def open_era5_lwa(
     *,
     zg_level: int = 500,
+    years: Sequence[int] | None = None,
     chunks: Mapping[str, int] | None = None,
 ) -> xr.Dataset:
     """Open ERA5 daily LWA fields for a single pressure level."""
     pattern = f"{config.ERA5_LWA_ROOT}/z{zg_level}/LWA_day_ERA5_2deg.{zg_level}.nc"
     path = _glob_required(pattern)[0]
     ds = _open_single_dataset(path, chunks=chunks or DEFAULT_LWA_CHUNKS)
-    return _standardize_common_structure(ds)
+    ds = _standardize_common_structure(ds)
+    return _filter_dataset_time_years(ds, years)
 
 
 def open_era5_lwa_threshold(
@@ -86,6 +88,7 @@ def open_era5_hw_threshold(
     region: str,
     quantile: str | int | float,
     method: str = "evolving",
+    years: Sequence[int] | None = None,
     chunks: Mapping[str, int] | None = None,
 ) -> xr.Dataset:
     """Open ERA5 heatwave thresholds for a region and quantile."""
@@ -98,11 +101,12 @@ def open_era5_hw_threshold(
     q_token = _normalize_quantile_token(quantile)
     pattern = (
         f"{config.HW_THRESH_ROOT}/{region}/ERA5/{method}/q{q_token}/"
-        f"ERA5_HWthresh_{method}_1950_2024_tas_q{q_token}_{region}.nc"
+        f"ERA5_HWthresh_{method}_1940_2024_tas_q{q_token}_{region}.nc"
     )
     path = _glob_required(pattern)[0]
     ds = _open_single_dataset(path, chunks=chunks or DEFAULT_THRESHOLD_CHUNKS)
-    return _standardize_common_structure(ds)
+    ds = _standardize_common_structure(ds)
+    return _filter_dataset_year_coord(ds, years)
 
 
 def open_era5_heat_budget(
@@ -172,6 +176,43 @@ def _filter_yearly_files(
     return selected
 
 
+def _filter_dataset_time_years(
+    ds: xr.Dataset,
+    years: Sequence[int] | None,
+    *,
+    time_dim: str = "time",
+) -> xr.Dataset:
+    """Restrict a time-indexed dataset to requested years after opening."""
+    if years is None:
+        return ds
+
+    if time_dim not in ds.coords:
+        raise ValueError(f"Dataset is missing required time coordinate {time_dim!r}.")
+
+    out = ds.where(ds[time_dim].dt.year.isin(years), drop=True)
+    if out.sizes.get(time_dim, 0) == 0:
+        requested = ", ".join(str(year) for year in sorted(set(years)))
+        raise ValueError(f"No {time_dim!r} values matched requested years ({requested}).")
+    return out
+
+
+def _filter_dataset_year_coord(
+    ds: xr.Dataset,
+    years: Sequence[int] | None,
+    *,
+    year_dim: str = "year",
+) -> xr.Dataset:
+    """Restrict a dataset with a year coordinate to requested years."""
+    if years is None or year_dim not in ds.coords:
+        return ds
+
+    out = ds.where(ds[year_dim].isin(years), drop=True)
+    if out.sizes.get(year_dim, 0) == 0:
+        requested = ", ".join(str(year) for year in sorted(set(years)))
+        raise ValueError(f"No {year_dim!r} values matched requested years ({requested}).")
+    return out
+
+
 def _open_single_dataset(
     path: str,
     *,
@@ -224,12 +265,3 @@ def _standardize_common_structure(ds: xr.Dataset) -> xr.Dataset:
         ds = ds.drop_vars(drop_names, errors="ignore")
 
     return ds
-
-
-__all__ = [
-    "open_era5_tas",
-    "open_era5_lwa",
-    "open_era5_lwa_threshold",
-    "open_era5_hw_threshold",
-    "open_era5_heat_budget",
-]

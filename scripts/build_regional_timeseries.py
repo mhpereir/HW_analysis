@@ -46,11 +46,16 @@ def parse_args() -> argparse.Namespace:
         help="Pressure level used for the LWA products.",
     )
     parser.add_argument(
-        "--years",
+        "--start-year",
         type=int,
-        nargs="+",
-        default=None,
-        help="Optional list of years to restrict tas and heat-budget loading.",
+        required=True,
+        help="First analysis year to load, inclusive.",
+    )
+    parser.add_argument(
+        "--end-year",
+        type=int,
+        required=True,
+        help="Last analysis year to load, inclusive.",
     )
     parser.add_argument(
         "--threshold-variable",
@@ -58,14 +63,22 @@ def parse_args() -> argparse.Namespace:
         help="Variable used for thresholding.",
         choices=["tas", "lwa", "lwa_a", "lwa_c"],
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.start_year > args.end_year:
+        parser.error("--start-year must be less than or equal to --end-year.")
+
+    args.analysis_years = list(range(args.start_year, args.end_year + 1))
+    return args
 
 
 def load_era5_inputs(args: argparse.Namespace) -> dict[str, object]:
     """Open all currently supported ERA5 inputs."""
     return {
-        "tas": data_io.open_era5_tas(years=args.years),
-        "lwa": data_io.open_era5_lwa(zg_level=args.zg_level),
+        "tas": data_io.open_era5_tas(years=args.analysis_years),
+        "lwa": data_io.open_era5_lwa(
+            zg_level=args.zg_level,
+            years=args.analysis_years,
+        ),
         "lwa_threshold": data_io.open_era5_lwa_threshold(
             region=args.region,
             quantile=args.quantile,
@@ -75,8 +88,9 @@ def load_era5_inputs(args: argparse.Namespace) -> dict[str, object]:
             region=args.region,
             quantile=args.quantile,
             method="evolving",
+            years=args.analysis_years,
         ),
-        "heat_budget": data_io.open_era5_heat_budget(years=args.years),
+        "heat_budget": data_io.open_era5_heat_budget(years=args.analysis_years),
     }
 
 
@@ -146,7 +160,7 @@ def main() -> int:
         datasets["lwa_threshold"]["LWA_a"],  # type: ignore[index]
         region=args.region,
         variable="LWA_a",
-        years=args.years,
+        years=args.analysis_years,
         min_duration=min_duration,
     )
 
@@ -155,7 +169,7 @@ def main() -> int:
         datasets["lwa_threshold"]["LWA_c"],  # type: ignore[index]
         region=args.region,
         variable="LWA_c",
-        years=args.years,
+        years=args.analysis_years,
         min_duration=min_duration,
     )
 

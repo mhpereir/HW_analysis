@@ -1,3 +1,4 @@
+import numpy as np
 import xarray as xr
 import pytest
 
@@ -88,7 +89,7 @@ def test_open_era5_tas_constructs_pattern_and_standardizes(monkeypatch):
 
     out = data_io.open_era5_tas(years=[1941])
 
-    assert captured["pattern"].endswith("/tas_daily_ERA_*_2x2_bil.nc")
+    assert captured["pattern"].endswith("/tas_daily_ERA5_*_2x2_bil.nc")
     assert captured["paths"] == ["/data/tas_daily_ERA_1941_2x2_bil.nc"]
     assert captured["combine"] == "by_coords"
     assert captured["chunks"] == data_io.DEFAULT_TAS_CHUNKS
@@ -122,6 +123,27 @@ def test_open_era5_lwa_opens_expected_file(monkeypatch):
     assert captured["pattern"].endswith("/z500/LWA_day_ERA5_2deg.500.nc")
     assert captured["path"] == "/data/LWA_day_ERA5_2deg.500.nc"
     assert {"LWA", "LWA_a", "LWA_c"} <= set(out.data_vars)
+
+
+def test_open_era5_lwa_filters_requested_years(monkeypatch):
+    ds = xr.Dataset(
+        data_vars={"LWA": (("time", "lat", "lon"), np.ones((3, 1, 1)))},
+        coords={
+            "time": np.array(["1940-05-01", "1941-05-01", "1942-05-01"], dtype="datetime64[D]"),
+            "lat": [50.0],
+            "lon": [240.0],
+        },
+    )
+    ds["LWA_a"] = ds["LWA"].copy()
+    ds["LWA_c"] = ds["LWA"].copy()
+
+    monkeypatch.setattr(data_io, "_glob_required", lambda pattern: ["/data/LWA_day_ERA5_2deg.500.nc"])
+    monkeypatch.setattr(data_io, "_open_single_dataset", lambda path, *, chunks: ds)
+
+    out = data_io.open_era5_lwa(years=[1941])
+
+    assert out.sizes["time"] == 1
+    assert int(out["time"].dt.year.item()) == 1941
 
 
 def test_open_era5_lwa_threshold_builds_current_path(monkeypatch):
@@ -173,9 +195,32 @@ def test_open_era5_hw_threshold_builds_evolving_path(monkeypatch):
 
     assert "/pnw_bartusek/ERA5/evolving/q97p5/" in captured["pattern"]
     assert captured["pattern"].endswith(
-        "ERA5_HWthresh_evolving_1950_2024_tas_q97p5_pnw_bartusek.nc"
+        "ERA5_HWthresh_evolving_1940_2024_tas_q97p5_pnw_bartusek.nc"
     )
     assert {"threshold", "climatology"} <= set(out.data_vars)
+
+
+def test_open_era5_hw_threshold_filters_requested_years(monkeypatch):
+    ds = xr.Dataset(
+        data_vars={
+            "threshold": (("year", "dayofyear"), [[1.0], [2.0], [3.0]]),
+            "climatology": (("year", "dayofyear"), [[0.0], [0.1], [0.2]]),
+        },
+        coords={"year": [1940, 1941, 1942], "dayofyear": [1]},
+    )
+
+    monkeypatch.setattr(data_io, "_glob_required", lambda pattern: ["/data/hw_thresh.nc"])
+    monkeypatch.setattr(data_io, "_open_single_dataset", lambda path, *, chunks: ds)
+
+    out = data_io.open_era5_hw_threshold(
+        region="pnw_bartusek",
+        quantile=95,
+        years=[1941, 1942],
+    )
+
+    assert out.sizes["year"] == 2
+    assert out["year"].values.tolist() == [1941, 1942]
+    assert out["threshold"].values[:, 0].tolist() == [2.0, 3.0]
 
 
 def test_open_era5_heat_budget_filters_requested_years(monkeypatch):
