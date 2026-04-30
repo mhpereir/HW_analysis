@@ -21,5 +21,7 @@ set -euo pipefail
 cd /home/mhpereir/HW_analysis/scripts
 
 echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hostname)"
-/usr/bin/time -v python plot_top_events.py
+/usr/bin/time -v python plot_top_events.py \
+    --top-n 10 \
+    --window-days 5
 echo "[info] $(date -Is) done"
