@@ -26,6 +26,8 @@ import xarray as xr
 
 from . import preprocess
 
+#future to do:
+# add event-summary for "LWA_a" events (similar to current tas-defined events)
 
 def mask_to_event_ids(
     mask: xr.DataArray,
