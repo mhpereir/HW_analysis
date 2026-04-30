@@ -35,6 +35,14 @@ HEAT_BUDGET_VARIABLE_MAP: dict[str, str] = {
     "diabatic_term": "diabatic",
 }
 
+HEAT_BUDGET_RATE_VARIABLE_SIGNS: dict[str, int] = {
+    "dT_dt": 1,
+    "advection_term": -1,
+    "adiabatic_term": 1,
+    "diabatic_term": 1,
+}
+SECONDS_PER_HOUR = 3600
+
 
 def build_regional_analysis_dataset(
     *,
@@ -186,17 +194,34 @@ def _prepare_heat_budget_variables(
     *,
     time_dim: str,
 ) -> dict[str, xr.DataArray]:
-    """Rename hourly heat-budget variables into internal analysis names."""
+    """Rename and normalize hourly heat-budget variables into analysis names."""
     missing = sorted(source for source in HEAT_BUDGET_VARIABLE_MAP if source not in heat_budget)
     if missing:
         raise ValueError(f"heat_budget is missing required variables: {', '.join(missing)}")
 
+    volume = heat_budget["domain_volume"]
     out: dict[str, xr.DataArray] = {}
     for source_name, output_name in HEAT_BUDGET_VARIABLE_MAP.items():
         da = heat_budget[source_name].rename(output_name)
         if time_dim not in da.dims:
             raise ValueError(
                 f"heat_budget variable {source_name!r} is missing dimension {time_dim!r}."
+            )
+        sign = HEAT_BUDGET_RATE_VARIABLE_SIGNS.get(source_name)
+        if sign is not None:
+            da = sign * da / volume * SECONDS_PER_HOUR
+            da.attrs.update(
+                {
+                    "units": "K hr-1",
+                    "normalized_by": "domain_volume",
+                    "time_conversion_factor": SECONDS_PER_HOUR,
+                    "sign_convention": (
+                        "advection_term multiplied by -1 to match "
+                        "eulerian heat-budget diagnostic plotting convention"
+                        if sign < 0
+                        else "source sign retained"
+                    ),
+                }
             )
         da = da.assign_coords({time_dim: heat_budget[time_dim]})
         da.attrs.update(
