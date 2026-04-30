@@ -54,12 +54,12 @@ def test_parse_args_builds_inclusive_analysis_years(monkeypatch):
     assert args.output_path == analysis_io.default_harmonized_timeseries_path(
         region="pnw_bartusek",
         threshold_variable="tas",
-        quantile="95",
+        quantile="90",
         start_year=1940,
         end_year=1942,
     )
     assert args.output_path.name == (
-        "harmonized_regional_timeseries_pnw_bartusek_tas_q95_1940_1942.nc"
+        "harmonized_regional_timeseries_pnw_bartusek_tas_q90_1940_1942.nc"
     )
 
 

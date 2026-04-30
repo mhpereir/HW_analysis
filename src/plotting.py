@@ -22,6 +22,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib
+import numpy as np
 import xarray as xr
 
 matplotlib.use("Agg")
@@ -31,6 +32,9 @@ from matplotlib.figure import Figure
 
 
 DEFAULT_COMPOSITE_WINDOW_DAYS = 7
+EVENT_PERCENTILE_PREFIX = "event_percentile_"
+LOWER_EVENT_PERCENTILE = 0.25
+UPPER_EVENT_PERCENTILE = 0.75
 
 
 def plot_composite_timeseries(composite: xr.Dataset) -> Figure:
@@ -45,7 +49,7 @@ def plot_composite_timeseries(composite: xr.Dataset) -> Figure:
     ax0, ax1, ax2, ax3 = axes
 
     _plot_temperature_volume_panel(ax0, composite)
-    _plot_single_variable_panel(ax1, composite, "dTdt", ylabel="dTdt")
+    _plot_single_variable_panel(ax1, composite, "dTdt", ylabel="[K hr-1]")
     _plot_tendency_panel(ax2, composite)
     _plot_lwa_panel(ax3, composite)
 
@@ -83,15 +87,16 @@ def smooth_composite_for_display(
         raise ValueError("smoothing_window must be >= 1.")
 
     out = composite.copy(deep=False)
-    for name in variables:
+    variable_names = _display_smoothing_variable_names(composite, variables)
+    for name in variable_names:
         out[name] = composite[name].rolling(
             {lag_dim: smoothing_window},
             center=True,
-            min_periods=1,
+            min_periods=smoothing_window,
         ).mean()
     out.attrs.update(composite.attrs)
     out.attrs["smoothing_window"] = int(smoothing_window)
-    out.attrs["smoothing_applied_to"] = ", ".join(variables)
+    out.attrs["smoothing_applied_to"] = ", ".join(variable_names)
     return out
 
 
@@ -131,12 +136,14 @@ def _plot_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
     """Plot T_mean and volume with separate y axes."""
     lag = ds["lag_hour"].values
     ax.plot(lag, ds["T_mean"].values, color="tab:red", label="T_mean")
-    ax.set_ylabel("T_mean")
+    _plot_event_percentile_band(ax, lag, ds, "T_mean", color="tab:red")
+    ax.set_ylabel("T_mean [K]")
     ax.tick_params(axis="y", labelcolor="tab:red")
 
     ax_volume = ax.twinx()
     ax_volume.plot(lag, ds["volume"].values, color="tab:blue", label="volume")
-    ax_volume.set_ylabel("volume")
+    _plot_event_percentile_band(ax_volume, lag, ds, "volume", color="tab:blue")
+    ax_volume.set_ylabel("volume [m2 Pa]")
     ax_volume.tick_params(axis="y", labelcolor="tab:blue")
 
     lines, labels = ax.get_legend_handles_labels()
@@ -153,6 +160,13 @@ def _plot_single_variable_panel(
 ) -> None:
     """Plot one composite variable."""
     ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color="tab:purple")
+    _plot_event_percentile_band(
+        ax,
+        ds["lag_hour"].values,
+        ds,
+        name,
+        color="tab:purple",
+    )
     ax.axhline(0, color="0.2", linewidth=1.0)
     ax.set_ylabel(ylabel)
     ax.legend(loc="upper left")
@@ -161,15 +175,105 @@ def _plot_single_variable_panel(
 def _plot_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
     """Plot heat-budget tendency terms on one axis."""
     for name in ("advection", "adiabatic", "diabatic"):
-        ax.plot(ds["lag_hour"].values, ds[name].values, label=name)
+        (line,) = ax.plot(ds["lag_hour"].values, ds[name].values, label=name)
+        _plot_event_percentile_band(
+            ax,
+            ds["lag_hour"].values,
+            ds,
+            name,
+            color=line.get_color(), #type: ignore
+        )
     ax.axhline(0, color="0.2", linewidth=1.0)
-    ax.set_ylabel("heat-budget terms")
+    ax.set_ylabel("[K hr-1]")
     ax.legend(loc="upper left")
 
 
 def _plot_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
     """Plot LWA_a and LWA_c regional composite time series."""
-    ax.plot(ds["lag_hour"].values, ds["lwa_a_region"].values, label="LWA_a_region")
-    ax.plot(ds["lag_hour"].values, ds["lwa_c_region"].values, label="LWA_c_region")
-    ax.set_ylabel("LWA")
+    for name in ("lwa_a_region", "lwa_c_region"):
+        (line,) = ax.plot(ds["lag_hour"].values, ds[name].values, label=name)
+        _plot_event_percentile_band(
+            ax,
+            ds["lag_hour"].values,
+            ds,
+            name,
+            color=line.get_color(), #type: ignore
+        )
+    ax.set_ylabel("LWA [m hPa]")
     ax.legend(loc="upper left")
+
+
+def _plot_event_percentile_band(
+    ax: Axes,
+    lag: np.ndarray,
+    ds: xr.Dataset,
+    name: str,
+    *,
+    color: str,
+) -> None:
+    """Shade the 5th-to-95th event percentile envelope for one variable."""
+    bounds = _event_percentile_bounds(ds, name)
+    if bounds is None:
+        return
+
+    lower, upper = bounds
+    ax.fill_between(
+        lag,
+        lower.values,
+        upper.values,
+        color=color,
+        alpha=0.18,
+        linewidth=0,
+    )
+
+
+def _event_percentile_bounds(
+    ds: xr.Dataset,
+    name: str,
+) -> tuple[xr.DataArray, xr.DataArray] | None:
+    """Return lower and upper event percentile traces for one variable."""
+    envelope_name = f"{_event_percentile_prefix(ds)}{name}"
+    if envelope_name not in ds:
+        return None
+
+    envelope = ds[envelope_name]
+    if "quantile" not in envelope.dims:
+        return None
+
+    lower = _select_quantile(envelope, LOWER_EVENT_PERCENTILE)
+    upper = _select_quantile(envelope, UPPER_EVENT_PERCENTILE)
+    if lower is None or upper is None:
+        return None
+    return lower, upper
+
+
+def _select_quantile(
+    da: xr.DataArray,
+    quantile: float,
+) -> xr.DataArray | None:
+    """Return a quantile slice when that quantile is present."""
+    quantiles = np.asarray(da["quantile"].values, dtype=float)
+    matches = np.flatnonzero(np.isclose(quantiles, quantile))
+    if matches.size == 0:
+        return None
+    return da.isel(quantile=int(matches[0]))
+
+
+def _display_smoothing_variable_names(
+    composite: xr.Dataset,
+    variables: Sequence[str],
+) -> list[str]:
+    """Return requested variables plus matching percentile envelope variables."""
+    percentile_prefix = _event_percentile_prefix(composite)
+    names: list[str] = []
+    for name in variables:
+        names.append(str(name))
+        envelope_name = f"{percentile_prefix}{name}"
+        if envelope_name in composite:
+            names.append(envelope_name)
+    return names
+
+
+def _event_percentile_prefix(ds: xr.Dataset) -> str:
+    """Return the percentile-variable prefix used by a composite dataset."""
+    return str(ds.attrs.get("event_percentile_prefix", EVENT_PERCENTILE_PREFIX))

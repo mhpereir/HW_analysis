@@ -106,7 +106,7 @@ def open_harmonized_timeseries(
 ) -> xr.Dataset:
     """Open a saved Stage-1 harmonized regional time-series dataset."""
     input_path = Path(path).expanduser().resolve()
-    kwargs: dict[str, Any] = {"engine": "h5netcdf"}
+    kwargs: dict[str, Any] = {"engine": "h5netcdf", "decode_timedelta": True}
     if chunks is not None:
         kwargs["chunks"] = dict(chunks)
 

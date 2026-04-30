@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -57,6 +59,34 @@ def test_open_harmonized_timeseries_validates_and_returns_dataset(tmp_path):
         np.testing.assert_allclose(out["T_mean"].values, [1.0, 2.0])
     finally:
         out.close()
+
+
+def test_open_harmonized_timeseries_enables_stable_timedelta_decoding(
+    monkeypatch,
+    tmp_path,
+):
+    captured = {}
+    ds = _make_harmonized_dataset()
+
+    def fake_open_dataset(path: Path, **kwargs):
+        captured["path"] = path
+        captured["kwargs"] = kwargs
+        return ds
+
+    monkeypatch.setattr(xr, "open_dataset", fake_open_dataset)
+
+    out = analysis_io.open_harmonized_timeseries(
+        tmp_path / "stage1.nc",
+        chunks={"time": 12},
+    )
+
+    assert out is ds
+    assert captured["path"] == (tmp_path / "stage1.nc").resolve()
+    assert captured["kwargs"] == {
+        "engine": "h5netcdf",
+        "decode_timedelta": True,
+        "chunks": {"time": 12},
+    }
 
 
 def test_save_harmonized_timeseries_rejects_non_stage1_dataset(tmp_path):

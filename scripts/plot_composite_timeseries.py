@@ -90,7 +90,7 @@ def main() -> int:
             variables=COMPOSITE_VARIABLES,
             pre_days=args.window_days,
             post_days=args.window_days,
-            event_percentiles=(0.05, 0.5, 0.95),
+            event_percentiles=(0.25, 0.5, 0.75),
         )
         written = plotting.write_composite_timeseries_outputs(
             composite,
