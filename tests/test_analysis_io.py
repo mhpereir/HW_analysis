@@ -5,6 +5,12 @@ import xarray as xr
 from src import analysis_io
 
 
+def test_default_harmonized_timeseries_path_constant_uses_stage1_filename():
+    assert analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH.name == (
+        "harmonized_regional_timeseries_pnw_bartusek_tas_q90_1940_2024.nc"
+    )
+
+
 def test_default_harmonized_timeseries_path_includes_run_tokens():
     path = analysis_io.default_harmonized_timeseries_path(
         region="pnw_bartusek",

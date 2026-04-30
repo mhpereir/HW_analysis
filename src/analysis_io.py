@@ -28,7 +28,10 @@ import xarray as xr
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HARMONIZED_TIMESERIES_PATH = (
-    REPO_ROOT / "results" / "stage1" / "harmonized_regional_timeseries.nc"
+    REPO_ROOT
+    / "results"
+    / "stage1"
+    / "harmonized_regional_timeseries_pnw_bartusek_tas_q90_1940_2024.nc"
 )
 DEFAULT_STAGE1_OUTPUT_DIR = REPO_ROOT / "results" / "stage1"
 EXPECTED_PIPELINE_STAGE = "stage_1_harmonized_regional_timeseries"
