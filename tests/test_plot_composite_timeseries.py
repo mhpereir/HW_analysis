@@ -1,114 +1,100 @@
-import numpy as np
+import argparse
+from pathlib import Path
+
 import xarray as xr
 
 from scripts import plot_composite_timeseries
+from src import analysis_io
 
 
-def test_build_all_hw_event_stack_uses_all_events():
-    ds = _make_composite_dataset()
+def test_parse_args_uses_default_input_path(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["plot_composite_timeseries.py"])
 
-    stacked = plot_composite_timeseries.build_all_hw_event_stack(ds, window_days=0)
+    args = plot_composite_timeseries.parse_args()
 
-    assert stacked.sizes == {"event": 2, "lag_hour": 1}
-    np.testing.assert_array_equal(stacked["event"].values, [1, 2])
-    np.testing.assert_allclose(stacked["T_mean"].values[:, 0], [281.0, 283.0])
-    assert stacked.attrs["n_events"] == 2
+    assert args.input_path == analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH
 
 
-def test_build_event_mean_composite_averages_over_events():
-    stacked = plot_composite_timeseries.build_all_hw_event_stack(
-        _make_composite_dataset(),
-        window_days=0,
+def test_validate_args_rejects_negative_window_days():
+    args = argparse.Namespace(window_days=-1, smoothing_window=24)
+
+    try:
+        plot_composite_timeseries.validate_args(args)
+    except ValueError as exc:
+        assert "--window-days" in str(exc)
+    else:
+        raise AssertionError("Expected negative window_days to raise ValueError.")
+
+
+def test_smoothed_output_path_uses_default_name_for_default_output():
+    path = plot_composite_timeseries._smoothed_output_path(
+        plot_composite_timeseries.DEFAULT_OUTPUT_PATH
     )
 
-    composite = plot_composite_timeseries.build_event_mean_composite(stacked)
-
-    assert composite.sizes == {"lag_hour": 1}
-    np.testing.assert_allclose(composite["T_mean"].values, [282.0])
-    np.testing.assert_allclose(composite["volume"].values, [12.0])
-    assert composite.attrs["composite_reduction"] == "mean over all HW events"
+    assert path.name == "hw_all_events_composite_smoothed.png"
 
 
-def test_write_composite_plot_writes_png(tmp_path):
-    stacked = plot_composite_timeseries.build_all_hw_event_stack(
-        _make_composite_dataset(),
-        window_days=0,
+def test_main_orchestrates_dataset_composite_and_plotting(monkeypatch, tmp_path, capsys):
+    input_path = tmp_path / "stage1.nc"
+    output_path = tmp_path / "composite.png"
+    opened = xr.Dataset()
+    composite = xr.Dataset()
+    captured = {}
+
+    def fake_open(path: str | Path):
+        captured["input_path"] = path
+        return opened
+
+    def fake_composite(ds: xr.Dataset, **kwargs):
+        captured["composite_ds"] = ds
+        captured["composite_kwargs"] = kwargs
+        return composite
+
+    def fake_write(ds: xr.Dataset, output: Path, **kwargs):
+        captured["plot_ds"] = ds
+        captured["output_path"] = output
+        captured["plot_kwargs"] = kwargs
+        return [output, kwargs["smoothed_output_path"]]
+
+    monkeypatch.setattr("sys.argv", [
+        "plot_composite_timeseries.py",
+        "--input-path",
+        str(input_path),
+        "--output-path",
+        str(output_path),
+        "--window-days",
+        "3",
+        "--smoothing-window",
+        "6",
+    ])
+    monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", fake_open)
+    monkeypatch.setattr(
+        plot_composite_timeseries.composites,
+        "all_event_peak_aligned_composite",
+        fake_composite,
     )
-    composite = plot_composite_timeseries.build_event_mean_composite(stacked)
-
-    path = plot_composite_timeseries.write_composite_plot(
-        composite,
-        tmp_path / "composite.png",
-    )
-
-    assert path.exists()
-    assert path.name == "composite.png"
-
-
-def test_smooth_composite_smooths_only_first_three_panel_variables():
-    composite = plot_composite_timeseries.build_event_mean_composite(
-        plot_composite_timeseries.build_all_hw_event_stack(
-            _make_composite_dataset(),
-            window_days=1,
-        )
-    )
-
-    smoothed = plot_composite_timeseries.smooth_composite(composite, smoothing_window=3)
-
-    assert smoothed.attrs["smoothing_window"] == 3
-    assert not np.array_equal(smoothed["T_mean"].values, composite["T_mean"].values)
-    assert not np.array_equal(smoothed["advection"].values, composite["advection"].values)
-    np.testing.assert_allclose(smoothed["lwa_a_region"].values, composite["lwa_a_region"].values)
-    np.testing.assert_allclose(smoothed["lwa_c_region"].values, composite["lwa_c_region"].values)
-
-
-def test_write_composite_outputs_writes_raw_and_smoothed_pngs(tmp_path):
-    composite = plot_composite_timeseries.build_event_mean_composite(
-        plot_composite_timeseries.build_all_hw_event_stack(
-            _make_composite_dataset(),
-            window_days=0,
-        )
-    )
-
-    written = plot_composite_timeseries.write_composite_outputs(
-        composite,
-        tmp_path / "hw_all_events_composite.png",
-        smoothing_window=2,
+    monkeypatch.setattr(
+        plot_composite_timeseries.plotting,
+        "write_composite_timeseries_outputs",
+        fake_write,
     )
 
-    assert [path.name for path in written] == [
-        "hw_all_events_composite.png",
-        "hw_all_events_composite_smoothed.png",
-    ]
-    assert all(path.exists() for path in written)
+    result = plot_composite_timeseries.main()
 
-
-def _make_composite_dataset() -> xr.Dataset:
-    time = np.array(
-        [
-            "2000-05-01T00:00",
-            "2000-05-01T01:00",
-            "2000-05-01T02:00",
-            "2000-05-01T03:00",
-        ],
-        dtype="datetime64[h]",
-    )
-    event = np.arange(2)
-    return xr.Dataset(
-        data_vars={
-            "T_mean": ("time", np.array([280.0, 281.0, 282.0, 283.0])),
-            "volume": ("time", np.array([10.0, 11.0, 12.0, 13.0])),
-            "dTdt": ("time", np.array([0.0, 0.1, 0.2, 0.3])),
-            "advection": ("time", np.array([1.0, 2.0, 3.0, 4.0])),
-            "adiabatic": ("time", np.array([0.5, 0.4, 0.3, 0.2])),
-            "diabatic": ("time", np.array([-1.0, -0.5, 0.0, 0.5])),
-            "lwa_a_region": ("time", np.array([2.0, 3.0, 4.0, 5.0])),
-            "lwa_c_region": ("time", np.array([5.0, 4.0, 3.0, 2.0])),
-            "event_id": ("event", np.array([1, 2], dtype=np.int64)),
-            "peak_time": (
-                "event",
-                np.array(["2000-05-01T01:00", "2000-05-01T03:00"], dtype="datetime64[h]"),
-            ),
-        },
-        coords={"time": time, "event": event},
-    )
+    assert result == 0
+    assert captured["input_path"] == input_path
+    assert captured["composite_ds"] is opened
+    assert captured["composite_kwargs"] == {
+        "variables": plot_composite_timeseries.COMPOSITE_VARIABLES,
+        "pre_days": 3,
+        "post_days": 3,
+        "event_percentiles": (0.05, 0.5, 0.95),
+    }
+    assert captured["plot_ds"] is composite
+    assert captured["output_path"] == output_path
+    assert captured["plot_kwargs"] == {
+        "smoothed_output_path": output_path.with_name("composite_smoothed.png"),
+        "smoothing_window": 6,
+        "smoothed_variables": plot_composite_timeseries.SMOOTHED_VARIABLES,
+    }
+    assert "Wrote HW all-event composite figures:" in capsys.readouterr().out

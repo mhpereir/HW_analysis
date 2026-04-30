@@ -20,7 +20,6 @@ Out of scope:
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -167,12 +166,18 @@ def peak_aligned_composite(
     peak_time_name: str = DEFAULT_PEAK_TIME_NAME,
     event_id_name: str = DEFAULT_EVENT_ID_NAME,
     skipna: bool = True,
+    event_percentiles: Sequence[float] | None = (0.05, 0.5, 0.95),
+    event_percentile_prefix: str = "event_percentile_",
 ) -> xr.Dataset:
     """Return the event-mean composite centered on event peak times.
 
     This is a convenience wrapper around ``stack_events_centered_on_peak`` plus
-    a mean over the event dimension. Use ``stack_events_centered_on_peak`` when
-    individual-event traces are needed for top-event plots.
+    a mean over the event dimension. By default, lag-wise event percentile
+    envelopes are also attached with prefixed variable names. Use
+    ``stack_events_centered_on_peak`` when individual-event traces are needed
+    for top-event plots.
+
+    Set ``event_percentiles=None`` to return only event-mean variables.
     """
     stacked = stack_events_centered_on_peak(
         ds,
@@ -186,9 +191,57 @@ def peak_aligned_composite(
         peak_time_name=peak_time_name,
         event_id_name=event_id_name,
     )
-    composite = stacked.mean(event_dim, skipna=skipna)
+    variable_names = _event_window_variable_names(stacked, event_dim=event_dim)
+    composite = stacked[variable_names].mean(event_dim, skipna=skipna)
+    if event_percentiles is not None:
+        envelope = event_percentile_envelope(
+            stacked,
+            q=event_percentiles,
+            event_dim=event_dim,
+            skipna=skipna,
+        )
+        composite = _attach_prefixed_variables(
+            composite,
+            envelope,
+            prefix=event_percentile_prefix,
+        )
     composite.attrs.update(stacked.attrs)
     composite.attrs["composite_reduction"] = "mean over selected events"
+    if event_percentiles is not None:
+        composite.attrs["event_percentiles"] = ",".join(
+            str(float(value)) for value in event_percentiles
+        )
+        composite.attrs["event_percentile_prefix"] = event_percentile_prefix
+    return composite
+
+
+def all_event_peak_aligned_composite(
+    ds: xr.Dataset,
+    *,
+    variables: Sequence[str],
+    pre_days: int,
+    post_days: int,
+    event_table: xr.Dataset | None = None,
+    event_percentiles: Sequence[float] | None = (0.05, 0.5, 0.95),
+) -> xr.Dataset:
+    """Build an all-event peak-aligned composite from a harmonized dataset.
+
+    If ``event_table`` is omitted, event summary variables are read from ``ds``.
+    Stage-1 stores those event summary variables in the same harmonized NetCDF
+    as the time-indexed analysis variables.
+    """
+    if event_table is None:
+        event_table = ds
+
+    composite = peak_aligned_composite(
+        ds,
+        event_table,
+        variables=variables,
+        pre_days=pre_days,
+        post_days=post_days,
+        event_percentiles=event_percentiles,
+    )
+    composite.attrs["composite_reduction"] = "mean over all HW events"
     return composite
 
 
@@ -201,6 +254,9 @@ def event_percentile_envelope(
     skipna: bool = True,
 ) -> xr.Dataset:
     """Compute percentile envelopes across stacked event windows.
+
+    Event-only metadata variables such as event IDs and peak timestamps are
+    excluded from the percentile reduction.
 
     Parameters
     ----------
@@ -219,7 +275,8 @@ def event_percentile_envelope(
         raise ValueError(f"stacked dataset is missing event dimension {event_dim!r}.")
     _validate_quantiles(q)
 
-    out = stacked.quantile(q, dim=event_dim, skipna=skipna)
+    variable_names = _event_window_variable_names(stacked, event_dim=event_dim)
+    out = stacked[variable_names].quantile(q, dim=event_dim, skipna=skipna)
     if "quantile" in out.dims and quantile_dim != "quantile":
         out = out.rename({"quantile": quantile_dim})
     out.attrs.update(stacked.attrs)
@@ -351,6 +408,40 @@ def _attach_event_metadata(
 
     out[event_id_name] = (event_dim, event_ids)
     out[event_id_name].attrs.update(event_table[event_id_name].attrs)
+    return out
+
+
+def _event_window_variable_names(stacked: xr.Dataset, *, event_dim: str) -> list[str]:
+    """Return data variables that represent event-window traces."""
+    variable_names = [
+        str(name)
+        for name, da in stacked.data_vars.items()
+        if event_dim in da.dims and da.ndim > 1
+    ]
+    if not variable_names:
+        raise ValueError(
+            "stacked dataset contains no event-window variables to reduce."
+        )
+    return variable_names
+
+
+def _attach_prefixed_variables(
+    target: xr.Dataset,
+    source: xr.Dataset,
+    *,
+    prefix: str,
+) -> xr.Dataset:
+    """Attach source variables to target using prefixed names."""
+    out = target.copy(deep=False)
+    for name, da in source.data_vars.items():
+        out_name = f"{prefix}{name}"
+        if out_name in out:
+            raise ValueError(
+                f"Cannot attach percentile variable {out_name!r}; "
+                "that name already exists."
+            )
+        out[out_name] = da
+        out[out_name].attrs.update(da.attrs)
     return out
 
 

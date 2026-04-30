@@ -27,5 +27,6 @@ echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hos
 /usr/bin/time -v python build_regional_timeseries.py \
     --start-year ${TIME_START} --end-year ${TIME_END} \
     --quantile 90 \
-    --region "pnw_bartusek"
+    --region "pnw_bartusek" \
+    --threshold-variable "tas"
 echo "[info] $(date -Is) done"
