@@ -191,6 +191,43 @@ def test_build_lwa_a_event_ids_filters_years_and_uses_lwa_threshold():
     np.testing.assert_array_equal(out["lwa_a_event_id"].values, [1, 1])
 
 
+def test_build_lwa_event_ids_supports_plain_lwa_variant():
+    times = np.array(["2001-01-01", "2001-01-02"], dtype="datetime64[D]")
+    lwa = xr.DataArray(
+        np.array(
+            [
+                [[2.0, 2.0], [2.0, 2.0]],
+                [[5.0, 5.0], [5.0, 5.0]],
+            ]
+        ),
+        dims=("time", "lat", "lon"),
+        coords={"time": times, "lat": [42.0, 44.0], "lon": [-124.0, -122.0]},
+        name="LWA",
+    )
+    threshold = xr.DataArray(
+        [3.0, 3.0],
+        dims=("dayofyear",),
+        coords={"dayofyear": [1, 2]},
+        name="LWA",
+    )
+
+    out = events.build_lwa_event_ids(
+        lwa,
+        threshold,
+        region="pnw_bartusek",
+        variable="LWA",
+    )
+
+    assert set(out) == {
+        "lwa_region",
+        "lwa_threshold",
+        "lwa_exceedance_mask",
+        "lwa_event_id",
+    }
+    np.testing.assert_array_equal(out["lwa_exceedance_mask"].values, [False, True])
+    np.testing.assert_array_equal(out["lwa_event_id"].values, [0, 1])
+
+
 def test_build_lwa_event_ids_supports_lwa_c_variant():
     times = np.array(["2001-01-01", "2001-01-02"], dtype="datetime64[D]")
     lwa_c = xr.DataArray(

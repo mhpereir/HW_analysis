@@ -23,6 +23,13 @@ import xarray as xr
 
 from src import analysis_io, data_io, events, harmonize
 
+EVENT_SUMMARY_VARIABLES: dict[str, tuple[str, str]] = {
+    "tas": ("hw_event_id", "tas_region"),
+    "lwa": ("lwa_event_id", "lwa_region"),
+    "lwa_a": ("lwa_a_event_id", "lwa_a_region"),
+    "lwa_c": ("lwa_c_event_id", "lwa_c_region"),
+}
+
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line options for the ERA5 input loader."""
@@ -36,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--quantile",
-        default="95",
+        default="90",
         help="Threshold quantile token, for example 95 or 97p5.",
     )
     parser.add_argument(
@@ -66,7 +73,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-path",
         type=Path,
-        default=analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH,
+        default=None,
         help="Path where the harmonized Stage-1 regional dataset will be saved.",
     )
     args = parser.parse_args()
@@ -74,6 +81,14 @@ def parse_args() -> argparse.Namespace:
         parser.error("--start-year must be less than or equal to --end-year.")
 
     args.analysis_years = list(range(args.start_year, args.end_year + 1))
+    if args.output_path is None:
+        args.output_path = analysis_io.default_harmonized_timeseries_path(
+            region=args.region,
+            threshold_variable=args.threshold_variable,
+            quantile=args.quantile,
+            start_year=args.start_year,
+            end_year=args.end_year,
+        )
     return args
 
 
@@ -145,20 +160,44 @@ def describe_event_summary_table(ds: xr.Dataset) -> None:
     """Print a compact summary of the event summary table."""
     dims_str = ", ".join(f"{dim}={size}" for dim, size in ds.sizes.items())
     vars_str = ", ".join(ds.data_vars) #type: ignore
-    print("Heatwave event summary table:")
+    print("Event summary table:")
     print(f"  dims: {dims_str}")
     print(f"  vars: {vars_str}")
 
 
+def append_event_summary_table(
+    ds: xr.Dataset,
+    *,
+    threshold_variable: str = "tas",
+) -> xr.Dataset:
+    """Return the harmonized dataset with the requested event summary table attached."""
+    event_id_name, peak_variable = event_summary_variables(threshold_variable)
+    event_summary = events.build_event_summary_table(
+        ds,
+        event_id_name,
+        peak_variable=peak_variable,
+    )
+    describe_event_summary_table(event_summary)
+    out = xr.merge([ds, event_summary])
+    out.attrs.update(event_summary.attrs)
+    return out
+
+
 def append_hw_event_summary_table(ds: xr.Dataset) -> xr.Dataset:
     """Return the harmonized dataset with the heatwave event summary table attached."""
-    hw_event_summary = events.build_event_summary_table(
-        ds,
-        "hw_event_id",
-        peak_variable="tas_region",
-    )
-    describe_event_summary_table(hw_event_summary)
-    return xr.merge([ds, hw_event_summary])
+    return append_event_summary_table(ds, threshold_variable="tas")
+
+
+def event_summary_variables(threshold_variable: str) -> tuple[str, str]:
+    """Return event-ID and peak-variable names for a threshold variable."""
+    try:
+        return EVENT_SUMMARY_VARIABLES[threshold_variable]
+    except KeyError as exc:
+        valid = ", ".join(sorted(EVENT_SUMMARY_VARIABLES))
+        raise ValueError(
+            f"Unsupported threshold variable {threshold_variable!r}. "
+            f"Expected one of: {valid}."
+        ) from exc
 
 
 def require_dataset(value: Any) -> xr.Dataset:
@@ -183,6 +222,14 @@ def main() -> int:
         region=args.region,
         min_duration=min_duration,
     )
+    lwa_products = events.build_lwa_event_ids(
+        datasets["lwa"]["LWA"],  # type: ignore[index]
+        datasets["lwa_threshold"]["LWA"],  # type: ignore[index]
+        region=args.region,
+        variable="LWA",
+        years=args.analysis_years,
+        min_duration=min_duration,
+    )
     lwa_a_products = events.build_lwa_event_ids(
         datasets["lwa"]["LWA_a"],  # type: ignore[index]
         datasets["lwa_threshold"]["LWA_a"],  # type: ignore[index]
@@ -203,6 +250,7 @@ def main() -> int:
 
     print("Preprocessed regional inputs:")
     describe_dataarray("tas_region", hw_products["tas_region"])
+    describe_dataarray("lwa_region", lwa_products["lwa_region"])
     describe_dataarray("lwa_a_region", lwa_a_products["lwa_a_region"])
     describe_dataarray("lwa_c_region", lwa_c_products["lwa_c_region"])
 
@@ -211,6 +259,11 @@ def main() -> int:
         "hw_event_id",
         hw_products["hw_exceedance_mask"],
         hw_products["hw_event_id"],
+    )
+    describe_event_ids(
+        "lwa_event_id",
+        lwa_products["lwa_exceedance_mask"],
+        lwa_products["lwa_event_id"],
     )
     describe_event_ids(
         "lwa_a_event_id",
@@ -227,17 +280,23 @@ def main() -> int:
     analysis_ds = harmonize.build_regional_analysis_dataset(
         heat_budget=heat_budget_dataset,
         hw_event_products=hw_products,
-        lwa_event_products=[lwa_a_products, lwa_c_products],
+        lwa_event_products=[lwa_products, lwa_a_products, lwa_c_products],
         attrs={
             "region": args.region,
             "quantile": str(args.quantile),
+            "threshold_variable": args.threshold_variable,
+            "start_year": args.start_year,
+            "end_year": args.end_year,
             "zg_level": args.zg_level,
             "min_duration": min_duration,
         },
     )
     describe_analysis_dataset(analysis_ds)
 
-    analysis_ds = append_hw_event_summary_table(analysis_ds)
+    analysis_ds = append_event_summary_table(
+        analysis_ds,
+        threshold_variable=args.threshold_variable,
+    )
 
     saved_path = analysis_io.save_harmonized_timeseries(analysis_ds, args.output_path)
     print(f"Saved harmonized Stage-1 regional dataset: {saved_path}")

@@ -24,5 +24,8 @@ TIME_END=2024
 cd /home/mhpereir/HW_analysis/scripts
 
 echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hostname)"
-/usr/bin/time -v python build_regional_timeseries.py --start-year ${TIME_START} --end-year ${TIME_END}
+/usr/bin/time -v python build_regional_timeseries.py \
+    --start-year ${TIME_START} --end-year ${TIME_END} \
+    --quantile 90 \
+    --region "pnw_bartusek"
 echo "[info] $(date -Is) done"

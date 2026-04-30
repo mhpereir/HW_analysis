@@ -5,6 +5,21 @@ import xarray as xr
 from src import analysis_io
 
 
+def test_default_harmonized_timeseries_path_includes_run_tokens():
+    path = analysis_io.default_harmonized_timeseries_path(
+        region="pnw_bartusek",
+        threshold_variable="lwa",
+        quantile="q97p5",
+        start_year=1940,
+        end_year=2024,
+    )
+
+    assert path.parent == analysis_io.DEFAULT_STAGE1_OUTPUT_DIR
+    assert path.name == (
+        "harmonized_regional_timeseries_pnw_bartusek_lwa_q97p5_1940_2024.nc"
+    )
+
+
 def test_save_harmonized_timeseries_creates_parent_and_writes_readable_file(tmp_path):
     ds = _make_harmonized_dataset()
     path = tmp_path / "nested" / "stage1.nc"
@@ -76,6 +91,10 @@ def _make_harmonized_dataset() -> xr.Dataset:
             "hw_threshold": ("time", values),
             "hw_flag": ("time", flags, {"projected_from_daily": True}),
             "hw_event_id": ("time", event_ids),
+            "lwa_region": ("time", values),
+            "lwa_threshold": ("time", values),
+            "lwa_flag": ("time", flags),
+            "lwa_event_id": ("time", event_ids),
             "lwa_a_region": ("time", values),
             "lwa_a_threshold": ("time", values),
             "lwa_a_flag": ("time", flags),

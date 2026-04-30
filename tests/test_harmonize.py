@@ -144,11 +144,17 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
         "lwa_a_exceedance_mask": _daily_array([False, True], name="lwa_a_exceedance_mask"),
         "lwa_a_event_id": _daily_array([0, 1], name="lwa_a_event_id"),
     }
+    lwa_products = {
+        "lwa_region": _daily_array([3.0, 4.0], name="LWA"),
+        "lwa_threshold": _daily_array([3.5, 3.5], name="lwa_threshold"),
+        "lwa_exceedance_mask": _daily_array([False, True], name="lwa_exceedance_mask"),
+        "lwa_event_id": _daily_array([0, 2], name="lwa_event_id"),
+    }
 
     out = harmonize.build_regional_analysis_dataset(
         heat_budget=heat_budget,
         hw_event_products=hw_products,
-        lwa_event_products=[lwa_a_products],
+        lwa_event_products=[lwa_products, lwa_a_products],
         attrs={"region": "pnw_bartusek"},
     )
 
@@ -166,6 +172,8 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
     np.testing.assert_allclose(out["tas_region"].values, [280.0, 280.0, 285.0])
     np.testing.assert_allclose(out["tas_climatology"].values, [279.0, 279.0, 281.0])
     np.testing.assert_array_equal(out["hw_event_id"].values, [0, 0, 1])
+    np.testing.assert_array_equal(out["lwa_event_id"].values, [0, 0, 2])
+    np.testing.assert_array_equal(out["lwa_flag"].values, [0, 0, 1])
     np.testing.assert_array_equal(out["lwa_a_flag"].values, [0, 0, 1])
     assert np.issubdtype(out["hw_event_id"].dtype, np.integer)
     assert out["lwa_a_flag"].dtype == np.int8

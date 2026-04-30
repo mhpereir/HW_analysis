@@ -30,6 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HARMONIZED_TIMESERIES_PATH = (
     REPO_ROOT / "results" / "stage1" / "harmonized_regional_timeseries.nc"
 )
+DEFAULT_STAGE1_OUTPUT_DIR = REPO_ROOT / "results" / "stage1"
 EXPECTED_PIPELINE_STAGE = "stage_1_harmonized_regional_timeseries"
 DEFAULT_TIME_DIM = "time"
 REQUIRED_HARMONIZED_VARIABLES: frozenset[str] = frozenset(
@@ -45,6 +46,10 @@ REQUIRED_HARMONIZED_VARIABLES: frozenset[str] = frozenset(
         "hw_threshold",
         "hw_flag",
         "hw_event_id",
+        "lwa_region",
+        "lwa_threshold",
+        "lwa_flag",
+        "lwa_event_id",
         "lwa_a_region",
         "lwa_a_threshold",
         "lwa_a_flag",
@@ -55,6 +60,26 @@ REQUIRED_HARMONIZED_VARIABLES: frozenset[str] = frozenset(
         "lwa_c_event_id",
     }
 )
+
+
+def default_harmonized_timeseries_path(
+    *,
+    region: str,
+    threshold_variable: str,
+    quantile: str | int | float,
+    start_year: int,
+    end_year: int,
+) -> Path:
+    """Return the run-specific default Stage-1 harmonized output path."""
+    q_token = _normalize_filename_quantile_token(quantile)
+    filename = (
+        "harmonized_regional_timeseries_"
+        f"{_filename_token(region)}_"
+        f"{_filename_token(threshold_variable)}_"
+        f"q{q_token}_"
+        f"{start_year}_{end_year}.nc"
+    )
+    return DEFAULT_STAGE1_OUTPUT_DIR / filename
 
 
 def save_harmonized_timeseries(
@@ -138,3 +163,30 @@ def _normalize_attrs(attrs: Mapping[Any, Any]) -> dict[Any, Any]:
         else:
             normalized[key] = value
     return normalized
+
+
+def _normalize_filename_quantile_token(quantile: str | int | float) -> str:
+    """Return the quantile token used in Stage-1 product filenames."""
+    if isinstance(quantile, str):
+        token = quantile.strip()
+        if token.startswith("q"):
+            token = token[1:]
+        return _filename_token(token)
+
+    if isinstance(quantile, int):
+        return str(quantile)
+
+    if isinstance(quantile, float):
+        if quantile.is_integer():
+            return str(int(quantile))
+        return _filename_token(format(quantile, "g").replace(".", "p"))
+
+    raise TypeError(f"Unsupported quantile type: {type(quantile)!r}")
+
+
+def _filename_token(value: object) -> str:
+    """Return a conservative single-path-component token for generated filenames."""
+    token = str(value).strip()
+    for old, new in (("/", "-"), ("\\", "-"), (" ", "-")):
+        token = token.replace(old, new)
+    return token
