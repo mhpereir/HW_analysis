@@ -58,7 +58,7 @@ The current working scope includes the following variables.
   - volume mean temperature
   - domain volume
   - time tendency of regional mean temperature
-  - net advection
+  - net advection (this term is coming in with the wrong sign convention; needs to be fixed upon harmonization)
   - adiabatic term
   - diabatic term
 
