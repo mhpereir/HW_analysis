@@ -46,6 +46,23 @@ def test_plot_composite_timeseries_adds_percentile_envelopes():
         plt.close(fig)
 
 
+def test_plot_composite_timeseries_adds_iqr_legend_to_first_panel():
+    fig = plotting.plot_composite_timeseries(_make_composite())
+    try:
+        assert fig.axes[4].get_legend().get_texts()[0].get_text() == "IQR"
+    finally:
+        plt.close(fig)
+
+
+def test_temperature_volume_axis_labels_match_tick_colors():
+    fig = plotting.plot_composite_timeseries(_make_composite())
+    try:
+        assert fig.axes[0].yaxis.label.get_color() == "tab:red"
+        assert fig.axes[4].yaxis.label.get_color() == "tab:blue"
+    finally:
+        plt.close(fig)
+
+
 def test_write_composite_timeseries_plot_writes_png(tmp_path):
     path = plotting.write_composite_timeseries_plot(
         _make_composite(),
@@ -99,6 +116,6 @@ def _make_composite() -> xr.Dataset:
     )
     return xr.Dataset(
         data_vars=data_vars,
-        coords={"lag_hour": lag_hour, "quantile": [0.05, 0.5, 0.95]},
+        coords={"lag_hour": lag_hour, "quantile": [0.25, 0.5, 0.75]},
         attrs={"n_events": 2, "pre_days": 2, "post_days": 2},
     )

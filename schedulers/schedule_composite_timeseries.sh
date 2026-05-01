@@ -21,6 +21,8 @@ set -euo pipefail
 cd /home/mhpereir/HW_analysis/scripts
 
 echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hostname)"
-/usr/bin/time -v python plot_composite_timeseries.py \
-    --window-days 7
+/usr/bin/time -v python plot_composite_timeseries_all.py \
+    --window-days 7 \
+    --season-months 6 7 8 \
+    --require-full-event
 echo "[info] $(date -Is) done"

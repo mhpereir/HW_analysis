@@ -258,6 +258,76 @@ def select_event_quantile_bin(
     return out
 
 
+def select_events_by_season(
+    event_table: xr.Dataset,
+    season_months: Sequence[int],
+    *,
+    time_name: str = "peak_time",
+    event_dim: str = DEFAULT_EVENT_DIM,
+    require_full_event: bool = False,
+    start_time_name: str = "start_time",
+    end_time_name: str = "end_time",
+    drop: bool = True,
+) -> xr.Dataset:
+    """Select events whose peak time, or full event interval, falls within a season.
+
+    Parameters
+    ----------
+    event_table:
+        Event summary table. It may also be a harmonized dataset containing
+        event-level variables alongside time-indexed variables.
+    season_months:
+        Calendar months in the target season, using 1=January through
+        12=December. Cross-year seasons such as DJF can be passed as
+        ``[12, 1, 2]``.
+    time_name:
+        Event-level timestamp used for peak-time selection when
+        ``require_full_event`` is False.
+    event_dim:
+        Dimension indexing events.
+    require_full_event:
+        If True, select only events where every calendar month touched by the
+        inclusive ``[start_time, end_time]`` interval is in ``season_months``.
+    start_time_name, end_time_name:
+        Event-level interval endpoints used when ``require_full_event`` is True.
+    drop:
+        If True, return only selected event rows. If False, preserve the full
+        event dimension and mask only variables that contain ``event_dim``.
+
+    Returns
+    -------
+    xr.Dataset
+        Filtered event table with season-selection metadata added to attrs.
+    """
+    months = _validate_season_months(season_months)
+    _validate_event_table(event_table, event_dim=event_dim)
+
+    if require_full_event:
+        _validate_event_time_variable(event_table, start_time_name, event_dim=event_dim)
+        _validate_event_time_variable(event_table, end_time_name, event_dim=event_dim)
+        selected = _full_event_season_mask(
+            event_table[start_time_name],
+            event_table[end_time_name],
+            months,
+            event_dim=event_dim,
+        )
+    else:
+        _validate_event_time_variable(event_table, time_name, event_dim=event_dim)
+        selected = _event_time_month_mask(event_table[time_name], months)
+
+    out = _apply_event_selection(event_table, selected, event_dim=event_dim, drop=drop)
+    out.attrs.update(
+        {
+            "selection_type": "season",
+            "selection_months": ",".join(str(month) for month in months),
+            "selection_time_name": time_name,
+            "selection_require_full_event": int(require_full_event),
+            "n_selected_events": _count_true(selected),
+        }
+    )
+    return out
+
+
 def selected_event_ids(
     event_table: xr.Dataset,
     *,
@@ -350,10 +420,7 @@ def _validate_event_metric_table(
     event_dim: str,
 ) -> None:
     """Validate common event-table inputs."""
-    if not isinstance(event_table, xr.Dataset):
-        raise TypeError(f"Expected xr.Dataset, got {type(event_table).__name__}.")
-    if event_dim not in event_table.dims:
-        raise ValueError(f"event_table is missing required dimension {event_dim!r}.")
+    _validate_event_table(event_table, event_dim=event_dim)
     if metric not in event_table:
         raise ValueError(f"event_table is missing metric variable {metric!r}.")
     if event_table[metric].dims != (event_dim,):
@@ -361,6 +428,48 @@ def _validate_event_metric_table(
             f"Metric {metric!r} must be 1D with dims ({event_dim!r},); "
             f"got {event_table[metric].dims!r}."
         )
+
+
+def _validate_event_table(event_table: xr.Dataset, *, event_dim: str) -> None:
+    """Validate common event-table shape inputs."""
+    if not isinstance(event_table, xr.Dataset):
+        raise TypeError(f"Expected xr.Dataset, got {type(event_table).__name__}.")
+    if event_dim not in event_table.dims:
+        raise ValueError(f"event_table is missing required dimension {event_dim!r}.")
+
+
+def _validate_event_time_variable(event_table: xr.Dataset, name: str, *, event_dim: str) -> None:
+    """Validate that a timestamp variable is 1D on the event dimension."""
+    if name not in event_table:
+        raise ValueError(f"event_table is missing time variable {name!r}.")
+    da = event_table[name]
+    if da.dims != (event_dim,):
+        raise ValueError(
+            f"Time variable {name!r} must be 1D with dims ({event_dim!r},); "
+            f"got {da.dims!r}."
+        )
+    if not np.issubdtype(da.dtype, np.datetime64):
+        raise TypeError(f"Time variable {name!r} must have datetime64 dtype.")
+
+
+def _validate_season_months(season_months: Sequence[int]) -> tuple[int, ...]:
+    """Return validated month numbers with duplicates removed in input order."""
+    if isinstance(season_months, (str, bytes)):
+        raise TypeError("season_months must be a sequence of integer month numbers.")
+
+    months: list[int] = []
+    for month in season_months:
+        if isinstance(month, (bool, np.bool_)) or not isinstance(month, (int, np.integer)):
+            raise ValueError("season_months must contain only integer month numbers.")
+        month_int = int(month)
+        if month_int < 1 or month_int > 12:
+            raise ValueError("season_months values must be between 1 and 12.")
+        if month_int not in months:
+            months.append(month_int)
+
+    if not months:
+        raise ValueError("season_months must contain at least one month.")
+    return tuple(months)
 
 
 def _validate_quantile_bounds(qmin: float, qmax: float) -> None:
@@ -386,6 +495,69 @@ def _lower_bound_mask(metric_da: xr.DataArray, value: float, *, inclusive: bool)
 def _upper_bound_mask(metric_da: xr.DataArray, value: float, *, inclusive: bool) -> xr.DataArray:
     """Return upper-bound mask."""
     return metric_da <= value if inclusive else metric_da < value
+
+
+def _event_time_month_mask(time_da: xr.DataArray, months: Sequence[int]) -> xr.DataArray:
+    """Return a boolean event mask based on event timestamp month."""
+    mask = time_da.dt.month.isin(months)
+    return mask.fillna(False).astype(bool)
+
+
+def _full_event_season_mask(
+    start_time: xr.DataArray,
+    end_time: xr.DataArray,
+    months: Sequence[int],
+    *,
+    event_dim: str,
+) -> xr.DataArray:
+    """Return a mask for events whose inclusive interval touches only season months."""
+    start_values = np.asarray(start_time.compute().values, dtype="datetime64[ns]")
+    end_values = np.asarray(end_time.compute().values, dtype="datetime64[ns]")
+    allowed = set(int(month) for month in months)
+    selected = np.asarray(
+        [
+            _interval_months_are_in_season(start, end, allowed)
+            for start, end in zip(start_values, end_values)
+        ],
+        dtype=bool,
+    )
+    return xr.DataArray(selected, dims=(event_dim,), coords={event_dim: start_time[event_dim]})
+
+
+def _interval_months_are_in_season(
+    start: np.datetime64,
+    end: np.datetime64,
+    allowed_months: set[int],
+) -> bool:
+    """Return True when every calendar month touched by an interval is allowed."""
+    if np.isnat(start) or np.isnat(end) or end < start:
+        return False
+
+    start_month = start.astype("datetime64[M]")
+    end_month = end.astype("datetime64[M]")
+    month_values = np.arange(start_month, end_month + np.timedelta64(1, "M"), dtype="datetime64[M]")
+    month_numbers = (month_values.astype(int) % 12) + 1
+    return bool(np.isin(month_numbers, list(allowed_months)).all())
+
+
+def _apply_event_selection(
+    event_table: xr.Dataset,
+    selected: xr.DataArray,
+    *,
+    event_dim: str,
+    drop: bool,
+) -> xr.Dataset:
+    """Apply an event-dimension mask without broadcasting across other dimensions."""
+    if drop:
+        selected_values = np.asarray(selected.compute().values, dtype=bool)
+        selected_idx = np.flatnonzero(selected_values)
+        return event_table.isel({event_dim: selected_idx})
+
+    out = event_table.copy(deep=False)
+    for name, da in event_table.data_vars.items():
+        if event_dim in da.dims:
+            out[name] = da.where(selected)
+    return out
 
 
 def _metric_values(metric_da: xr.DataArray) -> np.ndarray:

@@ -12,7 +12,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from src import analysis_io, composites, plotting
+from src import analysis_io, composites, plotting, selectors
 
 
 DEFAULT_OUTPUT_PATH = REPO_ROOT / "results" / "plots_composites" / "hw_all_events_composite.png"
@@ -67,6 +67,19 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_SMOOTHING_WINDOW,
         help="Hourly running-mean window for the smoothed composite figure.",
     )
+    parser.add_argument(
+        "--season-months",
+        type=int,
+        nargs="+",
+        default=None,
+        metavar="MONTH",
+        help="Optional calendar months to retain before compositing, e.g. 6 7 8.",
+    )
+    parser.add_argument(
+        "--require-full-event",
+        action="store_true",
+        help="Require the full event interval to fall within --season-months.",
+    )
     return parser.parse_args()
 
 
@@ -76,6 +89,10 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--window-days must be >= 0.")
     if args.smoothing_window < 1:
         raise ValueError("--smoothing-window must be >= 1.")
+    if args.require_full_event and args.season_months is None:
+        raise ValueError("--require-full-event requires --season-months.")
+    if args.season_months is not None:
+        _validate_season_months(args.season_months)
 
 
 def main() -> int:
@@ -85,12 +102,26 @@ def main() -> int:
 
     ds = analysis_io.open_harmonized_timeseries(args.input_path)
     try:
+        composite_kwargs = {
+            "variables": COMPOSITE_VARIABLES,
+            "pre_days": args.window_days,
+            "post_days": args.window_days,
+            "event_percentiles": (0.25, 0.5, 0.75),
+        }
+        if args.season_months is not None:
+            event_table = selectors.select_events_by_season(
+                ds,
+                args.season_months,
+                require_full_event=args.require_full_event,
+            )
+            if event_table.sizes.get("event", 0) == 0:
+                months = " ".join(str(month) for month in args.season_months)
+                raise ValueError(f"No events remain after filtering to season months: {months}.")
+            composite_kwargs["event_table"] = event_table
+
         composite = composites.all_event_peak_aligned_composite(
             ds,
-            variables=COMPOSITE_VARIABLES,
-            pre_days=args.window_days,
-            post_days=args.window_days,
-            event_percentiles=(0.25, 0.5, 0.75),
+            **composite_kwargs,
         )
         written = plotting.write_composite_timeseries_outputs(
             composite,
@@ -105,6 +136,14 @@ def main() -> int:
     finally:
         ds.close()
     return 0
+
+
+def _validate_season_months(months: list[int]) -> None:
+    """Validate CLI season-month values."""
+    invalid = [month for month in months if month < 1 or month > 12]
+    if invalid:
+        values = ", ".join(str(month) for month in invalid)
+        raise ValueError(f"--season-months values must be between 1 and 12; got {values}.")
 
 
 def _smoothed_output_path(output_path: Path) -> Path:
