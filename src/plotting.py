@@ -29,7 +29,16 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.patches import Patch
 
+plt.rcParams.update({
+    "axes.titlesize": 18,
+    "axes.labelsize": 16,
+    "xtick.labelsize": 14,
+    "ytick.labelsize": 14,
+    "legend.fontsize": 12,
+    "figure.titlesize": 20,
+})
 
 DEFAULT_COMPOSITE_WINDOW_DAYS = 7
 EVENT_PERCENTILE_PREFIX = "event_percentile_"
@@ -69,7 +78,7 @@ def plot_composite_timeseries(composite: xr.Dataset) -> Figure:
     fig.suptitle(
         f"HW event-mean composite centered on peak tas "
         f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})",
-        fontsize=13,
+        fontsize=18,
     )
     ax3.set_xlabel("Lag from event peak (hours)")
     return fig
@@ -137,18 +146,19 @@ def _plot_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
     lag = ds["lag_hour"].values
     ax.plot(lag, ds["T_mean"].values, color="tab:red", label="T_mean")
     _plot_event_percentile_band(ax, lag, ds, "T_mean", color="tab:red")
-    ax.set_ylabel("T_mean [K]")
+    ax.set_ylabel("T_mean [K]", color="tab:red")
     ax.tick_params(axis="y", labelcolor="tab:red")
 
     ax_volume = ax.twinx()
     ax_volume.plot(lag, ds["volume"].values, color="tab:blue", label="volume")
     _plot_event_percentile_band(ax_volume, lag, ds, "volume", color="tab:blue")
-    ax_volume.set_ylabel("volume [m2 Pa]")
+    ax_volume.set_ylabel("volume [m2 Pa]", color="tab:blue")
     ax_volume.tick_params(axis="y", labelcolor="tab:blue")
 
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax_volume.get_legend_handles_labels()
     ax.legend(lines + lines2, labels + labels2, loc="upper left")
+    _add_iqr_legend(ax_volume)
 
 
 def _plot_single_variable_panel(
@@ -185,7 +195,7 @@ def _plot_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
         )
     ax.axhline(0, color="0.2", linewidth=1.0)
     ax.set_ylabel("[K hr-1]")
-    ax.legend(loc="upper left")
+    ax.legend(loc="upper left", ncol=3)
 
 
 def _plot_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
@@ -211,7 +221,7 @@ def _plot_event_percentile_band(
     *,
     color: str,
 ) -> None:
-    """Shade the 5th-to-95th event percentile envelope for one variable."""
+    """Shade the event percentile envelope for one variable."""
     bounds = _event_percentile_bounds(ds, name)
     if bounds is None:
         return
@@ -225,6 +235,12 @@ def _plot_event_percentile_band(
         alpha=0.18,
         linewidth=0,
     )
+
+
+def _add_iqr_legend(ax: Axes) -> None:
+    """Add a first-panel legend entry describing percentile shading."""
+    handle = Patch(facecolor="0.5", edgecolor="none", alpha=0.18, label="IQR")
+    ax.legend(handles=[handle], loc="upper right")
 
 
 def _event_percentile_bounds(
