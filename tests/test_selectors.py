@@ -72,6 +72,69 @@ def test_select_events_by_season_rejects_missing_time_variable():
         selectors.select_events_by_season(event_table, [6, 7, 8])
 
 
+def test_select_event_quantile_bin_supports_numeric_duration():
+    event_table = _make_metric_event_table()
+
+    out = selectors.select_event_quantile_bin(
+        event_table,
+        "duration",
+        qmin=0.0,
+        qmax=0.5,
+        inclusive="left",
+    )
+
+    np.testing.assert_array_equal(out["event_id"].values, [1, 2])
+    assert out.attrs["selection_lower_value"] == 1.0
+    assert out.attrs["selection_upper_value"] == 2.5
+
+
+def test_select_event_quantile_bin_supports_timedelta_duration_in_days():
+    event_table = _make_metric_event_table(
+        duration=np.array([1, 2, 3, 4], dtype="timedelta64[D]"),
+    )
+
+    out = selectors.select_event_quantile_bin(
+        event_table,
+        "duration",
+        qmin=0.5,
+        qmax=1.0,
+        inclusive="both",
+    )
+
+    np.testing.assert_array_equal(out["event_id"].values, [3, 4])
+    assert out.attrs["selection_lower_value"] == 2.5
+    assert out.attrs["selection_upper_value"] == 4.0
+    assert out.attrs["selection_metric_units"] == "days"
+
+
+def test_select_events_by_metric_supports_timedelta_duration_day_bounds():
+    event_table = _make_metric_event_table(
+        duration=np.array([1, 2, 3, 4], dtype="timedelta64[D]"),
+    )
+
+    out = selectors.select_events_by_metric(
+        event_table,
+        "duration",
+        min_value=2.0,
+        max_value=3.0,
+    )
+
+    np.testing.assert_array_equal(out["event_id"].values, [2, 3])
+    assert out.attrs["selection_metric_units"] == "days"
+
+
+def test_select_event_quantile_bin_rejects_datetime_metric():
+    event_table = _make_metric_event_table()
+
+    with pytest.raises(TypeError, match="datetime64"):
+        selectors.select_event_quantile_bin(
+            event_table,
+            "peak_time",
+            qmin=0.0,
+            qmax=0.5,
+        )
+
+
 def _make_event_table() -> xr.Dataset:
     event = np.arange(5)
     time = np.array(
@@ -124,4 +187,32 @@ def _make_event_table() -> xr.Dataset:
             "T_mean": ("time", np.array([280.0, 281.0, 282.0])),
         },
         coords={"event": event, "time": time},
+    )
+
+
+def _make_metric_event_table(
+    *,
+    duration: np.ndarray | None = None,
+) -> xr.Dataset:
+    if duration is None:
+        duration = np.array([1.0, 2.0, 3.0, 4.0])
+    event = np.arange(4)
+    return xr.Dataset(
+        data_vars={
+            "event_id": ("event", np.array([1, 2, 3, 4], dtype=np.int64)),
+            "duration": ("event", duration),
+            "peak_time": (
+                "event",
+                np.array(
+                    [
+                        "2000-06-01T00:00",
+                        "2000-06-02T00:00",
+                        "2000-06-03T00:00",
+                        "2000-06-04T00:00",
+                    ],
+                    dtype="datetime64[ns]",
+                ),
+            ),
+        },
+        coords={"event": event},
     )

@@ -89,6 +89,41 @@ def test_write_composite_timeseries_outputs_writes_raw_and_smoothed_pngs(tmp_pat
     assert all(path.exists() for path in written)
 
 
+def test_plot_split_composite_timeseries_draws_mean_lines_for_each_bin():
+    fig = plotting.plot_split_composite_timeseries(_make_split_composite())
+    try:
+        # dTdt panel: 2 bins * (mean + 2 IQR bounds), plus zero line and peak marker.
+        assert len(fig.axes[1].lines) == 8
+    finally:
+        plt.close(fig)
+
+
+def test_plot_split_composite_timeseries_draws_iqr_as_lines_not_fills():
+    fig = plotting.plot_split_composite_timeseries(_make_split_composite())
+    try:
+        assert sum(len(ax.collections) for ax in fig.axes) == 0
+        assert _legend_label_count(fig, "IQR bounds") == 1
+        assert fig.axes[4].get_legend().get_texts()[-1].get_text() == "IQR bounds"
+    finally:
+        plt.close(fig)
+
+
+def test_write_split_composite_timeseries_outputs_writes_raw_and_smoothed_pngs(tmp_path):
+    written = plotting.write_split_composite_timeseries_outputs(
+        _make_split_composite(),
+        tmp_path / "hw_split_composite.png",
+        smoothed_output_path=tmp_path / "hw_split_composite_smoothed.png",
+        smoothing_window=2,
+        smoothed_variables=("T_mean", "volume", "dTdt"),
+    )
+
+    assert [path.name for path in written] == [
+        "hw_split_composite.png",
+        "hw_split_composite_smoothed.png",
+    ]
+    assert all(path.exists() for path in written)
+
+
 def _make_composite() -> xr.Dataset:
     lag_hour = np.arange(-2, 3)
     variables = {
@@ -119,3 +154,38 @@ def _make_composite() -> xr.Dataset:
         coords={"lag_hour": lag_hour, "quantile": [0.25, 0.5, 0.75]},
         attrs={"n_events": 2, "pre_days": 2, "post_days": 2},
     )
+
+
+def _legend_label_count(fig, label: str) -> int:
+    """Return the number of legend entries matching one label."""
+    count = 0
+    for ax in fig.axes:
+        legend = ax.get_legend()
+        if legend is None:
+            continue
+        count += sum(text.get_text() == label for text in legend.get_texts())
+    return count
+
+
+def _make_split_composite() -> xr.Dataset:
+    base = _make_composite()
+    bins = []
+    for offset in (0.0, 2.0):
+        ds = base.copy(deep=True)
+        for name in ds.data_vars:
+            ds[name] = ds[name] + offset
+        bins.append(ds)
+    out = xr.concat(
+        bins,
+        dim=xr.IndexVariable("split_bin", ["q0-0.5 (n=2)", "q0.5-1 (n=2)"]),
+    )
+    out = out.assign_coords(split_n_events=("split_bin", np.array([2, 2])))
+    out.attrs.update(
+        {
+            "n_events": 4,
+            "pre_days": 2,
+            "post_days": 2,
+            "split_variable": "duration",
+        }
+    )
+    return out

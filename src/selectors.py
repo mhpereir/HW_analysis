@@ -70,7 +70,7 @@ def select_events_by_metric(
     if min_value is None and max_value is None:
         raise ValueError("At least one of min_value or max_value must be provided.")
 
-    metric_da = event_table[metric]
+    metric_da = _numeric_metric_dataarray(event_table[metric])
     selected = _finite_metric_mask(metric_da)
 
     if min_value is not None:
@@ -87,16 +87,18 @@ def select_events_by_metric(
         )
 
     out = event_table.where(selected, drop=drop)
-    out.attrs.update(
-        {
-            "selection_type": "metric_range",
-            "selection_metric": metric,
-            "selection_min_value": np.nan if min_value is None else float(min_value),
-            "selection_max_value": np.nan if max_value is None else float(max_value),
-            "selection_inclusive": inclusive,
-            "n_selected_events": _count_true(selected),
-        }
-    )
+    attrs = {
+        "selection_type": "metric_range",
+        "selection_metric": metric,
+        "selection_min_value": np.nan if min_value is None else float(min_value),
+        "selection_max_value": np.nan if max_value is None else float(max_value),
+        "selection_inclusive": inclusive,
+        "n_selected_events": _count_true(selected),
+    }
+    metric_units = _selection_metric_units(event_table[metric])
+    if metric_units is not None:
+        attrs["selection_metric_units"] = metric_units
+    out.attrs.update(attrs)
     return out
 
 
@@ -221,7 +223,9 @@ def select_event_quantile_bin(
     _validate_event_metric_table(event_table, metric, event_dim=event_dim)
     _validate_quantile_bounds(qmin, qmax)
 
-    values = _metric_values(event_table[metric])
+    metric_da = event_table[metric]
+    values = _metric_values(metric_da)
+    metric_units = _selection_metric_units(metric_da)
     finite_values = values[np.isfinite(values)]
     if finite_values.size == 0:
         return _empty_quantile_selection(
@@ -230,6 +234,7 @@ def select_event_quantile_bin(
             qmin=qmin,
             qmax=qmax,
             event_dim=event_dim,
+            metric_units=metric_units,
         )
 
     lower = float(np.nanquantile(finite_values, qmin))
@@ -244,17 +249,18 @@ def select_event_quantile_bin(
         inclusive=inclusive,
         drop=drop,
     )
-    out.attrs.update(
-        {
-            "selection_type": "metric_quantile_bin",
-            "selection_metric": metric,
-            "selection_qmin": float(qmin),
-            "selection_qmax": float(qmax),
-            "selection_lower_value": lower,
-            "selection_upper_value": upper,
-            "selection_inclusive": inclusive,
-        }
-    )
+    attrs = {
+        "selection_type": "metric_quantile_bin",
+        "selection_metric": metric,
+        "selection_qmin": float(qmin),
+        "selection_qmax": float(qmax),
+        "selection_lower_value": lower,
+        "selection_upper_value": upper,
+        "selection_inclusive": inclusive,
+    }
+    if metric_units is not None:
+        attrs["selection_metric_units"] = metric_units
+    out.attrs.update(attrs)
     return out
 
 
@@ -497,6 +503,32 @@ def _upper_bound_mask(metric_da: xr.DataArray, value: float, *, inclusive: bool)
     return metric_da <= value if inclusive else metric_da < value
 
 
+def _numeric_metric_dataarray(metric_da: xr.DataArray) -> xr.DataArray:
+    """Return a numeric metric view for range, ranking, and quantile selection."""
+    if np.issubdtype(metric_da.dtype, np.datetime64):
+        raise TypeError(
+            f"Metric {metric_da.name!r} is datetime64 and cannot be used for "
+            "numeric metric selection."
+        )
+    if np.issubdtype(metric_da.dtype, np.timedelta64):
+        out = metric_da / np.timedelta64(1, "D")
+        out.name = metric_da.name
+        return out
+    if np.issubdtype(metric_da.dtype, np.number):
+        return metric_da
+    raise TypeError(
+        f"Metric {metric_da.name!r} must be numeric or timedelta64; "
+        f"got dtype {metric_da.dtype}."
+    )
+
+
+def _selection_metric_units(metric_da: xr.DataArray) -> str | None:
+    """Return selection units added by metric normalization, if any."""
+    if np.issubdtype(metric_da.dtype, np.timedelta64):
+        return "days"
+    return None
+
+
 def _event_time_month_mask(time_da: xr.DataArray, months: Sequence[int]) -> xr.DataArray:
     """Return a boolean event mask based on event timestamp month."""
     mask = time_da.dt.month.isin(months)
@@ -562,7 +594,8 @@ def _apply_event_selection(
 
 def _metric_values(metric_da: xr.DataArray) -> np.ndarray:
     """Return metric values as a realized 1D float NumPy array."""
-    return np.asarray(metric_da.compute().values, dtype=float)
+    numeric_metric = _numeric_metric_dataarray(metric_da)
+    return np.asarray(numeric_metric.compute().values, dtype=float)
 
 
 def _count_true(mask: xr.DataArray) -> int:
@@ -603,16 +636,18 @@ def _empty_quantile_selection(
     qmin: float,
     qmax: float,
     event_dim: str,
+    metric_units: str | None = None,
 ) -> xr.Dataset:
     """Return an empty quantile-bin selection."""
     out = event_table.isel({event_dim: slice(0, 0)})
-    out.attrs.update(
-        {
-            "selection_type": "metric_quantile_bin",
-            "selection_metric": metric,
-            "selection_qmin": float(qmin),
-            "selection_qmax": float(qmax),
-            "n_selected_events": 0,
-        }
-    )
+    attrs = {
+        "selection_type": "metric_quantile_bin",
+        "selection_metric": metric,
+        "selection_qmin": float(qmin),
+        "selection_qmax": float(qmax),
+        "n_selected_events": 0,
+    }
+    if metric_units is not None:
+        attrs["selection_metric_units"] = metric_units
+    out.attrs.update(attrs)
     return out
