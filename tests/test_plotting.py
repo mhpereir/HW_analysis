@@ -63,6 +63,21 @@ def test_temperature_volume_axis_labels_match_tick_colors():
         plt.close(fig)
 
 
+def test_plot_composite_timeseries_uses_variable_colors_for_multi_variable_panels():
+    fig = plotting.plot_composite_timeseries(_make_composite())
+    try:
+        tendency_colors = _line_colors_by_label(fig.axes[2])
+        assert tendency_colors["advection"] == plotting.VARIABLE_COLORS["advection"]
+        assert tendency_colors["adiabatic"] == plotting.VARIABLE_COLORS["adiabatic"]
+        assert tendency_colors["diabatic"] == plotting.VARIABLE_COLORS["diabatic"]
+
+        lwa_colors = _line_colors_by_label(fig.axes[3])
+        assert lwa_colors["lwa_a_region"] == plotting.VARIABLE_COLORS["lwa_a_region"]
+        assert lwa_colors["lwa_c_region"] == plotting.VARIABLE_COLORS["lwa_c_region"]
+    finally:
+        plt.close(fig)
+
+
 def test_write_composite_timeseries_plot_writes_png(tmp_path):
     path = plotting.write_composite_timeseries_plot(
         _make_composite(),
@@ -165,6 +180,15 @@ def _legend_label_count(fig, label: str) -> int:
             continue
         count += sum(text.get_text() == label for text in legend.get_texts())
     return count
+
+
+def _line_colors_by_label(ax) -> dict[str, str]:
+    """Return plotted line colors keyed by their visible legend labels."""
+    return {
+        line.get_label(): line.get_color()
+        for line in ax.lines
+        if not line.get_label().startswith("_")
+    }
 
 
 def _make_split_composite() -> xr.Dataset:

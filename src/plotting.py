@@ -325,13 +325,14 @@ def _plot_split_single_variable_panel(
 def _plot_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
     """Plot heat-budget tendency terms on one axis."""
     for name in ("advection", "adiabatic", "diabatic"):
-        (line,) = ax.plot(ds["lag_hour"].values, ds[name].values, label=name)
+        color = VARIABLE_COLORS[name]
+        ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color=color)
         _plot_event_percentile_band(
             ax,
             ds["lag_hour"].values,
             ds,
             name,
-            color=line.get_color(), #type: ignore
+            color=color,
         )
     ax.axhline(0, color="0.2", linewidth=1.0)
     ax.set_ylabel("[K hr-1]")
@@ -364,13 +365,14 @@ def _plot_split_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
 def _plot_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
     """Plot LWA_a and LWA_c regional composite time series."""
     for name in ("lwa_a_region", "lwa_c_region"):
-        (line,) = ax.plot(ds["lag_hour"].values, ds[name].values, label=name)
+        color = VARIABLE_COLORS[name]
+        ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color=color)
         _plot_event_percentile_band(
             ax,
             ds["lag_hour"].values,
             ds,
             name,
-            color=line.get_color(), #type: ignore
+            color=color,
         )
     ax.set_ylabel("LWA [m hPa]")
     ax.legend(loc="upper left")
