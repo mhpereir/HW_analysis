@@ -75,13 +75,22 @@ def parse_args() -> argparse.Namespace:
         "--split-variable",
         type=str,
         required=True,
-        help="Variable to split the composite by. Examples: duration, peak_value, tas_peak, tas_anom_peak, tas_excess_peak, tas_excess_integral, lwa_a_peak, lwa_c_peak",
+        help="Variable to split the composite by. Examples: duration, peak_time, peak_value, tas_peak, tas_anom_peak, tas_excess_peak, tas_excess_integral, lwa_a_peak, lwa_c_peak",
     )
     parser.add_argument(
         "--split-quantiles",
         type=float,
         nargs="+",
         help="Quantiles to split the composite by, e.g. 0.25 0.5 0.75.",
+    )
+    parser.add_argument(
+        "--split-years",
+        type=int,
+        nargs="+",
+        help=(
+            "Calendar years where peak-time bins start. Used only with "
+            "--split-variable peak_time, e.g. 1980 2000."
+        ),
     )
     parser.add_argument(
         "--season-months",
@@ -105,7 +114,14 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--window-days must be >= 0.")
     if args.smoothing_window < 1:
         raise ValueError("--smoothing-window must be >= 1.")
-    _validate_split_quantiles(args.split_quantiles)
+    if args.split_variable == "peak_time":
+        _validate_split_years(args.split_years)
+        if args.split_quantiles is not None:
+            raise ValueError("--split-variable peak_time uses --split-years, not --split-quantiles.")
+    else:
+        _validate_split_quantiles(args.split_quantiles)
+        if args.split_years is not None:
+            raise ValueError("--split-years is only supported with --split-variable peak_time.")
     if args.require_full_event and args.season_months is None:
         raise ValueError("--require-full-event requires --season-months.")
     if args.season_months is not None:
@@ -136,13 +152,21 @@ def main() -> int:
                 months = " ".join(str(month) for month in args.season_months)
                 raise ValueError(f"No events remain after filtering to season months: {months}.")
 
-        composite = build_split_quantile_composite(
-            ds,
-            event_table=event_table,
-            split_variable=args.split_variable,
-            split_quantiles=args.split_quantiles,
-            composite_kwargs=composite_kwargs,
-        )
+        if args.split_variable == "peak_time":
+            composite = build_split_year_composite(
+                ds,
+                event_table=event_table,
+                split_years=args.split_years,
+                composite_kwargs=composite_kwargs,
+            )
+        else:
+            composite = build_split_quantile_composite(
+                ds,
+                event_table=event_table,
+                split_variable=args.split_variable,
+                split_quantiles=args.split_quantiles,
+                composite_kwargs=composite_kwargs,
+            )
         output_path = _split_output_path(args.output_path, args.split_variable)
         written = plotting.write_split_composite_timeseries_outputs(
             composite,
@@ -232,6 +256,84 @@ def build_split_quantile_composite(
     return split
 
 
+def build_split_year_composite(
+    ds: xr.Dataset,
+    *,
+    event_table: xr.Dataset,
+    split_years: list[int] | tuple[int, ...],
+    composite_kwargs: dict[str, object],
+) -> xr.Dataset:
+    """Build one composite per peak-time calendar-year bin."""
+    _validate_peak_time_variable(event_table, "peak_time")
+    years = _event_peak_years(event_table["peak_time"])
+    finite_years = years[~np.isnan(years)]
+    if finite_years.size == 0:
+        raise ValueError("Split variable 'peak_time' contains no finite timestamps.")
+
+    first_year = int(np.min(finite_years))
+    last_year = int(np.max(finite_years))
+    cut_years = _validate_split_years(split_years)
+    invalid = [year for year in cut_years if year <= first_year or year > last_year]
+    if invalid:
+        text = ", ".join(str(year) for year in invalid)
+        raise ValueError(
+            "--split-years must be within the filtered peak-time year range "
+            f"({first_year + 1}-{last_year}); got {text}."
+        )
+
+    starts = (first_year, *cut_years)
+    ends = (*(year - 1 for year in cut_years), last_year)
+
+    bin_composites: list[xr.Dataset] = []
+    labels: list[str] = []
+    start_values: list[int] = []
+    end_values: list[int] = []
+    n_events: list[int] = []
+
+    for start_year, end_year in zip(starts, ends, strict=True):
+        selected_mask = (years >= start_year) & (years <= end_year)
+        selected_indices = np.flatnonzero(selected_mask)
+        selected_count = int(selected_indices.size)
+        if selected_count == 0:
+            raise ValueError(
+                f"Split year bin {start_year}-{end_year} for 'peak_time' contains no events."
+            )
+
+        selected = event_table.isel(event=selected_indices)
+        composite = composites.all_event_peak_aligned_composite(
+            ds,
+            event_table=selected,
+            **composite_kwargs, # type: ignore
+        )
+        label = _split_year_bin_label(start_year, end_year, selected_count)
+        bin_composites.append(composite)
+        labels.append(label)
+        start_values.append(int(start_year))
+        end_values.append(int(end_year))
+        n_events.append(selected_count)
+
+    split = xr.concat(
+        bin_composites,
+        dim=xr.IndexVariable(SPLIT_BIN_DIM, labels),
+    )
+    split = split.assign_coords(
+        split_start_year=(SPLIT_BIN_DIM, np.asarray(start_values, dtype=np.int64)),
+        split_end_year=(SPLIT_BIN_DIM, np.asarray(end_values, dtype=np.int64)),
+        split_n_events=(SPLIT_BIN_DIM, np.asarray(n_events, dtype=np.int64)),
+    )
+    split.attrs.update(
+        {
+            "composite_reduction": "mean over split HW event peak-time year bins",
+            "split_variable": "peak_time",
+            "split_type": "year_bin",
+            "split_years": ",".join(str(value) for value in cut_years),
+            "split_bin_labels": ",".join(labels),
+            "n_events": int(np.sum(n_events)),
+        }
+    )
+    return split
+
+
 def _validate_split_quantiles(
     quantiles: list[float] | tuple[float, ...] | None,
 ) -> tuple[float, ...]:
@@ -253,6 +355,25 @@ def _validate_split_quantiles(
     return values
 
 
+def _validate_split_years(
+    years: list[int] | tuple[int, ...] | None,
+) -> tuple[int, ...]:
+    """Return sorted, validated peak-time split years."""
+    if years is None:
+        raise ValueError("--split-years must provide at least one year.")
+    values = tuple(sorted(int(year) for year in years))
+    if not values:
+        raise ValueError("--split-years must provide at least one year.")
+    invalid = [year for year in values if year < 1 or year > 9999]
+    if invalid:
+        text = ", ".join(str(year) for year in invalid)
+        raise ValueError(f"--split-years values must be between 1 and 9999; got {text}.")
+    unique_values = set(values)
+    if len(unique_values) != len(values):
+        raise ValueError("--split-years must not contain duplicate values.")
+    return values
+
+
 def _validate_split_variable(event_table: xr.Dataset, split_variable: str) -> None:
     """Validate that the requested split variable is a numeric event-summary variable."""
     if split_variable not in event_table:
@@ -267,9 +388,37 @@ def _validate_split_variable(event_table: xr.Dataset, split_variable: str) -> No
         raise TypeError(f"Split variable {split_variable!r} must be numeric.")
 
 
+def _validate_peak_time_variable(event_table: xr.Dataset, split_variable: str) -> None:
+    """Validate that the requested split variable is a datetime event-summary variable."""
+    if split_variable not in event_table:
+        raise ValueError(f"event table is missing split variable {split_variable!r}.")
+    da = event_table[split_variable]
+    if da.dims != ("event",):
+        raise ValueError(
+            f"Split variable {split_variable!r} must be 1D with dims ('event',); "
+            f"got {da.dims!r}."
+        )
+    if not np.issubdtype(da.dtype, np.datetime64):
+        raise TypeError(f"Split variable {split_variable!r} must be datetime64.")
+
+
+def _event_peak_years(peak_time: xr.DataArray) -> np.ndarray:
+    """Return event peak years as floats, using NaN for missing timestamps."""
+    peak_values = np.asarray(peak_time.values).astype("datetime64[ns]")
+    years = np.full(peak_values.shape, np.nan, dtype=float)
+    finite = ~np.isnat(peak_values)
+    years[finite] = peak_values[finite].astype("datetime64[Y]").astype(int) + 1970
+    return years
+
+
 def _split_bin_label(qmin: float, qmax: float, n_events: int) -> str:
     """Return a compact split-bin label for legends and coordinates."""
     return f"q{qmin:g}-{qmax:g} (n={n_events})"
+
+
+def _split_year_bin_label(start_year: int, end_year: int, n_events: int) -> str:
+    """Return a compact year-bin label for legends and coordinates."""
+    return f"{start_year}-{end_year} (n={n_events})"
 
 
 def _validate_season_months(months: list[int]) -> None:
