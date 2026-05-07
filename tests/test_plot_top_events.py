@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
@@ -13,6 +14,7 @@ def test_parse_args_uses_default_input_path(monkeypatch):
     args = plot_top_events.parse_args()
 
     assert args.input_path == analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH
+    assert args.smoothing_window == plot_top_events.DEFAULT_SMOOTHING_WINDOW
 
 
 def test_parse_args_accepts_custom_input_path(monkeypatch, tmp_path):
@@ -58,7 +60,7 @@ def test_select_top_tas_events_returns_ranked_top_events():
     np.testing.assert_allclose(selected["tas_peak"].values, [305.0, 301.0])
 
 
-def test_write_top_event_plots_writes_one_figure_per_event(tmp_path):
+def test_write_top_event_plots_writes_raw_and_smoothed_figures_per_event(tmp_path):
     ds = _make_plot_dataset()
     selected = plot_top_events.select_top_tas_events(ds, n=2)
 
@@ -69,9 +71,99 @@ def test_write_top_event_plots_writes_one_figure_per_event(tmp_path):
         window_days=1,
     )
 
-    assert len(written) == 2
+    assert len(written) == 4
     assert all(path.exists() for path in written)
     assert written[0].name.startswith("top_event_rank_01_event_0002_")
+    assert written[1].name.startswith("top_event_rank_01_event_0002_")
+    assert written[1].name.endswith("_smoothed.png")
+
+
+def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp_path):
+    ds = _make_plot_dataset()
+    selected = plot_top_events.select_top_tas_events(ds, n=2)
+    reference_composite = xr.Dataset()
+    smoothed_reference_composite = xr.Dataset()
+    captured = {
+        "composite_calls": 0,
+        "plot_references": [],
+        "smooth_calls": [],
+    }
+
+    def fake_composite(source, **kwargs):
+        captured["composite_calls"] += 1
+        captured["composite_source"] = source
+        captured["composite_kwargs"] = kwargs
+        return reference_composite
+
+    def fake_smooth(source, **kwargs):
+        captured["smooth_calls"].append((source, kwargs))
+        if source is reference_composite:
+            return smoothed_reference_composite
+        smoothed = source.copy(deep=False)
+        smoothed.attrs["smoothing_window"] = kwargs["smoothing_window"]
+        return smoothed
+
+    def fake_plot(event_window, event, *, reference_composite=None):
+        captured["plot_references"].append(reference_composite)
+        fig = plt.figure()
+        fig.add_subplot(111)
+        return fig
+
+    monkeypatch.setattr(
+        plot_top_events.composites,
+        "all_event_peak_aligned_composite",
+        fake_composite,
+    )
+    monkeypatch.setattr(
+        plot_top_events.plotting,
+        "plot_top_event_timeseries",
+        fake_plot,
+    )
+    monkeypatch.setattr(
+        plot_top_events.plotting,
+        "smooth_composite_for_display",
+        fake_smooth,
+    )
+
+    written = plot_top_events.write_top_event_plots(
+        ds,
+        selected,
+        output_dir=tmp_path,
+        window_days=1,
+        smoothing_window=6,
+    )
+
+    assert len(written) == 4
+    assert captured["composite_calls"] == 1
+    assert captured["composite_source"] is ds
+    assert captured["composite_kwargs"] == {
+        "variables": plot_top_events.TOP_EVENT_VARIABLES,
+        "pre_days": 1,
+        "post_days": 1,
+        "event_percentiles": plot_top_events.REFERENCE_EVENT_PERCENTILES,
+    }
+    assert captured["plot_references"] == [
+        reference_composite,
+        smoothed_reference_composite,
+        reference_composite,
+        smoothed_reference_composite,
+    ]
+    assert len(captured["smooth_calls"]) == 3
+    first_smooth_source, first_smooth_kwargs = captured["smooth_calls"][0]
+    assert first_smooth_source is reference_composite
+    assert first_smooth_kwargs == {
+        "variables": plot_top_events.SMOOTHED_TOP_EVENT_VARIABLES,
+        "smoothing_window": 6,
+    }
+    assert all(
+        kwargs == {
+            "variables": plot_top_events.SMOOTHED_TOP_EVENT_VARIABLES,
+            "smoothing_window": 6,
+            "lag_dim": "time",
+        }
+        for _, kwargs in captured["smooth_calls"][1:]
+    )
+    assert all(path.exists() for path in written)
 
 
 def _make_plot_dataset() -> xr.Dataset:

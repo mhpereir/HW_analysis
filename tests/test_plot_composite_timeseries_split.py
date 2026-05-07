@@ -106,6 +106,121 @@ def test_build_split_quantile_composite_sorts_multiple_quantiles(monkeypatch):
     np.testing.assert_array_equal(out["split_n_events"].values, [2, 4, 2])
 
 
+def test_build_split_year_composite_one_cutoff_makes_two_bins(monkeypatch):
+    captured = []
+
+    def fake_composite(ds, **kwargs):
+        captured.append(kwargs["event_table"]["event_id"].values.copy())
+        return _make_composite(float(len(captured)))
+
+    monkeypatch.setattr(
+        plot_split.composites,
+        "all_event_peak_aligned_composite",
+        fake_composite,
+    )
+
+    out = plot_split.build_split_year_composite(
+        xr.Dataset(),
+        event_table=_make_event_table(
+            event_ids=np.arange(1, 5),
+            peak_time=np.array(
+                ["1940-06-01", "1979-07-01", "1980-06-01", "2024-07-01"],
+                dtype="datetime64[ns]",
+            ),
+        ),
+        split_years=[1980],
+        composite_kwargs={
+            "variables": plot_split.COMPOSITE_VARIABLES,
+            "pre_days": 1,
+            "post_days": 1,
+            "event_percentiles": (0.25, 0.5, 0.75),
+        },
+    )
+
+    assert out.sizes["split_bin"] == 2
+    np.testing.assert_array_equal(out["split_start_year"].values, [1940, 1980])
+    np.testing.assert_array_equal(out["split_end_year"].values, [1979, 2024])
+    np.testing.assert_array_equal(out["split_n_events"].values, [2, 2])
+    np.testing.assert_array_equal(captured, [np.array([1, 2]), np.array([3, 4])])
+    assert out.attrs["split_variable"] == "peak_time"
+    assert out.attrs["split_type"] == "year_bin"
+    assert out.attrs["split_years"] == "1980"
+
+
+def test_build_split_year_composite_sorts_multiple_cutoffs(monkeypatch):
+    captured = []
+
+    def fake_composite(ds, **kwargs):
+        captured.append(kwargs["event_table"]["event_id"].values.copy())
+        return _make_composite(float(len(captured)))
+
+    monkeypatch.setattr(
+        plot_split.composites,
+        "all_event_peak_aligned_composite",
+        fake_composite,
+    )
+
+    out = plot_split.build_split_year_composite(
+        xr.Dataset(),
+        event_table=_make_event_table(
+            event_ids=np.arange(1, 6),
+            peak_time=np.array(
+                [
+                    "1979-06-01",
+                    "1980-06-01",
+                    "1999-06-01",
+                    "2000-06-01",
+                    "2024-06-01",
+                ],
+                dtype="datetime64[ns]",
+            ),
+        ),
+        split_years=[2000, 1980],
+        composite_kwargs={
+            "variables": plot_split.COMPOSITE_VARIABLES,
+            "pre_days": 1,
+            "post_days": 1,
+            "event_percentiles": (0.25, 0.5, 0.75),
+        },
+    )
+
+    np.testing.assert_array_equal(out["split_start_year"].values, [1979, 1980, 2000])
+    np.testing.assert_array_equal(out["split_end_year"].values, [1979, 1999, 2024])
+    np.testing.assert_array_equal(captured[0], [1])
+    np.testing.assert_array_equal(captured[1], [2, 3])
+    np.testing.assert_array_equal(captured[2], [4, 5])
+
+
+def test_build_split_year_composite_cutoff_year_starts_next_bin(monkeypatch):
+    captured = []
+
+    def fake_composite(ds, **kwargs):
+        captured.append(kwargs["event_table"]["event_id"].values.copy())
+        return _make_composite(float(len(captured)))
+
+    monkeypatch.setattr(
+        plot_split.composites,
+        "all_event_peak_aligned_composite",
+        fake_composite,
+    )
+
+    plot_split.build_split_year_composite(
+        xr.Dataset(),
+        event_table=_make_event_table(
+            event_ids=np.array([1, 2, 3]),
+            peak_time=np.array(
+                ["1979-06-01", "1980-06-01", "1981-06-01"],
+                dtype="datetime64[ns]",
+            ),
+        ),
+        split_years=[1980],
+        composite_kwargs={},
+    )
+
+    np.testing.assert_array_equal(captured[0], [1])
+    np.testing.assert_array_equal(captured[1], [2, 3])
+
+
 def test_main_filters_event_table_before_quantile_splitting(monkeypatch, tmp_path):
     opened = _make_event_table(
         event_ids=np.array([1, 2, 3]),
@@ -162,6 +277,60 @@ def test_main_filters_event_table_before_quantile_splitting(monkeypatch, tmp_pat
     assert captured["smoothed_output_path"].name == "split_duration_smoothed.png"
 
 
+def test_main_filters_event_table_before_year_splitting(monkeypatch, tmp_path):
+    opened = _make_event_table(
+        event_ids=np.array([1, 2, 3]),
+        duration=np.array([10.0, 20.0, 30.0]),
+        peak_time=np.array(
+            ["2000-06-01", "2001-07-01", "2002-09-01"],
+            dtype="datetime64[ns]",
+        ),
+    )
+    captured = {}
+
+    def fake_build(ds, **kwargs):
+        captured["event_table"] = kwargs["event_table"]
+        captured["split_years"] = kwargs["split_years"]
+        return xr.Dataset(
+            data_vars={"T_mean": (("split_bin", "lag_hour"), np.ones((2, 1)))},
+            coords={"split_bin": ["2000-2000", "2001-2001"], "lag_hour": [0]},
+        )
+
+    def fake_write(ds, output, **kwargs):
+        captured["plot_ds"] = ds
+        captured["output_path"] = output
+        captured["smoothed_output_path"] = kwargs["smoothed_output_path"]
+        return [output, kwargs["smoothed_output_path"]]
+
+    monkeypatch.setattr("sys.argv", [
+        "plot_composite_timeseries_split.py",
+        "--input-path",
+        str(tmp_path / "stage1.nc"),
+        "--output-path",
+        str(tmp_path / "split.png"),
+        "--split-variable",
+        "peak_time",
+        "--split-years",
+        "2001",
+        "--season-months",
+        "6",
+        "7",
+    ])
+    monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", lambda path: opened)
+    monkeypatch.setattr(plot_split, "build_split_year_composite", fake_build)
+    monkeypatch.setattr(
+        plot_split.plotting,
+        "write_split_composite_timeseries_outputs",
+        fake_write,
+    )
+
+    assert plot_split.main() == 0
+    np.testing.assert_array_equal(captured["event_table"]["event_id"].values, [1, 2])
+    assert captured["split_years"] == [2001]
+    assert captured["output_path"].name == "split_peak_time.png"
+    assert captured["smoothed_output_path"].name == "split_peak_time_smoothed.png"
+
+
 def test_validate_split_variable_rejects_missing_variable():
     with pytest.raises(ValueError, match="missing split variable"):
         plot_split.build_split_quantile_composite(
@@ -187,6 +356,29 @@ def test_validate_split_variable_rejects_non_numeric_variable():
         )
 
 
+def test_validate_peak_time_variable_rejects_missing_variable():
+    with pytest.raises(ValueError, match="missing split variable"):
+        plot_split.build_split_year_composite(
+            xr.Dataset(),
+            event_table=_make_event_table().drop_vars("peak_time"),
+            split_years=[1980],
+            composite_kwargs={},
+        )
+
+
+def test_validate_peak_time_variable_rejects_non_datetime_variable():
+    event_table = _make_event_table()
+    event_table["peak_time"] = ("event", np.array([1.0, 2.0, 3.0, 4.0]))
+
+    with pytest.raises(TypeError, match="must be datetime64"):
+        plot_split.build_split_year_composite(
+            xr.Dataset(),
+            event_table=event_table,
+            split_years=[1980],
+            composite_kwargs={},
+        )
+
+
 def test_empty_quantile_bin_raises_clear_error(monkeypatch):
     monkeypatch.setattr(
         plot_split.composites,
@@ -204,11 +396,51 @@ def test_empty_quantile_bin_raises_clear_error(monkeypatch):
         )
 
 
+def test_empty_year_bin_raises_clear_error(monkeypatch):
+    monkeypatch.setattr(
+        plot_split.composites,
+        "all_event_peak_aligned_composite",
+        lambda ds, **kwargs: _make_composite(1.0),
+    )
+
+    with pytest.raises(ValueError, match="contains no events"):
+        plot_split.build_split_year_composite(
+            xr.Dataset(),
+            event_table=_make_event_table(
+                event_ids=np.array([1, 2]),
+                peak_time=np.array(
+                    ["1940-06-01", "1942-06-01"],
+                    dtype="datetime64[ns]",
+                ),
+            ),
+            split_years=[1941, 1942],
+            composite_kwargs={},
+        )
+
+
+def test_split_year_outside_filtered_peak_year_range_raises_clear_error():
+    with pytest.raises(ValueError, match="filtered peak-time year range"):
+        plot_split.build_split_year_composite(
+            xr.Dataset(),
+            event_table=_make_event_table(
+                event_ids=np.array([1, 2]),
+                peak_time=np.array(
+                    ["1940-06-01", "2024-06-01"],
+                    dtype="datetime64[ns]",
+                ),
+            ),
+            split_years=[2025],
+            composite_kwargs={},
+        )
+
+
 def test_validate_args_rejects_missing_split_quantiles():
     args = argparse.Namespace(
         window_days=7,
         smoothing_window=24,
+        split_variable="duration",
         split_quantiles=None,
+        split_years=None,
         season_months=None,
         require_full_event=False,
     )
@@ -221,12 +453,74 @@ def test_validate_args_rejects_duplicate_split_quantiles():
     args = argparse.Namespace(
         window_days=7,
         smoothing_window=24,
+        split_variable="duration",
         split_quantiles=[0.5, 0.5],
+        split_years=None,
         season_months=None,
         require_full_event=False,
     )
 
     with pytest.raises(ValueError, match="duplicate"):
+        plot_split.validate_args(args)
+
+
+def test_validate_args_rejects_missing_split_years_for_peak_time():
+    args = argparse.Namespace(
+        window_days=7,
+        smoothing_window=24,
+        split_variable="peak_time",
+        split_quantiles=None,
+        split_years=None,
+        season_months=None,
+        require_full_event=False,
+    )
+
+    with pytest.raises(ValueError, match="--split-years"):
+        plot_split.validate_args(args)
+
+
+def test_validate_args_rejects_duplicate_split_years():
+    args = argparse.Namespace(
+        window_days=7,
+        smoothing_window=24,
+        split_variable="peak_time",
+        split_quantiles=None,
+        split_years=[1980, 1980],
+        season_months=None,
+        require_full_event=False,
+    )
+
+    with pytest.raises(ValueError, match="duplicate"):
+        plot_split.validate_args(args)
+
+
+def test_validate_args_rejects_out_of_range_split_years():
+    args = argparse.Namespace(
+        window_days=7,
+        smoothing_window=24,
+        split_variable="peak_time",
+        split_quantiles=None,
+        split_years=[0],
+        season_months=None,
+        require_full_event=False,
+    )
+
+    with pytest.raises(ValueError, match="between 1 and 9999"):
+        plot_split.validate_args(args)
+
+
+def test_validate_args_rejects_split_quantiles_for_peak_time():
+    args = argparse.Namespace(
+        window_days=7,
+        smoothing_window=24,
+        split_variable="peak_time",
+        split_quantiles=[0.5],
+        split_years=[1980],
+        season_months=None,
+        require_full_event=False,
+    )
+
+    with pytest.raises(ValueError, match="uses --split-years"):
         plot_split.validate_args(args)
 
 
@@ -260,7 +554,7 @@ def _make_event_table(
     if event_ids is None:
         event_ids = np.array([1, 2, 3, 4], dtype=np.int64)
     if duration is None:
-        duration = np.array([1.0, 2.0, 3.0, 4.0])
+        duration = np.arange(1.0, float(event_ids.size) + 1.0)
     if peak_time is None:
         peak_time = np.arange(
             np.datetime64("2000-06-01"),

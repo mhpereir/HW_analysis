@@ -23,8 +23,8 @@ cd /home/mhpereir/HW_analysis/scripts
 echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hostname)"
 /usr/bin/time -v python plot_composite_timeseries_split.py \
     --window-days 7 \
-    --split-variable "duration" \
-    --split-quantiles 0.5 \
+    --split-variable "peak_time" \
+    --split-years 1982 \
     --season-months 6 7 8 \
     --require-full-event
 echo "[info] $(date -Is) done"
