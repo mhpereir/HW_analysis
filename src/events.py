@@ -289,7 +289,7 @@ def build_event_summary_table(
         columns["tas_peak"].append(_nanmax_or_nan(tas_values))
         columns["tas_anom_peak"].append(_nanmax_or_nan(tas_anom_values))
         columns["tas_excess_peak"].append(_nanmax_or_nan(tas_excess_values))
-        columns["tas_excess_integral"].append(_nansum_or_nan(tas_excess_values))
+        columns["tas_excess_integral"].append(_nansum_or_nan(tas_excess_values)) #nansum != nanmax
         columns["lwa_a_peak"].append(_nanmax_or_nan(lwa_a_values))
         columns["lwa_c_peak"].append(_nanmax_or_nan(lwa_c_values))
 

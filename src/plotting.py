@@ -139,6 +139,98 @@ def plot_split_composite_timeseries(composite: xr.Dataset) -> Figure:
     return fig
 
 
+def plot_top_event_timeseries(
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    *,
+    reference_composite: xr.Dataset | None = None,
+) -> Figure:
+    """Return a four-panel absolute-time figure for one selected event."""
+    peak_time = _event_time_value(event, "peak_time")
+    start_time = _event_time_value(event, "start_time")
+    end_time = _event_time_value(event, "end_time")
+
+    fig, axes = plt.subplots(
+        nrows=4,
+        ncols=1,
+        figsize=(12, 10),
+        sharex=True,
+        constrained_layout=True,
+    )
+    ax0, ax1, ax2, ax3 = axes
+
+    _plot_top_event_temperature_volume_panel(
+        ax0,
+        event_window,
+        event,
+        reference_composite=reference_composite,
+    )
+    _plot_top_event_single_variable_panel(
+        ax1,
+        event_window,
+        event,
+        "dTdt",
+        ylabel="[K hr-1]",
+        reference_composite=reference_composite,
+    )
+    _plot_top_event_tendency_panel(
+        ax2,
+        event_window,
+        event,
+        reference_composite=reference_composite,
+    )
+    _plot_top_event_lwa_panel(
+        ax3,
+        event_window,
+        event,
+        reference_composite=reference_composite,
+    )
+
+    for ax in axes:
+        ax.axvline(start_time, color="tab:orange", linewidth=1.2, linestyle=":", alpha=0.9)
+        ax.axvline(end_time, color="tab:orange", linewidth=1.2, linestyle=":", alpha=0.9)
+        ax.axvline(peak_time, color="0.2", linewidth=1.0, linestyle="--", alpha=0.8)
+        ax.grid(True, linewidth=0.5, alpha=0.35)
+
+    event_id = int(event["event_id"].item())
+    rank = int(event["selection_rank"].item()) if "selection_rank" in event else event_id
+    peak_value = float(event["tas_peak"].item()) if "tas_peak" in event else np.nan
+    smoothing_window = event_window.attrs.get("smoothing_window")
+    smoothing_label = (
+        f", {int(smoothing_window)}-hour running mean"
+        if smoothing_window is not None
+        else ""
+    )
+    fig.suptitle(
+        f"Rank {rank} HW event {event_id}: peak tas={peak_value:.2f}{smoothing_label}",
+        fontsize=13,
+    )
+    ax3.set_xlabel("Time")
+    return fig
+
+
+def _plot_line(
+    ax: Axes,
+    x: np.ndarray,
+    ds: xr.Dataset,
+    name: str,
+    *,
+    color: str,
+    label: str | None = None,
+    linestyle: str = "-",
+    linewidth: float | None = None,
+) -> None:
+    """Plot one named variable from a dataset against an explicit x coordinate."""
+    ax.plot(
+        x,
+        ds[name].values,
+        color=color,
+        label=label or name,
+        linestyle=linestyle,
+        linewidth=linewidth,
+    )
+
+
 def smooth_composite_for_display(
     composite: xr.Dataset,
     *,
@@ -248,6 +340,63 @@ def _plot_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
     _add_iqr_legend(ax_volume)
 
 
+def _plot_top_event_temperature_volume_panel(
+    ax: Axes,
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    *,
+    reference_composite: xr.Dataset | None,
+) -> None:
+    """Plot top-event T_mean and volume with optional all-event reference."""
+    time = event_window["time"].values
+    _plot_line(
+        ax,
+        time,
+        event_window,
+        "T_mean",
+        color=VARIABLE_COLORS["T_mean"],
+        label="T_mean",
+        linestyle="--",
+    )
+    if reference_composite is not None:
+        _plot_top_event_reference(
+            ax,
+            event,
+            reference_composite,
+            "T_mean",
+            color=VARIABLE_COLORS["T_mean"],
+        )
+    ax.set_ylabel("T_mean [K]", color=VARIABLE_COLORS["T_mean"])
+    ax.tick_params(axis="y", labelcolor=VARIABLE_COLORS["T_mean"])
+
+    ax_volume = ax.twinx()
+    _plot_line(
+        ax_volume,
+        time,
+        event_window,
+        "volume",
+        color=VARIABLE_COLORS["volume"],
+        label="volume",
+        linestyle="--",
+    )
+    if reference_composite is not None:
+        _plot_top_event_reference(
+            ax_volume,
+            event,
+            reference_composite,
+            "volume",
+            color=VARIABLE_COLORS["volume"],
+        )
+    ax_volume.set_ylabel("volume [m2 Pa]", color=VARIABLE_COLORS["volume"])
+    ax_volume.tick_params(axis="y", labelcolor=VARIABLE_COLORS["volume"])
+
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax_volume.get_legend_handles_labels()
+    ax.legend(lines + lines2, labels + labels2, loc="upper left")
+    if reference_composite is not None:
+        _add_top_event_reference_legend(ax_volume)
+
+
 def _plot_split_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
     """Plot split-bin T_mean and volume with separate y axes."""
     lag = ds["lag_hour"].values
@@ -303,6 +452,38 @@ def _plot_single_variable_panel(
     ax.legend(loc="upper left")
 
 
+def _plot_top_event_single_variable_panel(
+    ax: Axes,
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    name: str,
+    *,
+    ylabel: str,
+    reference_composite: xr.Dataset | None,
+) -> None:
+    """Plot one top-event variable with optional all-event reference."""
+    color = VARIABLE_COLORS[name]
+    _plot_line(
+        ax,
+        event_window["time"].values,
+        event_window,
+        name,
+        color=color,
+        linestyle="--",
+    )
+    if reference_composite is not None:
+        _plot_top_event_reference(
+            ax,
+            event,
+            reference_composite,
+            name,
+            color=color,
+        )
+    ax.axhline(0, color="0.2", linewidth=1.0)
+    ax.set_ylabel(ylabel)
+    ax.legend(loc="upper left")
+
+
 def _plot_split_single_variable_panel(
     ax: Axes,
     ds: xr.Dataset,
@@ -336,6 +517,39 @@ def _plot_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
         )
     ax.axhline(0, color="0.2", linewidth=1.0)
     ax.set_ylabel("[K hr-1]")
+    _expand_yaxis(ax, factor=1.5)
+    ax.legend(loc="upper left", ncol=3)
+
+
+def _plot_top_event_tendency_panel(
+    ax: Axes,
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    *,
+    reference_composite: xr.Dataset | None,
+) -> None:
+    """Plot top-event heat-budget terms with optional all-event reference."""
+    for name in ("advection", "adiabatic", "diabatic"):
+        color = VARIABLE_COLORS[name]
+        _plot_line(
+            ax,
+            event_window["time"].values,
+            event_window,
+            name,
+            color=color,
+            linestyle="--",
+        )
+        if reference_composite is not None:
+            _plot_top_event_reference(
+                ax,
+                event,
+                reference_composite,
+                name,
+                color=color,
+            )
+    ax.axhline(0, color="0.2", linewidth=1.0)
+    ax.set_ylabel("[K hr-1]")
+    _expand_yaxis(ax, factor=1.5)
     ax.legend(loc="upper left", ncol=3)
 
 
@@ -351,6 +565,7 @@ def _plot_split_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
         )
     ax.axhline(0, color="0.2", linewidth=1.0)
     ax.set_ylabel("[K hr-1]")
+    _expand_yaxis(ax, factor=1.5)
     variable_legend = ax.legend(
         handles=[
             _variable_legend_handle(name)
@@ -374,6 +589,36 @@ def _plot_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
             name,
             color=color,
         )
+    ax.set_ylabel("LWA [m hPa]")
+    ax.legend(loc="upper left")
+
+
+def _plot_top_event_lwa_panel(
+    ax: Axes,
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    *,
+    reference_composite: xr.Dataset | None,
+) -> None:
+    """Plot top-event LWA_a and LWA_c with optional all-event reference."""
+    for name in ("lwa_a_region", "lwa_c_region"):
+        color = VARIABLE_COLORS[name]
+        _plot_line(
+            ax,
+            event_window["time"].values,
+            event_window,
+            name,
+            color=color,
+            linestyle="--",
+        )
+        if reference_composite is not None:
+            _plot_top_event_reference(
+                ax,
+                event,
+                reference_composite,
+                name,
+                color=color,
+            )
     ax.set_ylabel("LWA [m hPa]")
     ax.legend(loc="upper left")
 
@@ -478,10 +723,52 @@ def _plot_event_percentile_bound_lines(
         )
 
 
+def _expand_yaxis(ax: Axes, *, factor: float) -> None:
+    """Expand an axis y-range around its current center by a scale factor."""
+    if factor <= 0:
+        raise ValueError("factor must be positive.")
+
+    lower, upper = ax.get_ylim()
+    center = 0.5 * (lower + upper)
+    half_range = 0.5 * (upper - lower) * factor
+    ax.set_ylim(center - half_range, center + half_range)
+
+
+def _plot_top_event_reference(
+    ax: Axes,
+    event: xr.Dataset,
+    reference_composite: xr.Dataset,
+    name: str,
+    *,
+    color: str,
+) -> None:
+    """Plot an all-event composite reference aligned to one event peak."""
+    time = _reference_composite_time(event, reference_composite)
+    _plot_line(
+        ax,
+        time,
+        reference_composite,
+        name,
+        color=color,
+        linewidth=1.8,
+        label="_all_event_average",
+    )
+    _plot_event_percentile_band(ax, time, reference_composite, name, color=color)
+
+
 def _add_iqr_legend(ax: Axes) -> None:
     """Add a first-panel legend entry describing percentile shading."""
     handle = Patch(facecolor="0.5", edgecolor="none", alpha=0.18, label="IQR")
     ax.legend(handles=[handle], loc="upper right")
+
+
+def _add_top_event_reference_legend(ax: Axes) -> None:
+    """Add a single legend for top-event reference line and IQR shading."""
+    handles = [
+        Line2D([0], [0], color="0.2", linestyle="-", label="all-event average"),
+        Patch(facecolor="0.5", edgecolor="none", alpha=0.18, label="IQR"),
+    ]
+    ax.legend(handles=handles, loc="upper right")
 
 
 def _add_split_style_legend(ax: Axes, labels: Sequence[str]) -> None:
@@ -514,6 +801,21 @@ def _event_percentile_bounds(
     if lower is None or upper is None:
         return None
     return lower, upper
+
+
+def _reference_composite_time(
+    event: xr.Dataset,
+    reference_composite: xr.Dataset,
+) -> np.ndarray:
+    """Return reference-composite lags as absolute datetimes for one event."""
+    peak_time = _event_time_value(event, "peak_time")
+    lag_hours = np.asarray(reference_composite["lag_hour"].values, dtype=np.int64)
+    return peak_time + lag_hours.astype("timedelta64[h]")
+
+
+def _event_time_value(event: xr.Dataset, name: str) -> np.datetime64:
+    """Return an event timestamp scalar as datetime64[ns]."""
+    return np.datetime64(np.asarray(event[name].values).item(), "ns")
 
 
 def _select_quantile(
