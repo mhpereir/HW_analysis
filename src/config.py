@@ -19,6 +19,9 @@ ARCO_PATH  = "gs://gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-
 ARCO_TOKEN = "anon"
 ARCO_OPEN_MAX_ATTEMPTS: int = 4
 ARCO_OPEN_RETRY_BASE_DELAY_SECONDS: float = 15.0
+G_M_S2: float = 9.806
+CP_J_KG_K: float = 1005.0
+EARTH_RADIUS_M: float = 6.371e6
 
 REGIONS: dict[str, tuple[slice, slice]] = {
     "pnw_bartusek": (slice(40, 60), slice(-130.0, -110.0)),
@@ -125,3 +128,12 @@ mass_flux_contribution_top (time)
 abs_mass_advection_residual_fraction (time) - diagnostic quantity, not necessary
 '''
 
+# locally stored hourly ARCO/ERA5 full diagnostics
+ERA5_PBL_P_ROOT: str = "/home/mhpereir/data-mhpereir/arco_era5/PBL_download/outputs"
+ERA5_CLOUD_COVER_ROOT: str = "/home/mhpereir/data-mhpereir/arco_era5/CloudCover_download/outputs"
+ERA5_HOURLY_SURFACE_ROOT: str = "/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly"
+ERA5_NSLR_ROOT: str = f"{ERA5_HOURLY_SURFACE_ROOT}/nslr"
+ERA5_NSSR_ROOT: str = f"{ERA5_HOURLY_SURFACE_ROOT}/nssr"
+ERA5_SLHF_ROOT: str = f"{ERA5_HOURLY_SURFACE_ROOT}/slhf"
+ERA5_SSHF_ROOT: str = f"{ERA5_HOURLY_SURFACE_ROOT}/sshf"
+ERA5_SOIL_MOISTURE_ROOT: str = f"{ERA5_HOURLY_SURFACE_ROOT}/soil_moisture"
