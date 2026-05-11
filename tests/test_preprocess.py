@@ -242,6 +242,21 @@ def test_compute_region_mean_converts_0_360_longitudes_before_selection():
     np.testing.assert_allclose(out.values, [15.0])
 
 
+def test_compute_region_mean_handles_descending_latitudes():
+    da = xr.DataArray(
+        np.array([[[1.0, 3.0], [10.0, 30.0]]]),
+        dims=("time", "lat", "lon"),
+        coords={"time": [0], "lat": [59.0, 41.0], "lon": [-129.0, -111.0]},
+        name="tas",
+    )
+
+    out = preprocess.compute_region_mean(da, "pnw_bartusek")
+
+    weights = np.cos(np.deg2rad(da["lat"]))
+    expected = da.weighted(weights).mean(dim=["lat", "lon"])
+    xr.testing.assert_allclose(out, expected)
+
+
 def test_compute_region_mean_preserves_name():
     out = preprocess.compute_region_mean(_sample_field(), "pnw_bartusek")
 
@@ -293,3 +308,40 @@ def test_compute_region_mean_rejects_dataset_inputs():
 
     with pytest.raises(TypeError, match="xarray.DataArray"):
         preprocess.compute_region_mean(ds, "pnw_bartusek") # type: ignore[arg-type]
+
+
+def test_compute_region_weighted_quantiles_reduces_lat_lon():
+    out = preprocess.compute_region_weighted_quantiles(
+        _sample_field(),
+        "pnw_bartusek",
+        (0.0, 1.0),
+    )
+
+    assert out.dims == ("quantile", "time")
+    np.testing.assert_allclose(out.sel(quantile=0.0), [5.0, 17.0])
+    assert np.all(out.sel(quantile=1.0).values <= np.array([10.0, 22.0]))
+    assert np.all(out.sel(quantile=1.0).values >= np.array([5.0, 17.0]))
+    assert out.attrs["region"] == "pnw_bartusek"
+    assert out.attrs["spatial_quantile"] == "cosine-latitude area-weighted quantile"
+
+
+def test_compute_region_weighted_quantiles_rejects_invalid_quantile():
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        preprocess.compute_region_weighted_quantiles(_sample_field(), "pnw_bartusek", 1.5)
+
+
+def test_compute_region_area_is_positive_for_selected_grid():
+    area = preprocess.compute_region_area(_sample_field(), "pnw_bartusek")
+
+    assert area > 0.0
+
+
+def test_compute_region_area_requires_multiple_cells_per_axis():
+    da = xr.DataArray(
+        np.ones((1, 1, 1)),
+        dims=("time", "lat", "lon"),
+        coords={"time": [0], "lat": [50.0], "lon": [-120.0]},
+    )
+
+    with pytest.raises(ValueError, match="At least two coordinate values"):
+        preprocess.compute_region_area(da, "pnw_bartusek")

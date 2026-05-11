@@ -30,6 +30,16 @@ def test_filter_yearly_files_raises_when_no_year_matches():
         data_io._filter_yearly_files(["/tmp/heat_budget_1940.nc"], [1999])
 
 
+def test_filter_yearly_files_raises_when_one_requested_year_is_missing():
+    paths = [
+        "/tmp/heat_budget_1940.nc",
+        "/tmp/heat_budget_1942.nc",
+    ]
+
+    with pytest.raises(FileNotFoundError, match="1941"):
+        data_io._filter_yearly_files(paths, [1940, 1941, 1942])
+
+
 def test_glob_required_raises_with_pattern():
     with pytest.raises(FileNotFoundError, match=r"No files matched pattern: /tmp/missing_\*"):
         data_io._glob_required("/tmp/missing_*")
@@ -82,7 +92,7 @@ def test_open_era5_tas_constructs_pattern_and_standardizes(monkeypatch):
     def fake_open(paths, *, combine, chunks):
         captured["paths"] = list(paths)
         captured["combine"] = combine
-        captured["chunks"] = dict(chunks)
+        captured["chunks"] = chunks
         return ds
 
     monkeypatch.setattr(data_io, "_open_multiple_datasets", fake_open)
@@ -247,7 +257,7 @@ def test_open_era5_heat_budget_filters_requested_years(monkeypatch):
     def fake_open(paths, *, combine, chunks):
         captured["paths"] = list(paths)
         captured["combine"] = combine
-        captured["chunks"] = dict(chunks)
+        captured["chunks"] = chunks
         return ds
 
     monkeypatch.setattr(data_io, "_open_multiple_datasets", fake_open)
@@ -260,3 +270,104 @@ def test_open_era5_heat_budget_filters_requested_years(monkeypatch):
     assert captured["chunks"] == data_io.DEFAULT_HEAT_BUDGET_CHUNKS
     assert {"dT_dt", "adiabatic_term", "diabatic_term", "T_domain_avg", "domain_volume", "advection_term"} <= set(out.data_vars)
     assert "time" in out.coords
+
+
+def test_open_era5_surface_diagnostic_builds_expected_path(monkeypatch):
+    captured = {}
+    ds = xr.Dataset(
+        data_vars={"ssr": (("valid_time", "latitude", "longitude"), [[[1.0]]])},
+        coords={"valid_time": [0], "latitude": [50.0], "longitude": [240.0]},
+    )
+
+    def fake_glob_required(pattern):
+        captured["pattern"] = pattern
+        return [
+            "/data/nssr_hour_ERA5_1940.nc",
+            "/data/nssr_hour_ERA5_1941.nc",
+        ]
+
+    def fake_open(paths, *, combine, chunks):
+        captured["paths"] = list(paths)
+        captured["combine"] = combine
+        captured["chunks"] = chunks
+        return ds
+
+    monkeypatch.setattr(data_io, "_glob_required", fake_glob_required)
+    monkeypatch.setattr(data_io, "_open_multiple_datasets", fake_open)
+
+    out = data_io.open_era5_surface_diagnostic("nssr", years=[1941])
+
+    assert captured["pattern"].endswith("/nssr/nssr_hour_ERA5_*.nc")
+    assert captured["paths"] == ["/data/nssr_hour_ERA5_1941.nc"]
+    assert captured["combine"] == "by_coords"
+    assert captured["chunks"] == data_io.DEFAULT_GLOBAL_HOURLY_CHUNKS
+    assert "time" in out.coords
+    assert "lat" in out.coords
+    assert "lon" in out.coords
+    assert "ssr" in out.data_vars
+
+
+def test_open_era5_surface_diagnostic_rejects_unknown_name():
+    with pytest.raises(ValueError, match="Unsupported ERA5 surface diagnostic"):
+        data_io.open_era5_surface_diagnostic("bad")
+
+
+def test_open_era5_pbl_p_builds_expected_path(monkeypatch):
+    captured = {}
+    ds = xr.Dataset(
+        data_vars={"pbl_p": (("time", "lat", "lon"), [[[1.0]]])},
+        coords={"time": [0], "lat": [50.0], "lon": [-120.0]},
+    )
+
+    def fake_glob_required(pattern):
+        captured["pattern"] = pattern
+        return ["/data/ERA5_ARCO_pbl_p_1940.nc"]
+
+    monkeypatch.setattr(data_io, "_glob_required", fake_glob_required)
+
+    def fake_open(paths, *, combine, chunks):
+        captured["paths"] = list(paths)
+        captured["chunks"] = chunks
+        return ds
+
+    monkeypatch.setattr(data_io, "_open_multiple_datasets", fake_open)
+
+    out = data_io.open_era5_pbl_p(years=[1940])
+
+    assert captured["pattern"].endswith("/ERA5_ARCO_pbl_p_*.nc")
+    assert captured["paths"] == ["/data/ERA5_ARCO_pbl_p_1940.nc"]
+    assert captured["chunks"] == data_io.DEFAULT_PBL_CHUNKS
+    assert "pbl_p" in out.data_vars
+
+
+def test_open_era5_total_cloud_cover_uses_region_in_pattern(monkeypatch):
+    captured = {}
+    ds = xr.Dataset(
+        data_vars={"total_cloud_cover": ("time", [0.5])},
+        coords={"time": [0]},
+    )
+
+    def fake_glob_required(pattern):
+        captured["pattern"] = pattern
+        return [
+            "/data/ERA5_ARCO_total_cloud_cover_pnw_bartusek_1940.nc",
+            "/data/ERA5_ARCO_total_cloud_cover_pnw_bartusek_1941.nc",
+        ]
+
+    def fake_open(paths, *, combine, chunks):
+        captured["paths"] = list(paths)
+        captured["chunks"] = chunks
+        return ds
+
+    monkeypatch.setattr(data_io, "_glob_required", fake_glob_required)
+    monkeypatch.setattr(data_io, "_open_multiple_datasets", fake_open)
+
+    out = data_io.open_era5_total_cloud_cover(
+        region="pnw_bartusek",
+        years=[1940],
+    )
+
+    assert "ERA5_ARCO_total_cloud_cover_pnw_bartusek_*.nc" in captured["pattern"]
+    assert captured["paths"] == ["/data/ERA5_ARCO_total_cloud_cover_pnw_bartusek_1940.nc"]
+    assert captured["chunks"] == data_io.DEFAULT_REGIONAL_HOURLY_CHUNKS
+    assert "total_cloud_cover" in out.data_vars

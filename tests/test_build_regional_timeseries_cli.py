@@ -1,3 +1,5 @@
+from argparse import Namespace
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -51,6 +53,7 @@ def test_parse_args_builds_inclusive_analysis_years(monkeypatch):
     assert args.end_year == 1942
     assert args.analysis_years == [1940, 1941, 1942]
     assert args.threshold_variable == "tas"
+    assert args.add_full_diagnostics is False
     assert args.output_path == analysis_io.default_harmonized_timeseries_path(
         region="pnw_bartusek",
         threshold_variable="tas",
@@ -106,6 +109,58 @@ def test_parse_args_accepts_custom_output_path(monkeypatch, tmp_path):
     args = build_regional_timeseries.parse_args()
 
     assert args.output_path == output_path
+
+
+def test_parse_args_accepts_add_full_diagnostics_flag(monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "build_regional_timeseries.py",
+            "--start-year",
+            "1940",
+            "--end-year",
+            "1940",
+            "--add-full-diagnostics",
+        ],
+    )
+
+    args = build_regional_timeseries.parse_args()
+
+    assert args.add_full_diagnostics is True
+
+
+def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_tas", lambda **kwargs: xr.Dataset())
+    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_lwa", lambda **kwargs: xr.Dataset())
+    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_lwa_threshold", lambda **kwargs: xr.Dataset())
+    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_hw_threshold", lambda **kwargs: xr.Dataset())
+    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_heat_budget", lambda **kwargs: xr.Dataset())
+
+    def fake_load_full(args):
+        calls.append(args)
+        return {"pbl_p": xr.Dataset()}
+
+    monkeypatch.setattr(build_regional_timeseries, "load_full_diagnostic_inputs", fake_load_full)
+
+    args = Namespace(
+        analysis_years=[1940],
+        region="pnw_bartusek",
+        quantile="90",
+        zg_level=500,
+        add_full_diagnostics=False,
+    )
+    datasets = build_regional_timeseries.load_era5_inputs(args)
+
+    assert calls == []
+    assert "pbl_p" not in datasets
+
+    args.add_full_diagnostics = True
+    datasets = build_regional_timeseries.load_era5_inputs(args)
+
+    assert calls == [args]
+    assert "pbl_p" in datasets
 
 
 def test_append_event_summary_table_defaults_to_tas_events():

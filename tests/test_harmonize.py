@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from src import harmonize
+from src import config, harmonize, preprocess
 
 
 def test_project_daily_to_hourly_replicates_daily_values_by_date():
@@ -224,6 +224,108 @@ def test_build_regional_analysis_dataset_raises_for_missing_heat_budget_variable
         )
 
 
+def test_build_regional_analysis_dataset_adds_optional_full_diagnostics():
+    hourly_time = np.array(
+        ["2000-01-01T00:00", "2000-01-01T01:00"],
+        dtype="datetime64[m]",
+    )
+    heat_budget = _make_heat_budget(hourly_time)
+    hw_products = {
+        "tas_region": _daily_array([280.0], name="tas"),
+        "tas_climatology": _daily_array([279.0], name="tas_climatology"),
+        "hw_threshold": _daily_array([282.0], name="hw_threshold"),
+        "hw_exceedance_mask": _daily_array([False], name="hw_exceedance_mask"),
+        "hw_event_id": _daily_array([0], name="hw_event_id"),
+    }
+    full_diagnostics = _make_full_diagnostics(hourly_time)
+
+    out = harmonize.build_regional_analysis_dataset(
+        heat_budget=heat_budget,
+        hw_event_products=hw_products,
+        full_diagnostics=full_diagnostics,
+        region="pnw_bartusek",
+    )
+
+    expected_names = {
+        "nslr",
+        "nssr",
+        "slhf",
+        "sshf",
+        "soil_moisture",
+        "cloud_cover",
+        "pbl_p_mean",
+        "pbl_p_p05",
+        "pbl_p_p95",
+        "nslr_heating_rate_approx",
+        "nssr_heating_rate_approx",
+        "slhf_heating_rate_approx",
+        "sshf_heating_rate_approx",
+        "surface_energy_heating_rate_approx",
+    }
+    assert expected_names <= set(out.data_vars)
+    np.testing.assert_allclose(out["nssr"].values, [10.0, 20.0])
+    np.testing.assert_allclose(out["soil_moisture"].values, [0.1, 0.2])
+    np.testing.assert_allclose(out["cloud_cover"].values, [0.25, 0.5])
+    assert out["pbl_p_p05"].dims == ("time",)
+    assert out["nssr"].attrs["source_variable"] == "ssr"
+    assert out["nssr"].attrs["alignment_method"] == "exact_time_selection"
+
+    region_area = preprocess.compute_region_area(full_diagnostics["nssr"]["ssr"], "pnw_bartusek")
+    expected_rate = (
+        out["nssr"].values
+        * region_area
+        * config.G_M_S2
+        / (config.CP_J_KG_K * out["volume"].values)
+    )
+    np.testing.assert_allclose(out["nssr_heating_rate_approx"].values, expected_rate)
+    expected_total = (
+        out["nslr_heating_rate_approx"]
+        + out["nssr_heating_rate_approx"]
+        + out["slhf_heating_rate_approx"]
+        + out["sshf_heating_rate_approx"]
+    )
+    xr.testing.assert_allclose(out["surface_energy_heating_rate_approx"], expected_total)
+
+
+def test_build_regional_analysis_dataset_requires_region_for_full_diagnostics():
+    hourly_time = np.array(["2000-01-01T00:00"], dtype="datetime64[m]")
+    heat_budget = _make_heat_budget(hourly_time)
+    hw_products = {
+        "tas_region": _daily_array([280.0], name="tas"),
+        "tas_climatology": _daily_array([279.0], name="tas_climatology"),
+        "hw_threshold": _daily_array([282.0], name="hw_threshold"),
+        "hw_exceedance_mask": _daily_array([False], name="hw_exceedance_mask"),
+        "hw_event_id": _daily_array([0], name="hw_event_id"),
+    }
+
+    with pytest.raises(ValueError, match="region is required"):
+        harmonize.build_regional_analysis_dataset(
+            heat_budget=heat_budget,
+            hw_event_products=hw_products,
+            full_diagnostics={},
+        )
+
+
+def test_build_regional_analysis_dataset_reports_missing_full_diagnostic_dataset():
+    hourly_time = np.array(["2000-01-01T00:00"], dtype="datetime64[m]")
+    heat_budget = _make_heat_budget(hourly_time)
+    hw_products = {
+        "tas_region": _daily_array([280.0], name="tas"),
+        "tas_climatology": _daily_array([279.0], name="tas_climatology"),
+        "hw_threshold": _daily_array([282.0], name="hw_threshold"),
+        "hw_exceedance_mask": _daily_array([False], name="hw_exceedance_mask"),
+        "hw_event_id": _daily_array([0], name="hw_event_id"),
+    }
+
+    with pytest.raises(ValueError, match="missing datasets"):
+        harmonize.build_regional_analysis_dataset(
+            heat_budget=heat_budget,
+            hw_event_products=hw_products,
+            full_diagnostics={},
+            region="pnw_bartusek",
+        )
+
+
 def _daily_array(values, *, name: str) -> xr.DataArray:
     return xr.DataArray(
         values,
@@ -252,3 +354,30 @@ def _make_heat_budget(hourly_time: np.ndarray) -> xr.Dataset:
         },
         coords=coords,
     )
+
+
+def _make_full_diagnostics(hourly_time: np.ndarray) -> dict[str, xr.Dataset]:
+    lat = [59.0, 41.0]
+    lon = [-129.0, -111.0]
+    shape = (hourly_time.size, len(lat), len(lon))
+
+    def gridded(source_name: str, values: list[float]) -> xr.Dataset:
+        data = np.asarray(values, dtype=float).reshape(hourly_time.size, 1, 1)
+        data = np.broadcast_to(data, shape)
+        return xr.Dataset(
+            {source_name: (("time", "lat", "lon"), data)},
+            coords={"time": hourly_time, "lat": lat, "lon": lon},
+        )
+
+    return {
+        "nslr": gridded("str", [-1.0, -2.0]),
+        "nssr": gridded("ssr", [10.0, 20.0]),
+        "slhf": gridded("slhf", [-3.0, -4.0]),
+        "sshf": gridded("sshf", [-5.0, -6.0]),
+        "soil_moisture": gridded("swvl1", [0.1, 0.2]),
+        "pbl_p": gridded("pbl_p", [70000.0, 65000.0]),
+        "cloud_cover": xr.Dataset(
+            {"total_cloud_cover": ("time", [0.25, 0.5])},
+            coords={"time": hourly_time},
+        ),
+    }
