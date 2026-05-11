@@ -23,6 +23,16 @@ import xarray as xr
 
 from src import analysis_io, data_io, events, harmonize
 
+FULL_DIAGNOSTIC_DATASET_KEYS: tuple[str, ...] = (
+    "pbl_p",
+    "nslr",
+    "nssr",
+    "slhf",
+    "sshf",
+    "soil_moisture",
+    "cloud_cover",
+)
+
 EVENT_SUMMARY_VARIABLES: dict[str, tuple[str, str]] = {
     "tas": ("hw_event_id", "tas_region"),
     "lwa": ("lwa_event_id", "lwa_region"),
@@ -76,6 +86,14 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Path where the harmonized Stage-1 regional dataset will be saved.",
     )
+    parser.add_argument(
+        "--add-full-diagnostics",
+        action="store_true",
+        help=(
+            "Add optional local ARCO/ERA5 surface diagnostics, PBL statistics, "
+            "cloud cover, and approximate heating-rate variables."
+        ),
+    )
     args = parser.parse_args()
     if args.start_year > args.end_year:
         parser.error("--start-year must be less than or equal to --end-year.")
@@ -94,7 +112,7 @@ def parse_args() -> argparse.Namespace:
 
 def load_era5_inputs(args: argparse.Namespace) -> dict[str, object]:
     """Open all currently supported ERA5 inputs."""
-    return {
+    datasets: dict[str, object] = {
         "tas": data_io.open_era5_tas(years=args.analysis_years),
         "lwa": data_io.open_era5_lwa(
             zg_level=args.zg_level,
@@ -112,6 +130,40 @@ def load_era5_inputs(args: argparse.Namespace) -> dict[str, object]:
             years=args.analysis_years,
         ),
         "heat_budget": data_io.open_era5_heat_budget(years=args.analysis_years),
+    }
+    if args.add_full_diagnostics:
+        datasets.update(load_full_diagnostic_inputs(args))
+    return datasets
+
+
+def load_full_diagnostic_inputs(args: argparse.Namespace) -> dict[str, xr.Dataset]:
+    """Open optional local ARCO/ERA5 full-diagnostic inputs."""
+    return {
+        "pbl_p": data_io.open_era5_pbl_p(years=args.analysis_years),
+        "nslr": data_io.open_era5_surface_diagnostic(
+            "nslr",
+            years=args.analysis_years,
+        ),
+        "nssr": data_io.open_era5_surface_diagnostic(
+            "nssr",
+            years=args.analysis_years,
+        ),
+        "slhf": data_io.open_era5_surface_diagnostic(
+            "slhf",
+            years=args.analysis_years,
+        ),
+        "sshf": data_io.open_era5_surface_diagnostic(
+            "sshf",
+            years=args.analysis_years,
+        ),
+        "soil_moisture": data_io.open_era5_surface_diagnostic(
+            "soil_moisture",
+            years=args.analysis_years,
+        ),
+        "cloud_cover": data_io.open_era5_total_cloud_cover(
+            region=args.region,
+            years=args.analysis_years,
+        ),
     }
 
 
@@ -205,6 +257,15 @@ def require_dataset(value: Any) -> xr.Dataset:
         raise TypeError(f"Expected xr.Dataset, got {type(value).__name__}")
     return value
 
+
+def full_diagnostic_datasets(datasets: dict[str, object]) -> dict[str, xr.Dataset]:
+    """Return optional full-diagnostic datasets from the loaded input mapping."""
+    return {
+        key: require_dataset(datasets[key])
+        for key in FULL_DIAGNOSTIC_DATASET_KEYS
+    }
+
+
 def main() -> int:
     """Load the configured ERA5 products and print a summary."""
     args = parse_args()
@@ -281,6 +342,12 @@ def main() -> int:
         heat_budget=heat_budget_dataset,
         hw_event_products=hw_products,
         lwa_event_products=[lwa_products, lwa_a_products, lwa_c_products],
+        full_diagnostics=(
+            full_diagnostic_datasets(datasets)
+            if args.add_full_diagnostics
+            else None
+        ),
+        region=args.region,
         attrs={
             "region": args.region,
             "quantile": str(args.quantile),
@@ -289,6 +356,7 @@ def main() -> int:
             "end_year": args.end_year,
             "zg_level": args.zg_level,
             "min_duration": min_duration,
+            "add_full_diagnostics": args.add_full_diagnostics,
         },
     )
     describe_analysis_dataset(analysis_ds)

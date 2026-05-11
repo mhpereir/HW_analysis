@@ -28,5 +28,6 @@ echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hos
     --start-year ${TIME_START} --end-year ${TIME_END} \
     --quantile 90 \
     --region "pnw_bartusek" \
+    --add-full-diagnostics \
     --threshold-variable "tas"
 echo "[info] $(date -Is) done"
