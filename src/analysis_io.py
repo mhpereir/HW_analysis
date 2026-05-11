@@ -18,7 +18,6 @@ Out of scope:
 
 from __future__ import annotations
 
-import inspect
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -107,9 +106,7 @@ def open_harmonized_timeseries(
 ) -> xr.Dataset:
     """Open a saved Stage-1 harmonized regional time-series dataset."""
     input_path = Path(path).expanduser().resolve()
-    kwargs: dict[str, Any] = {"engine": "h5netcdf"}
-    if "decode_timedelta" in inspect.signature(xr.open_dataset).parameters:
-        kwargs["decode_timedelta"] = True
+    kwargs: dict[str, Any] = {"engine": "h5netcdf", "decode_timedelta": True}
     if chunks is not None:
         kwargs["chunks"] = dict(chunks)
 
