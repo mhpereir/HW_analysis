@@ -10,7 +10,7 @@ This project brings together data products from several prior workflows, includi
 - local wave activity (LWA)
 - Eulerian heat budget diagnostics
 - planetary boundary layer (PBL) height
-- ARCO-only variables such as cloud fraction and surface radiative fluxes
+- locally stored ARCO/ERA5 surface variables such as cloud cover, surface radiation, turbulent heat fluxes, and soil moisture
 
 The immediate purpose of this document is to define a stable architectural direction before implementation proceeds too far.
 
@@ -53,7 +53,6 @@ The current working scope includes the following variables.
 - HW threshold
 - LWA (anticyclonic, cyclonic)
 - LWA threshold
-- PBL height in pressure units
 - Eulerian heat budget diagnostics, including:
   - volume mean temperature
   - domain volume
@@ -61,12 +60,24 @@ The current working scope includes the following variables.
   - net advection (this term is coming in with the wrong sign convention; needs to be fixed upon harmonization)
   - adiabatic term
   - diabatic term
+- PBL height in pressure units, locally stored as gridded hourly `pbl_p(time, lat, lon)` for `pnw_bartusek`
+- locally stored hourly ARCO/ERA5 surface variables that should be reduced and added to the harmonized Stage-1 dataset
 
-### ARCO-sourced
+### Local ARCO/ERA5 surface inputs
 
-- cloud cover fraction
-- net solar radiation at the surface
-- net longwave radiation at the surface
+The following source files are now available locally and should be treated as Stage-1 harmonization inputs. The example paths use 1940, but implementation should support the same yearly filename pattern for the requested analysis years.
+
+| Harmonized input | Source variable | Native dimensions | Local path pattern |
+| --- | --- | --- | --- |
+| `pbl_p` | `pbl_p` | `time, lat, lon` | `/home/mhpereir/data-mhpereir/arco_era5/PBL_download/outputs/ERA5_ARCO_pbl_p_{year}.nc` |
+| `nslr` | `str` | `valid_time, latitude, longitude` | `/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/nslr/nslr_hour_ERA5_{year}.nc` |
+| `nssr` | `ssr` | `valid_time, latitude, longitude` | `/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/nssr/nssr_hour_ERA5_{year}.nc` |
+| `slhf` | `slhf` | `valid_time, latitude, longitude` | `/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/slhf/slhf_hour_ERA5_{year}.nc` |
+| `sshf` | `sshf` | `valid_time, latitude, longitude` | `/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/sshf/sshf_hour_ERA5_{year}.nc` |
+| `soil_moisture` | `swvl1` | `valid_time, latitude, longitude` | `/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/soil_moisture/soil_moisture_hour_ERA5_{year}.nc` |
+| `cloud_cover` | `total_cloud_cover` | `time` | `/home/mhpereir/data-mhpereir/arco_era5/CloudCover_download/outputs/ERA5_ARCO_total_cloud_cover_pnw_bartusek_{year}.nc` |
+
+`slhf` should use the `slhf` path above; the earlier duplicated `nssr` path should be treated as a typo.
 
 ---
 
@@ -139,6 +150,8 @@ This module should define:
 - region definitions
 - seasons
 - source-specific constants
+- local yearly file patterns for the ARCO/ERA5 surface inputs
+- physical constants used by documented approximations, including `g = 9.806` and `cp = 1005`
 - output paths
 - default analysis settings
 - optional run presets
@@ -153,6 +166,8 @@ This module should be responsible for:
 - handling source-specific filename conventions
 - standardizing variable names where possible
 - preserving xarray-native lazy loading
+- opening the local yearly ARCO/ERA5 source files for `pbl_p`, `nslr`, `nssr`, `slhf`, `sshf`, `soil_moisture`, and `cloud_cover`
+- failing clearly when requested yearly files are missing
 
 This layer should not perform major transformations beyond what is necessary to return valid, source-consistent data objects.
 
@@ -178,6 +193,8 @@ This module should contain only low-level preprocessing tasks, such as:
 - unit conversions
 - coordinate standardization
 - area-weighted regional means
+- cosine-latitude weighted regional means for gridded surface variables
+- area-weighted regional percentiles for PBL pressure diagnostics
 - day-of-year climatologies and anomalies
 - resampling or interpolation utilities
 
@@ -194,6 +211,7 @@ Responsibilities should include:
 - aligning source-specific spatial domains
 - applying region averaging when needed
 - harmonizing selected variables to a target analysis timestep
+- aligning all hourly ARCO/ERA5 surface products to the heat-budget `time` coordinate
 - assembling a common analysis-ready dataset
 
 This is the module that turns heterogeneous source fields into a stable internal representation.
@@ -245,6 +263,7 @@ This module should compute or manage domain-specific derived diagnostics, such a
 - combined radiative metrics
 - residual checks
 - transformed or normalized diagnostics
+- approximate surface-energy heating rates derived from native hourly `J m-2` accumulations and pressure-coordinate `domain_volume`
 - optional derived event metrics for ranking or labeling
 
 This module is for scientific diagnostic logic, not generic preprocessing.
@@ -274,7 +293,7 @@ Raw datasets are opened from:
 
 - locally stored files
 - threshold products from previous workflows
-- ARCO-backed variables
+- locally stored ARCO/ERA5 variables
 
 At this layer, data remain close to source form.
 
@@ -289,6 +308,11 @@ This should include:
 - spatial averaging where required
 - shared naming conventions
 - source metadata retention
+- standardizing `valid_time`, `latitude`, and `longitude` to `time`, `lat`, and `lon`
+- cosine-latitude weighted regional means over `REGIONS["pnw_bartusek"]` for global gridded inputs
+- area-weighted regional mean plus area-weighted 5th and 95th percentiles for gridded `pbl_p`
+- direct inclusion of `total_cloud_cover(time)` as `cloud_cover(time)` because it is already region averaged
+- clear alignment of all hourly products to the heat-budget `time` coordinate
 
 The output of this layer is the main analysis-ready dataset, which completes top-level Stage 1.
 
@@ -368,10 +392,20 @@ Hourly diagnostic variables:
 - `advection(hourly_time)`
 - `adiabatic(hourly_time)`
 - `diabatic(hourly_time)`
-- `cloud_frac(hourly_time)` #pending implementation
-- `rad_sw_net_sfc(hourly_time)`
-- `rad_lw_net_sfc(hourly_time)`
-- `pbl_p(hourly_time)`
+- `nslr(hourly_time)` #native hourly accumulated `J m-2`
+- `nssr(hourly_time)` #native hourly accumulated `J m-2`
+- `slhf(hourly_time)` #native hourly accumulated `J m-2`
+- `sshf(hourly_time)` #native hourly accumulated `J m-2`
+- `soil_moisture(hourly_time)`
+- `cloud_cover(hourly_time)`
+- `pbl_p_mean(hourly_time)`
+- `pbl_p_p05(hourly_time)`
+- `pbl_p_p95(hourly_time)`
+- `nslr_heating_rate_approx(hourly_time)` #`K hr-1`
+- `nssr_heating_rate_approx(hourly_time)` #`K hr-1`
+- `slhf_heating_rate_approx(hourly_time)` #`K hr-1`
+- `sshf_heating_rate_approx(hourly_time)` #`K hr-1`
+- `surface_energy_heating_rate_approx(hourly_time)` #`K hr-1`
 
 Projected hourly event labels:
 
@@ -389,6 +423,26 @@ This dataset should also carry metadata describing:
 - preprocessing choices
 - region name
 - threshold settings used
+
+### Local ARCO/ERA5 harmonization contract
+
+The gridded global variables `nslr`, `nssr`, `slhf`, `sshf`, and `soil_moisture` should be spatially reduced before storage. The harmonized dataset should store only a single regional value per timestep for each variable, using a cosine-latitude weighted mean over `pnw_bartusek`.
+
+The PBL source field should not be stored as a gridded variable in the first harmonized product. Instead, the Stage-1 dataset should store:
+
+- `pbl_p_mean(time)`: area-weighted regional mean PBL top pressure
+- `pbl_p_p05(time)`: area-weighted 5th percentile of the regional PBL pressure distribution
+- `pbl_p_p95(time)`: area-weighted 95th percentile of the regional PBL pressure distribution
+
+The native surface energy variables should be preserved in their hourly accumulated `J m-2` form. In addition, the dataset should include approximate pressure-coordinate heating-rate diagnostics in `K hr-1`:
+
+```text
+energy_J_m2 * region_area_m2 * g / (cp * domain_volume_m2_Pa)
+```
+
+where `g = 9.806`, `cp = 1005`, and `domain_volume_m2_Pa` is the harmonized `volume(time)` from the Eulerian heat-budget product. Source signs should be retained. Metadata should state that this is an approximation that assumes the accumulated surface energy is uniformly distributed through the pressure-coordinate control volume.
+
+`surface_energy_heating_rate_approx(time)` should be the source-sign-preserving sum of the four individual surface-energy heating-rate approximations.
 
 ---
 
@@ -491,8 +545,9 @@ The target composite figure currently envisioned includes multiple vertically st
 1. regional mean temperature on the left axis and volume on the right axis
 2. time tendency of regional mean temperature
 3. net advection, adiabatic, and diabatic terms
-4. net solar and longwave surface radiation on one axis, cloud fraction on the other
-5. LWA anticyclonic and cyclonic on one axis, PBL height on the other
+4. native hourly accumulated `nssr`, `nslr`, `slhf`, and `sshf`, with cloud cover available on a secondary axis when useful
+5. approximate surface-energy heating rates, including the total `surface_energy_heating_rate_approx`
+6. LWA anticyclonic and cyclonic on one axis, with PBL pressure mean and 5th/95th percentile spread on the other
 
 In addition, the workflow should support:
 
@@ -506,6 +561,19 @@ Plotting functions should never handle raw loading or event generation internall
 
 ---
 
+## Validation and test expectations
+
+The first implementation that adds these variables should include focused checks for:
+
+- header or loader validation on representative 1940 files confirming source variables `str`, `ssr`, `slhf`, `sshf`, `swvl1`, `pbl_p`, and `total_cloud_cover`
+- coordinate standardization from `valid_time`, `latitude`, and `longitude` to `time`, `lat`, and `lon`
+- cosine-latitude weighted regional means for gridded global fields
+- area-weighted PBL mean, 5th percentile, and 95th percentile
+- the approximate `K hr-1` heating-rate formula using `region_area_m2`, `g`, `cp`, and `domain_volume`
+- a 1940 Stage-1 build confirming all new variables are present on `time` and carry source, units, region, and preprocessing metadata
+
+---
+
 ## Recommended implementation phases
 
 To reduce risk, implementation should proceed in stages.
@@ -513,6 +581,9 @@ To reduce risk, implementation should proceed in stages.
 ### Phase 1
 
 - build harmonized regional time series dataset
+- add the locally available ARCO/ERA5 surface variables to the Stage-1 harmonized dataset
+- preserve native surface energy accumulations in `J m-2` and add approximate `K hr-1` heating-rate diagnostics
+- add PBL pressure mean and area-weighted 5th/95th percentile time series
 - support HW-based and LWA-based selectors
 - implement one composite engine
 - implement a reduced three-row plot:
@@ -522,8 +593,7 @@ To reduce risk, implementation should proceed in stages.
 
 ### Phase 2
 
-- add ARCO cloud and radiation variables
-- add PBL height
+- expand composite and top-event plots to use cloud cover, surface energy, approximate heating rates, and PBL mean/spread
 - add top-event extraction and individual-event plots
 
 ### Phase 3
@@ -589,6 +659,8 @@ The following decisions should be treated as the current default architecture:
 - **Primary alignment for composites:** event peak
 - **Primary comparison mode:** ERA5 reference versus CanESM ensemble summary
 - **Primary design pattern:** build once, analyze many times
+- **Surface energy storage:** preserve native hourly accumulated `J m-2` variables and add approximate `K hr-1` heating-rate diagnostics
+- **PBL storage:** store area-weighted mean, 5th percentile, and 95th percentile time series rather than gridded PBL fields in the v1 harmonized product
 
 These defaults can be revised later, but they provide a stable starting point.
 
