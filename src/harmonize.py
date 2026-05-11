@@ -25,6 +25,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from . import diagnostics, preprocess
+
 
 HEAT_BUDGET_VARIABLE_MAP: dict[str, str] = {
     "T_domain_avg": "T_mean",
@@ -43,12 +45,29 @@ HEAT_BUDGET_RATE_VARIABLE_SIGNS: dict[str, int] = {
 }
 SECONDS_PER_HOUR = 3600
 
+FULL_DIAGNOSTIC_SOURCE_VARIABLES: dict[str, str] = {
+    "nslr": "str",
+    "nssr": "ssr",
+    "slhf": "slhf",
+    "sshf": "sshf",
+    "soil_moisture": "swvl1",
+    "pbl_p": "pbl_p",
+    "cloud_cover": "total_cloud_cover",
+}
+SURFACE_ENERGY_VARIABLES: tuple[str, ...] = ("nslr", "nssr", "slhf", "sshf")
+PBL_QUANTILES: dict[str, float] = {
+    "pbl_p_p05": 0.05,
+    "pbl_p_p95": 0.95,
+}
+
 
 def build_regional_analysis_dataset(
     *,
     heat_budget: xr.Dataset,
     hw_event_products: Mapping[str, xr.DataArray],
     lwa_event_products: Sequence[Mapping[str, xr.DataArray]] = (),
+    full_diagnostics: Mapping[str, xr.Dataset] | None = None,
+    region: str | None = None,
     attrs: Mapping[str, object] | None = None,
     time_dim: str = "time",
 ) -> xr.Dataset:
@@ -91,6 +110,23 @@ def build_regional_analysis_dataset(
                     f"{prefix}_exceedance_mask": (f"{prefix}_flag", "flag"),
                     f"{prefix}_event_id": (f"{prefix}_event_id", "event_id"),
                 },
+                time_dim=time_dim,
+            )
+        )
+
+    if full_diagnostics is not None:
+        diagnostics_region = region
+        if diagnostics_region is None and attrs is not None and "region" in attrs:
+            diagnostics_region = str(attrs["region"])
+        if diagnostics_region is None:
+            raise ValueError("region is required when full_diagnostics are provided.")
+
+        data_vars.update(
+            _prepare_full_diagnostic_variables(
+                full_diagnostics,
+                hourly_time,
+                volume=data_vars["volume"],
+                region=diagnostics_region,
                 time_dim=time_dim,
             )
         )
@@ -234,6 +270,217 @@ def _prepare_heat_budget_variables(
         out[output_name] = da
 
     return out
+
+
+def _prepare_full_diagnostic_variables(
+    full_diagnostics: Mapping[str, xr.Dataset],
+    hourly_time: xr.DataArray,
+    *,
+    volume: xr.DataArray,
+    region: str,
+    time_dim: str,
+) -> dict[str, xr.DataArray]:
+    """Reduce and align optional full diagnostic source datasets."""
+    missing = sorted(
+        name for name in FULL_DIAGNOSTIC_SOURCE_VARIABLES if name not in full_diagnostics
+    )
+    if missing:
+        raise ValueError(f"full_diagnostics are missing datasets: {', '.join(missing)}")
+
+    out: dict[str, xr.DataArray] = {}
+    region_area_m2: float | None = None
+
+    for output_name in ("nslr", "nssr", "slhf", "sshf", "soil_moisture"):
+        ds = full_diagnostics[output_name]
+        source_name = FULL_DIAGNOSTIC_SOURCE_VARIABLES[output_name]
+        source = _require_dataset_variable(ds, source_name, dataset_name=output_name)
+        regional = preprocess.compute_region_mean(source, region).rename(output_name)
+        regional = _align_hourly_series(
+            regional,
+            hourly_time,
+            name=output_name,
+            time_dim=time_dim,
+        )
+        regional.attrs.update(
+            {
+                "source_dataset": output_name,
+                "source_variable": source_name,
+                "native_time_resolution": "hourly",
+                "analysis_time_resolution": "hourly",
+                "alignment_method": "exact_time_selection",
+            }
+        )
+        out[output_name] = regional
+
+        if output_name in SURFACE_ENERGY_VARIABLES:
+            if region_area_m2 is None:
+                region_area_m2 = preprocess.compute_region_area(source, region)
+            heating_name = f"{output_name}_heating_rate_approx"
+            out[heating_name] = diagnostics.approximate_surface_energy_heating_rate(
+                regional,
+                volume,
+                region_area_m2=region_area_m2,
+                name=heating_name,
+            )
+            out[heating_name].attrs.update(
+                {
+                    "native_time_resolution": "hourly",
+                    "analysis_time_resolution": "hourly",
+                    "source_dataset": output_name,
+                }
+            )
+
+    out.update(
+        _prepare_pbl_diagnostics(
+            full_diagnostics["pbl_p"],
+            hourly_time,
+            region=region,
+            time_dim=time_dim,
+        )
+    )
+    out["cloud_cover"] = _prepare_cloud_cover(
+        full_diagnostics["cloud_cover"],
+        hourly_time,
+        time_dim=time_dim,
+    )
+
+    rates = [out[f"{name}_heating_rate_approx"] for name in SURFACE_ENERGY_VARIABLES]
+    total = rates[0]
+    for rate in rates[1:]:
+        total = total + rate
+    total = total.rename("surface_energy_heating_rate_approx")
+    total.attrs.update(
+        {
+            "units": "K hr-1",
+            "source_variables": ",".join(SURFACE_ENERGY_VARIABLES),
+            "source_sign_convention": "source signs retained",
+            "native_time_resolution": "hourly",
+            "analysis_time_resolution": "hourly",
+            "aggregation": "sum of individual surface-energy heating-rate approximations",
+        }
+    )
+    out["surface_energy_heating_rate_approx"] = total
+
+    return out
+
+
+def _prepare_pbl_diagnostics(
+    ds: xr.Dataset,
+    hourly_time: xr.DataArray,
+    *,
+    region: str,
+    time_dim: str,
+) -> dict[str, xr.DataArray]:
+    """Return regional PBL mean and weighted percentile series."""
+    source_name = FULL_DIAGNOSTIC_SOURCE_VARIABLES["pbl_p"]
+    source = _require_dataset_variable(ds, source_name, dataset_name="pbl_p")
+
+    mean = preprocess.compute_region_mean(source, region).rename("pbl_p_mean")
+    mean = _align_hourly_series(mean, hourly_time, name="pbl_p_mean", time_dim=time_dim)
+    mean.attrs.update(
+        {
+            "source_dataset": "pbl_p",
+            "source_variable": source_name,
+            "native_time_resolution": "hourly",
+            "analysis_time_resolution": "hourly",
+            "alignment_method": "exact_time_selection",
+        }
+    )
+
+    quantiles = preprocess.compute_region_weighted_quantiles(
+        source,
+        region,
+        tuple(PBL_QUANTILES.values()),
+    )
+    out = {"pbl_p_mean": mean}
+    for output_name, q in PBL_QUANTILES.items():
+        da = quantiles.sel(quantile=q, drop=True).rename(output_name)
+        da = _align_hourly_series(da, hourly_time, name=output_name, time_dim=time_dim)
+        da.attrs.update(
+            {
+                "source_dataset": "pbl_p",
+                "source_variable": source_name,
+                "native_time_resolution": "hourly",
+                "analysis_time_resolution": "hourly",
+                "alignment_method": "exact_time_selection",
+                "weighted_quantile": q,
+            }
+        )
+        out[output_name] = da
+    return out
+
+
+def _prepare_cloud_cover(
+    ds: xr.Dataset,
+    hourly_time: xr.DataArray,
+    *,
+    time_dim: str,
+) -> xr.DataArray:
+    """Return the already regionalized cloud-cover time series."""
+    source_name = FULL_DIAGNOSTIC_SOURCE_VARIABLES["cloud_cover"]
+    source = _require_dataset_variable(ds, source_name, dataset_name="cloud_cover")
+    out = _align_hourly_series(
+        source.rename("cloud_cover"),
+        hourly_time,
+        name="cloud_cover",
+        time_dim=time_dim,
+    )
+    out.attrs.update(
+        {
+            "source_dataset": "cloud_cover",
+            "source_variable": source_name,
+            "native_time_resolution": "hourly",
+            "analysis_time_resolution": "hourly",
+            "alignment_method": "exact_time_selection",
+            "spatial_mean": "precomputed regional cosine-latitude weighted mean",
+        }
+    )
+    return out
+
+
+def _align_hourly_series(
+    da: xr.DataArray,
+    hourly_time: xr.DataArray,
+    *,
+    name: str,
+    time_dim: str,
+) -> xr.DataArray:
+    """Align a 1D hourly series to the Stage-1 target time coordinate."""
+    if time_dim not in da.coords:
+        raise ValueError(f"{name!r} is missing required time coordinate {time_dim!r}.")
+    if da.dims != (time_dim,):
+        raise ValueError(f"{name!r} must be 1D over {time_dim!r}; got {da.dims!r}.")
+
+    source_time = pd.DatetimeIndex(da[time_dim].values)
+    target_time = pd.DatetimeIndex(hourly_time.values)
+    if source_time.has_duplicates:
+        raise ValueError(f"{name!r} has duplicate timestamps.")
+
+    missing = target_time.difference(source_time)
+    if len(missing) > 0:
+        preview = ", ".join(timestamp.strftime("%Y-%m-%dT%H:%M") for timestamp in missing[:5])
+        suffix = "" if len(missing) <= 5 else f", ... ({len(missing)} total)"
+        raise ValueError(f"{name!r} is missing target timestamps: {preview}{suffix}.")
+
+    out = da.sel({time_dim: target_time}).assign_coords({time_dim: hourly_time.values})
+    out.name = name
+    return out
+
+
+def _require_dataset_variable(
+    ds: xr.Dataset,
+    variable: str,
+    *,
+    dataset_name: str,
+) -> xr.DataArray:
+    """Return a dataset variable or raise a source-specific error."""
+    if not isinstance(ds, xr.Dataset):
+        raise TypeError(f"{dataset_name!r} diagnostic input must be an xarray.Dataset.")
+    if variable not in ds:
+        raise ValueError(
+            f"{dataset_name!r} diagnostic dataset is missing required variable {variable!r}."
+        )
+    return ds[variable]
 
 
 def _project_daily_product_variables(
