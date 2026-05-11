@@ -136,6 +136,19 @@ def build_diurnal_composite(
         hw_event_id_name=hw_event_id_name,
     )
 
+    # Classify HW/non-HW samples first in the dataset's native time convention
+    # (GMT/UTC), then shift the selected samples onto local-hour coordinates.
+    native_month = ds[time_dim].dt.month
+    season_mask = native_month.isin(months)
+    hw_event_id = ds[hw_event_id_name].fillna(0)
+
+    class_masks = (
+        season_mask & (hw_event_id > 0),
+        season_mask & (hw_event_id == 0),
+    )
+
+    # Shift only after the native-time masks have been defined.
+
     local_times = utc_to_local_time_values(ds[time_dim], offset)
     local_index = pd.DatetimeIndex(local_times)
     local_hour = xr.DataArray(
@@ -144,19 +157,19 @@ def build_diurnal_composite(
         coords={time_dim: ds[time_dim]},
         name="local_hour",
     )
-    local_month = xr.DataArray(
-        np.asarray(local_index.month, dtype=np.int64),
-        dims=(time_dim,),
-        coords={time_dim: ds[time_dim]},
-        name="local_month",
-    )
+    # local_month = xr.DataArray(
+    #     np.asarray(local_index.month, dtype=np.int64),
+    #     dims=(time_dim,),
+    #     coords={time_dim: ds[time_dim]},
+    #     name="local_month",
+    # )
 
-    season_mask = local_month.isin(months)
-    hw_event_id = ds[hw_event_id_name].fillna(0)
-    class_masks = (
-        season_mask & (hw_event_id > 0),
-        season_mask & (hw_event_id == 0),
-    )
+    # season_mask = local_month.isin(months)
+    # hw_event_id = ds[hw_event_id_name].fillna(0)
+    # class_masks = (
+    #     season_mask & (hw_event_id > 0),
+    #     season_mask & (hw_event_id == 0),
+    # )
 
     source = ds[list(variables)].assign_coords(
         local_hour=local_hour,
@@ -179,6 +192,9 @@ def build_diurnal_composite(
             )
         )
         class_sample_counts.append(sample_count)
+        count_by_hour = selected["volume"].groupby("local_hour").count()
+        print(label)
+        print(count_by_hour.values)
 
     composite = xr.concat(
         class_composites,

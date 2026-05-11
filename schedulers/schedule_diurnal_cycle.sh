@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N stage_2_plot_diurnal_cycle
-#PBS -l select=1:ncpus=4:mem=32gb
+#PBS -l select=1:ncpus=4:mem=8gb
 #PBS -j oe
 #PBS -o /dev/null
 
@@ -22,6 +22,7 @@ cd /home/mhpereir/HW_analysis/scripts
 
 echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hostname)"
 /usr/bin/time -v python plot_diurnal_cycle.py \
+    --input-path /home/mhpereir/HW_analysis/results/stage1/harmonized_regional_timeseries_pnw_bartusek_tas_q90_1940_2024.nc.old \
     --season-months 6 7 8 \
     --local-utc-offset-hours -7
 echo "[info] $(date -Is) done"
