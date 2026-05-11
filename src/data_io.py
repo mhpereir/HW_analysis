@@ -21,7 +21,7 @@ from __future__ import annotations
 import glob
 import re
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, TypeAlias
 
 import xarray as xr
 
@@ -32,6 +32,28 @@ DEFAULT_TAS_CHUNKS: dict[str, int] = {"time": 365}
 DEFAULT_LWA_CHUNKS: dict[str, int] = {"time": 3650, "lat": 35, "lon": 180}
 DEFAULT_THRESHOLD_CHUNKS: dict[str, int] = {"dayofyear": 365}
 DEFAULT_HEAT_BUDGET_CHUNKS: dict[str, int] = {"time": 512}
+ChunkSpec: TypeAlias = Mapping[str, int] | str
+DEFAULT_GLOBAL_HOURLY_CHUNKS: str = "auto"
+DEFAULT_REGIONAL_HOURLY_CHUNKS: str = "auto"
+DEFAULT_PBL_CHUNKS: str = "auto"
+
+
+SURFACE_DIAGNOSTIC_ROOTS: dict[str, str] = {
+    "nslr": config.ERA5_NSLR_ROOT,
+    "nssr": config.ERA5_NSSR_ROOT,
+    "slhf": config.ERA5_SLHF_ROOT,
+    "sshf": config.ERA5_SSHF_ROOT,
+    "soil_moisture": config.ERA5_SOIL_MOISTURE_ROOT,
+}
+
+#file name stems
+SURFACE_DIAGNOSTIC_FILE_STEMS: dict[str, str] = {
+    "nslr": "nslr_hour_ERA5",
+    "nssr": "nssr_hour_ERA5",
+    "slhf": "slhf_hour_ERA5",
+    "sshf": "sshf_hour_ERA5",
+    "soil_moisture": "soil_moisture_hour_ERA5",
+}
 
 
 def open_era5_tas(
@@ -126,6 +148,71 @@ def open_era5_heat_budget(
     return _standardize_common_structure(ds)
 
 
+def open_era5_surface_diagnostic(
+    name: str,
+    *,
+    years: Sequence[int] | None = None,
+    chunks: ChunkSpec | None = None,
+) -> xr.Dataset:
+    """Open a local hourly gridded ERA5 surface diagnostic."""
+    try:
+        root = SURFACE_DIAGNOSTIC_ROOTS[name]
+        stem = SURFACE_DIAGNOSTIC_FILE_STEMS[name]
+    except KeyError as exc:
+        valid = ", ".join(sorted(SURFACE_DIAGNOSTIC_ROOTS))
+        raise ValueError(
+            f"Unsupported ERA5 surface diagnostic {name!r}. Expected one of: {valid}."
+        ) from exc
+
+    pattern = f"{root}/{stem}_*.nc"
+    paths = _glob_required(pattern)
+    paths = _filter_yearly_files(paths, years)
+    ds = _open_multiple_datasets(
+        paths,
+        combine="by_coords",
+        chunks=chunks or DEFAULT_GLOBAL_HOURLY_CHUNKS,
+    )
+    return _standardize_common_structure(ds)
+
+
+def open_era5_pbl_p(
+    *,
+    years: Sequence[int] | None = None,
+    chunks: ChunkSpec | None = None,
+) -> xr.Dataset:
+    """Open local hourly ARCO PBL top pressure fields."""
+    pattern = f"{config.ERA5_PBL_P_ROOT}/ERA5_ARCO_pbl_p_*.nc"
+    paths = _glob_required(pattern)
+    paths = _filter_yearly_files(paths, years)
+    ds = _open_multiple_datasets(
+        paths,
+        combine="by_coords",
+        chunks=chunks or DEFAULT_PBL_CHUNKS,
+    )
+    return _standardize_common_structure(ds)
+
+
+def open_era5_total_cloud_cover(
+    *,
+    region: str,
+    years: Sequence[int] | None = None,
+    chunks: ChunkSpec | None = None,
+) -> xr.Dataset:
+    """Open local hourly ARCO total cloud cover regional time series."""
+    pattern = (
+        f"{config.ERA5_CLOUD_COVER_ROOT}/"
+        f"ERA5_ARCO_total_cloud_cover_{region}_*.nc"
+    )
+    paths = _glob_required(pattern)
+    paths = _filter_yearly_files(paths, years)
+    ds = _open_multiple_datasets(
+        paths,
+        combine="by_coords",
+        chunks=chunks or DEFAULT_REGIONAL_HOURLY_CHUNKS,
+    )
+    return _standardize_common_structure(ds)
+
+
 def _normalize_quantile_token(quantile: str | int | float) -> str:
     """Return the quantile token used in filenames."""
     if isinstance(quantile, str):
@@ -163,13 +250,21 @@ def _filter_yearly_files(
 
     year_tokens = {str(year) for year in years}
     selected = []
+    matched_years = set()
     for path in paths:
         match = re.search(r"(?<!\d)(\d{4})(?!\d)", path)
         if match and match.group(1) in year_tokens:
             selected.append(path)
+            matched_years.add(match.group(1))
 
     if not selected:
         requested = ", ".join(sorted(year_tokens))
+        raise FileNotFoundError(
+            f"No files matched requested years ({requested}) in provided paths."
+        )
+    missing_years = sorted(year_tokens.difference(matched_years))
+    if missing_years:
+        requested = ", ".join(missing_years)
         raise FileNotFoundError(
             f"No files matched requested years ({requested}) in provided paths."
         )
@@ -216,12 +311,12 @@ def _filter_dataset_year_coord(
 def _open_single_dataset(
     path: str,
     *,
-    chunks: Mapping[str, int] | None = None,
+    chunks: ChunkSpec | None = None,
 ) -> xr.Dataset:
     """Open a single NetCDF dataset lazily."""
     kwargs: dict[str, Any] = {"engine": "h5netcdf"}
     if chunks is not None:
-        kwargs["chunks"] = dict(chunks)
+        kwargs["chunks"] = _normalize_chunks(chunks)
     return xr.open_dataset(path, **kwargs)
 
 
@@ -229,7 +324,7 @@ def _open_multiple_datasets(
     paths: Sequence[str],
     *,
     combine: str,
-    chunks: Mapping[str, int] | None = None,
+    chunks: ChunkSpec | None = None,
 ) -> xr.Dataset:
     """Open multiple NetCDF files lazily using xarray's multi-file loader."""
     kwargs: dict[str, Any] = {
@@ -239,8 +334,15 @@ def _open_multiple_datasets(
         "engine": "h5netcdf",
     }
     if chunks is not None:
-        kwargs["chunks"] = dict(chunks)
+        kwargs["chunks"] = _normalize_chunks(chunks)
     return xr.open_mfdataset(list(paths), **kwargs)
+
+
+def _normalize_chunks(chunks: ChunkSpec) -> Mapping[str, int] | str:
+    """Return chunks in a form accepted by xarray open functions."""
+    if isinstance(chunks, str):
+        return chunks
+    return dict(chunks)
 
 
 def _standardize_common_structure(ds: xr.Dataset) -> xr.Dataset:
