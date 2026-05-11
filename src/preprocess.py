@@ -140,13 +140,7 @@ def compute_region_mean(
         available = ", ".join(sorted(config.REGIONS))
         raise ValueError(f"Unknown region {region!r}. Available regions: {available}") from exc
 
-    da = _ensure_minus180_to_180_longitudes(da, lon_dim=lon_dim)
-    da_region = da.sel({lat_dim: lat_bounds, lon_dim: lon_bounds})
-    if da_region.sizes[lat_dim] == 0 or da_region.sizes[lon_dim] == 0:
-        raise ValueError(
-            f"Region {region!r} selected no grid cells for dimensions "
-            f"{lat_dim!r}/{lon_dim!r}."
-        )
+    da_region = _select_region(da, region, lat_dim=lat_dim, lon_dim=lon_dim)
 
     weights_np = np.cos(np.deg2rad(da_region[lat_dim]))
     weights = xr.DataArray(
@@ -164,6 +158,137 @@ def compute_region_mean(
         }
     )
     return out
+
+
+def compute_region_weighted_quantiles(
+    da: xr.DataArray,
+    region: str,
+    quantiles: float | list[float] | tuple[float, ...],
+    *,
+    lat_dim: str = "lat",
+    lon_dim: str = "lon",
+) -> xr.DataArray:
+    """Compute cosine-latitude weighted regional quantiles over lat/lon."""
+    if not isinstance(da, xr.DataArray):
+        raise TypeError("compute_region_weighted_quantiles expects an xarray.DataArray.")
+
+    da_region = _select_region(da, region, lat_dim=lat_dim, lon_dim=lon_dim)
+    q = np.atleast_1d(np.asarray(quantiles, dtype=float))
+    if np.any((q < 0.0) | (q > 1.0)):
+        raise ValueError("quantiles must lie within [0, 1].")
+
+    weights = xr.DataArray(
+        np.cos(np.deg2rad(da_region[lat_dim])),
+        dims=(lat_dim,),
+        coords={lat_dim: da_region[lat_dim]},
+    )
+    out = da_region.weighted(weights).quantile(
+        q,
+        dim=[lat_dim, lon_dim],
+        skipna=True,
+    )
+    if "quantile" in out.dims:
+        out = out.assign_coords(quantile=q)
+        remaining_dims = [dim for dim in out.dims if dim != "quantile"]
+        out = out.transpose("quantile", *remaining_dims)
+    out.attrs.update(
+        {
+            "region": region,
+            "spatial_quantile": "cosine-latitude area-weighted quantile",
+            "lat_bounds": (
+                config.REGIONS[region][0].start,
+                config.REGIONS[region][0].stop,
+            ),
+            "lon_bounds": (
+                config.REGIONS[region][1].start,
+                config.REGIONS[region][1].stop,
+            ),
+        }
+    )
+    return out
+
+
+def compute_region_area(
+    da: xr.DataArray,
+    region: str,
+    *,
+    lat_dim: str = "lat",
+    lon_dim: str = "lon",
+    earth_radius_m: float = config.EARTH_RADIUS_M,
+) -> float:
+    """Return the summed horizontal grid-cell area selected for a region."""
+    if not isinstance(da, xr.DataArray):
+        raise TypeError("compute_region_area expects an xarray.DataArray.")
+
+    da_region = _select_region(da, region, lat_dim=lat_dim, lon_dim=lon_dim)
+    lat_edges = _coordinate_edges(np.asarray(da_region[lat_dim].values, dtype=float))
+    lon_edges = _coordinate_edges(np.asarray(da_region[lon_dim].values, dtype=float))
+
+    lat_edges = np.clip(lat_edges, -90.0, 90.0)
+    lat_edges_rad = np.deg2rad(lat_edges)
+    lon_edges_rad = np.deg2rad(lon_edges)
+
+    d_sin_lat = np.abs(np.sin(lat_edges_rad[1:]) - np.sin(lat_edges_rad[:-1]))
+    d_lon = np.abs(lon_edges_rad[1:] - lon_edges_rad[:-1])
+    return float((earth_radius_m**2) * d_sin_lat.sum() * d_lon.sum())
+
+
+def _select_region(
+    da: xr.DataArray,
+    region: str,
+    *,
+    lat_dim: str,
+    lon_dim: str,
+) -> xr.DataArray:
+    """Return a regional lat/lon subset, handling longitude and latitude order."""
+    if lat_dim not in da.dims:
+        raise ValueError(f"DataArray is missing latitude dimension {lat_dim!r}.")
+    if lon_dim not in da.dims:
+        raise ValueError(f"DataArray is missing longitude dimension {lon_dim!r}.")
+
+    try:
+        lat_bounds, lon_bounds = config.REGIONS[region]
+    except KeyError as exc:
+        available = ", ".join(sorted(config.REGIONS))
+        raise ValueError(f"Unknown region {region!r}. Available regions: {available}") from exc
+
+    da = _ensure_minus180_to_180_longitudes(da, lon_dim=lon_dim)
+    da_region = da.sel(
+        {
+            lat_dim: _slice_for_coord(da[lat_dim], lat_bounds),
+            lon_dim: _slice_for_coord(da[lon_dim], lon_bounds),
+        }
+    )
+    if da_region.sizes[lat_dim] == 0 or da_region.sizes[lon_dim] == 0:
+        raise ValueError(
+            f"Region {region!r} selected no grid cells for dimensions "
+            f"{lat_dim!r}/{lon_dim!r}."
+        )
+    return da_region
+
+
+def _slice_for_coord(coord: xr.DataArray, bounds: slice) -> slice:
+    """Return an order-aware slice for a monotonic coordinate."""
+    if coord.size < 2:
+        return bounds
+
+    start = bounds.start
+    stop = bounds.stop
+    if float(coord[0]) > float(coord[-1]):
+        return slice(stop, start)
+    return bounds
+
+
+def _coordinate_edges(values: np.ndarray) -> np.ndarray:
+    """Infer one-dimensional cell edges from coordinate centers."""
+    centers = np.sort(np.asarray(values, dtype=float))
+    if centers.ndim != 1 or centers.size < 2:
+        raise ValueError("At least two coordinate values are required to infer cell area.")
+
+    mids = 0.5 * (centers[:-1] + centers[1:])
+    first = centers[0] - (mids[0] - centers[0])
+    last = centers[-1] + (centers[-1] - mids[-1])
+    return np.concatenate([[first], mids, [last]])
 
 
 def _ensure_minus180_to_180_longitudes(
@@ -203,4 +328,3 @@ def _validate_threshold_to_time_inputs(
             f"({dayofyear_dim!r},) or ({year_dim!r}, {dayofyear_dim!r}); "
             f"got {threshold.dims!r}."
         )
-
