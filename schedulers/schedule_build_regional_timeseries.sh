@@ -1,16 +1,16 @@
 #!/bin/bash
 #PBS -N stage_1_build_regional_timeseries
-#PBS -l select=1:ncpus=12:mem=32gb
+#PBS -l select=1:ncpus=8:mem=32gb
 #PBS -j oe
 #PBS -o /dev/null
 
 LOGFILE="/home/mhpereir/HW_analysis/logs/${PBS_JOBID}_build_regional_timeseries.log"
 exec > >(tee -a "${LOGFILE}") 2>&1
 
-# export OMP_NUM_THREADS=1
-# export MKL_NUM_THREADS=1
-# export OPENBLAS_NUM_THREADS=1
-# export NUMEXPR_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
 
 export MAMBA_ROOT_PREFIX=/home/mhpereir/miniconda3
 source /home/mhpereir/miniconda3/etc/profile.d/mamba.sh

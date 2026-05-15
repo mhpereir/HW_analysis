@@ -3,3 +3,4 @@
 *.png
 logs/*
 results/stage1/*.nc
+*.old
