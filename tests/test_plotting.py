@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import xarray as xr
 
@@ -105,6 +106,53 @@ def test_plot_composite_timeseries_expands_tendency_axis_range():
         plt.close(expected_fig)
 
 
+def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
+    composite = _make_composite()
+
+    fig = plotting.plot_composite_timeseries(
+        composite,
+        plot_extended_variables=True,
+    )
+    try:
+        assert len(fig.axes) == 12
+
+        assert set(_line_colors_by_label(fig.axes[4])) == {"advection"}
+        assert set(_line_colors_by_label(fig.axes[6])) == {"adiabatic"}
+        assert set(_line_colors_by_label(fig.axes[8])) == {"diabatic"}
+
+        pbl_axis = fig.axes[3]
+        assert pbl_axis.yaxis_inverted()
+        assert pbl_axis.get_ylabel() == "PBL top pressure [hPa]"
+        np.testing.assert_allclose(
+            pbl_axis.lines[0].get_ydata(),
+            composite["pbl_p_mean"].values * 0.01,
+        )
+
+        assert set(_line_colors_by_label(fig.axes[5])) == {
+            "nslr_heating_rate_approx",
+            "nssr_heating_rate_approx",
+        }
+        assert set(_line_colors_by_label(fig.axes[7])) == {
+            "sshf_heating_rate_approx",
+            "slhf_heating_rate_approx",
+        }
+        assert fig.axes[9].get_ylabel() == "soil moisture [m3 m-3]"
+        assert fig.axes[11].get_ylabel() == "cloud cover fraction"
+    finally:
+        plt.close(fig)
+
+
+def test_plot_composite_timeseries_extended_layout_requires_optional_variables():
+    composite = _make_composite().drop_vars("cloud_cover")
+
+    try:
+        plotting.plot_composite_timeseries(composite, plot_extended_variables=True)
+    except ValueError as exc:
+        assert "Extended plot requires missing variables in composite: cloud_cover" in str(exc)
+    else:
+        raise AssertionError("Expected missing extended variable to raise ValueError.")
+
+
 def test_write_composite_timeseries_plot_writes_png(tmp_path):
     path = plotting.write_composite_timeseries_plot(
         _make_composite(),
@@ -150,6 +198,16 @@ def test_plot_split_composite_timeseries_draws_iqr_as_lines_not_fills():
         plt.close(fig)
 
 
+def test_plot_split_composite_timeseries_labels_dtdt_panel_variable():
+    fig = plotting.plot_split_composite_timeseries(_make_split_composite())
+    try:
+        legend_labels = [text.get_text() for text in fig.axes[1].get_legend().get_texts()]
+
+        assert "dTdt" in legend_labels
+    finally:
+        plt.close(fig)
+
+
 def test_plot_split_composite_timeseries_expands_tendency_axis_range():
     composite = _make_split_composite()
     fig = plotting.plot_split_composite_timeseries(composite)
@@ -174,6 +232,66 @@ def test_plot_split_composite_timeseries_expands_tendency_axis_range():
     finally:
         plt.close(fig)
         plt.close(expected_fig)
+
+
+def test_plot_split_composite_timeseries_extended_layout_uses_optional_panels():
+    composite = _make_split_composite()
+
+    fig = plotting.plot_split_composite_timeseries(
+        composite,
+        plot_extended_variables=True,
+    )
+    try:
+        assert len(fig.axes) == 12
+
+        assert plotting.VARIABLE_COLORS["advection"] in _non_marker_line_colors(fig.axes[4])
+        assert plotting.VARIABLE_COLORS["adiabatic"] in _non_marker_line_colors(fig.axes[6])
+        assert plotting.VARIABLE_COLORS["diabatic"] in _non_marker_line_colors(fig.axes[8])
+
+        pbl_axis = fig.axes[3]
+        assert pbl_axis.yaxis_inverted()
+        assert pbl_axis.get_ylabel() == "PBL top pressure [hPa]"
+        np.testing.assert_allclose(
+            pbl_axis.lines[0].get_ydata(),
+            composite.isel(split_bin=0)["pbl_p_mean"].values * 0.01,
+        )
+
+        assert plotting.VARIABLE_COLORS["nslr_heating_rate_approx"] in (
+            _non_marker_line_colors(fig.axes[5])
+        )
+        assert plotting.VARIABLE_COLORS["nssr_heating_rate_approx"] in (
+            _non_marker_line_colors(fig.axes[5])
+        )
+        assert plotting.VARIABLE_COLORS["sshf_heating_rate_approx"] in (
+            _non_marker_line_colors(fig.axes[7])
+        )
+        assert plotting.VARIABLE_COLORS["slhf_heating_rate_approx"] in (
+            _non_marker_line_colors(fig.axes[7])
+        )
+        assert fig.axes[9].get_ylabel() == "soil moisture [m3 m-3]"
+        assert fig.axes[11].get_ylabel() == "cloud cover fraction"
+    finally:
+        plt.close(fig)
+
+
+def test_plot_split_composite_timeseries_extended_labels_single_variable_panels():
+    fig = plotting.plot_split_composite_timeseries(
+        _make_split_composite(),
+        plot_extended_variables=True,
+    )
+    try:
+        for axis_index, label in zip(
+            (2, 4, 6, 8),
+            ("dTdt", "advection", "adiabatic", "diabatic"),
+            strict=True,
+        ):
+            legend_labels = [
+                text.get_text()
+                for text in fig.axes[axis_index].get_legend().get_texts()
+            ]
+            assert label in legend_labels
+    finally:
+        plt.close(fig)
 
 
 def test_write_split_composite_timeseries_outputs_writes_raw_and_smoothed_pngs(tmp_path):
@@ -281,6 +399,64 @@ def test_plot_top_event_timeseries_expands_tendency_axis_range():
         plt.close(expected_fig)
 
 
+def test_plot_top_event_timeseries_uses_concise_datetime_formatter():
+    fig = plotting.plot_top_event_timeseries(_make_top_event_window(), _make_top_event())
+    try:
+        assert isinstance(fig.axes[-1].xaxis.get_major_formatter(), mdates.ConciseDateFormatter)
+    finally:
+        plt.close(fig)
+
+
+def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
+    event_window = _make_top_event_window()
+    composite = _make_composite()
+
+    fig = plotting.plot_top_event_timeseries(
+        event_window,
+        _make_top_event(),
+        reference_composite=composite,
+        plot_extended_variables=True,
+    )
+    try:
+        assert len(fig.axes) == 12
+        assert set(_line_colors_by_label(fig.axes[4])) == {"advection"}
+        assert set(_line_colors_by_label(fig.axes[6])) == {"adiabatic"}
+        assert set(_line_colors_by_label(fig.axes[8])) == {"diabatic"}
+
+        pbl_axis = fig.axes[3]
+        assert pbl_axis.yaxis_inverted()
+        np.testing.assert_allclose(
+            pbl_axis.lines[0].get_ydata(),
+            event_window["pbl_p_mean"].values * 0.01,
+        )
+        assert set(_line_colors_by_label(fig.axes[5])) == {
+            "nslr_heating_rate_approx",
+            "nssr_heating_rate_approx",
+        }
+        assert set(_line_colors_by_label(fig.axes[7])) == {
+            "sshf_heating_rate_approx",
+            "slhf_heating_rate_approx",
+        }
+        assert fig.axes[9].get_ylabel() == "soil moisture [m3 m-3]"
+        assert fig.axes[11].get_ylabel() == "cloud cover fraction"
+    finally:
+        plt.close(fig)
+
+
+def test_plot_top_event_timeseries_extended_uses_concise_datetime_formatter():
+    fig = plotting.plot_top_event_timeseries(
+        _make_top_event_window(),
+        _make_top_event(),
+        reference_composite=_make_composite(),
+        plot_extended_variables=True,
+    )
+    try:
+        assert isinstance(fig.axes[8].xaxis.get_major_formatter(), mdates.ConciseDateFormatter)
+        assert isinstance(fig.axes[9].xaxis.get_major_formatter(), mdates.ConciseDateFormatter)
+    finally:
+        plt.close(fig)
+
+
 def _make_composite() -> xr.Dataset:
     lag_hour = np.arange(-2, 3)
     variables = {
@@ -292,6 +468,15 @@ def _make_composite() -> xr.Dataset:
         "diabatic": np.array([-1.0, -0.5, 1.0, 0.5, 0.0]),
         "lwa_a_region": np.array([2.0, 3.0, 6.0, 5.0, 4.0]),
         "lwa_c_region": np.array([6.0, 5.0, 2.0, 3.0, 4.0]),
+        "pbl_p_mean": np.array([90000.0, 88000.0, 85000.0, 87000.0, 89000.0]),
+        "pbl_p_p05": np.array([82000.0, 80000.0, 78000.0, 79000.0, 81000.0]),
+        "pbl_p_p95": np.array([95000.0, 94000.0, 92000.0, 93000.0, 94000.0]),
+        "nslr_heating_rate_approx": np.array([-0.2, -0.1, -0.3, -0.4, -0.2]),
+        "nssr_heating_rate_approx": np.array([0.0, 0.2, 0.6, 0.5, 0.1]),
+        "sshf_heating_rate_approx": np.array([0.1, 0.2, 0.4, 0.3, 0.2]),
+        "slhf_heating_rate_approx": np.array([-0.1, -0.2, -0.4, -0.3, -0.2]),
+        "soil_moisture": np.array([0.2, 0.19, 0.18, 0.17, 0.16]),
+        "cloud_cover": np.array([0.7, 0.6, 0.4, 0.3, 0.5]),
     }
     data_vars = {
         name: ("lag_hour", values)
@@ -333,6 +518,15 @@ def _make_top_event_window() -> xr.Dataset:
         "diabatic": np.array([-1.0, -0.5, 1.0, 0.5, 0.0]),
         "lwa_a_region": np.array([2.0, 3.0, 6.0, 5.0, 4.0]),
         "lwa_c_region": np.array([6.0, 5.0, 2.0, 3.0, 4.0]),
+        "pbl_p_mean": np.array([90000.0, 88000.0, 85000.0, 87000.0, 89000.0]),
+        "pbl_p_p05": np.array([82000.0, 80000.0, 78000.0, 79000.0, 81000.0]),
+        "pbl_p_p95": np.array([95000.0, 94000.0, 92000.0, 93000.0, 94000.0]),
+        "nslr_heating_rate_approx": np.array([-0.2, -0.1, -0.3, -0.4, -0.2]),
+        "nssr_heating_rate_approx": np.array([0.0, 0.2, 0.6, 0.5, 0.1]),
+        "sshf_heating_rate_approx": np.array([0.1, 0.2, 0.4, 0.3, 0.2]),
+        "slhf_heating_rate_approx": np.array([-0.1, -0.2, -0.4, -0.3, -0.2]),
+        "soil_moisture": np.array([0.2, 0.19, 0.18, 0.17, 0.16]),
+        "cloud_cover": np.array([0.7, 0.6, 0.4, 0.3, 0.5]),
     }
     return xr.Dataset(
         data_vars={name: ("time", values) for name, values in variables.items()},
@@ -371,6 +565,10 @@ def _line_colors_by_label(ax) -> dict[str, str]:
         for line in ax.lines
         if not line.get_label().startswith("_")
     }
+
+
+def _non_marker_line_colors(ax) -> set[str]:
+    return {line.get_color() for line in ax.lines if line.get_color() != "0.2"}
 
 
 def _make_split_composite() -> xr.Dataset:

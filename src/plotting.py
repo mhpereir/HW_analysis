@@ -31,6 +31,8 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+import matplotlib.dates as mdates
+
 
 plt.rcParams.update({
     "axes.titlesize": 18,
@@ -56,11 +58,64 @@ VARIABLE_COLORS = {
     "diabatic": "tab:brown",
     "lwa_a_region": "tab:olive",
     "lwa_c_region": "tab:cyan",
+    "pbl_p_mean": "tab:blue",
+    "pbl_p_p05": "tab:blue",
+    "pbl_p_p95": "tab:blue",
+    "nslr_heating_rate_approx": "tab:gray",
+    "nssr_heating_rate_approx": "tab:orange",
+    "sshf_heating_rate_approx": "tab:red",
+    "slhf_heating_rate_approx": "tab:purple",
+    "soil_moisture": "tab:green",
+    "cloud_cover": "tab:cyan",
 }
+EXTENDED_PLOT_VARIABLES: tuple[str, ...] = (
+    "T_mean",
+    "volume",
+    "dTdt",
+    "advection",
+    "adiabatic",
+    "diabatic",
+    "lwa_a_region",
+    "lwa_c_region",
+    "pbl_p_mean",
+    "pbl_p_p05",
+    "pbl_p_p95",
+    "nslr_heating_rate_approx",
+    "nssr_heating_rate_approx",
+    "sshf_heating_rate_approx",
+    "slhf_heating_rate_approx",
+    "soil_moisture",
+    "cloud_cover",
+)
+SPLIT_EXTENDED_PLOT_VARIABLES: tuple[str, ...] = (
+    "T_mean",
+    "volume",
+    "dTdt",
+    "advection",
+    "adiabatic",
+    "diabatic",
+    "lwa_a_region",
+    "lwa_c_region",
+    "pbl_p_mean",
+    "nslr_heating_rate_approx",
+    "nssr_heating_rate_approx",
+    "sshf_heating_rate_approx",
+    "slhf_heating_rate_approx",
+    "soil_moisture",
+    "cloud_cover",
+)
+PBL_PRESSURE_TO_HPA = 0.01
 
 
-def plot_composite_timeseries(composite: xr.Dataset) -> Figure:
-    """Return a four-panel figure for an event-mean composite."""
+def plot_composite_timeseries(
+    composite: xr.Dataset,
+    *,
+    plot_extended_variables: bool = False,
+) -> Figure:
+    """Return a composite time-series figure."""
+    if plot_extended_variables:
+        return _plot_extended_composite_timeseries(composite)
+
     fig, axes = plt.subplots(
         nrows=4,
         ncols=1,
@@ -97,10 +152,16 @@ def plot_composite_timeseries(composite: xr.Dataset) -> Figure:
     return fig
 
 
-def plot_split_composite_timeseries(composite: xr.Dataset) -> Figure:
-    """Return a four-panel figure for split-bin event-mean composites."""
+def plot_split_composite_timeseries(
+    composite: xr.Dataset,
+    *,
+    plot_extended_variables: bool = False,
+) -> Figure:
+    """Return a figure for split-bin event-mean composites."""
     if SPLIT_BIN_DIM not in composite.dims:
         raise ValueError(f"split composite is missing dimension {SPLIT_BIN_DIM!r}.")
+    if plot_extended_variables:
+        return _plot_extended_split_composite_timeseries(composite)
 
     fig, axes = plt.subplots(
         nrows=4,
@@ -144,8 +205,16 @@ def plot_top_event_timeseries(
     event: xr.Dataset,
     *,
     reference_composite: xr.Dataset | None = None,
+    plot_extended_variables: bool = False,
 ) -> Figure:
-    """Return a four-panel absolute-time figure for one selected event."""
+    """Return an absolute-time figure for one selected event."""
+    if plot_extended_variables:
+        return _plot_extended_top_event_timeseries(
+            event_window,
+            event,
+            reference_composite=reference_composite,
+        )
+
     peak_time = _event_time_value(event, "peak_time")
     start_time = _event_time_value(event, "start_time")
     end_time = _event_time_value(event, "end_time")
@@ -206,6 +275,253 @@ def plot_top_event_timeseries(
         fontsize=13,
     )
     ax3.set_xlabel("Time")
+
+    _format_datetime_xaxis(axes)
+
+    return fig
+
+
+def _plot_extended_composite_timeseries(composite: xr.Dataset) -> Figure:
+    """Return a 5x2 extended diagnostic figure for an event-mean composite."""
+    _require_dataset_variables(
+        composite,
+        EXTENDED_PLOT_VARIABLES,
+        dataset_label="composite",
+    )
+
+    fig, axes = plt.subplots(
+        nrows=5,
+        ncols=2,
+        figsize=(18, 14),
+        sharex=True,
+        constrained_layout=True,
+    )
+    left = axes[:, 0]
+    right = axes[:, 1]
+
+    _plot_temperature_volume_panel(left[0], composite)
+    _plot_single_variable_panel(left[1], composite, "dTdt", ylabel="[K hr-1]")
+    _plot_composite_variable_panel(left[2], composite, "advection", ylabel="[K hr-1]")
+    _plot_composite_variable_panel(left[3], composite, "adiabatic", ylabel="[K hr-1]")
+    _plot_composite_variable_panel(left[4], composite, "diabatic", ylabel="[K hr-1]")
+
+    _plot_lwa_panel(right[0], composite)
+    _plot_pbl_pressure_panel(right[1], composite)
+    _plot_composite_multi_variable_panel(
+        right[2],
+        composite,
+        ("nslr_heating_rate_approx", "nssr_heating_rate_approx"),
+        ylabel="[K hr-1]",
+    )
+    _plot_composite_multi_variable_panel(
+        right[3],
+        composite,
+        ("sshf_heating_rate_approx", "slhf_heating_rate_approx"),
+        ylabel="[K hr-1]",
+    )
+    _plot_soil_moisture_cloud_panel(right[4], composite)
+
+    for ax in axes.ravel():
+        ax.axvline(0, color="0.2", linewidth=1.0, linestyle="--", alpha=0.8)
+        ax.grid(True, linewidth=0.5, alpha=0.35)
+
+    n_events = int(composite.attrs.get("n_events", 0))
+    pre_days = int(composite.attrs.get("pre_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
+    post_days = int(composite.attrs.get("post_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
+    smoothing_window = composite.attrs.get("smoothing_window")
+    smoothing_label = (
+        f", {int(smoothing_window)}-hour running mean"
+        if smoothing_window is not None
+        else ""
+    )
+    fig.suptitle(
+        f"HW event-mean composite centered on peak tas "
+        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})",
+        fontsize=18,
+    )
+    left[-1].set_xlabel("Lag from event peak (hours)")
+    right[-1].set_xlabel("Lag from event peak (hours)")
+    return fig
+
+
+def _plot_extended_split_composite_timeseries(composite: xr.Dataset) -> Figure:
+    """Return a 5x2 extended diagnostic figure for split-bin composites."""
+    _require_dataset_variables(
+        composite,
+        SPLIT_EXTENDED_PLOT_VARIABLES,
+        dataset_label="split composite",
+    )
+
+    fig, axes = plt.subplots(
+        nrows=5,
+        ncols=2,
+        figsize=(18, 14),
+        sharex=True,
+        constrained_layout=True,
+    )
+    left = axes[:, 0]
+    right = axes[:, 1]
+
+    _plot_split_temperature_volume_panel(left[0], composite)
+    _plot_split_single_variable_panel(left[1], composite, "dTdt", ylabel="[K hr-1]")
+    _plot_split_single_variable_panel(left[2], composite, "advection", ylabel="[K hr-1]")
+    _plot_split_single_variable_panel(left[3], composite, "adiabatic", ylabel="[K hr-1]")
+    _plot_split_single_variable_panel(left[4], composite, "diabatic", ylabel="[K hr-1]")
+
+    _plot_split_lwa_panel(right[0], composite)
+    _plot_split_pbl_pressure_panel(right[1], composite)
+    _plot_split_multi_variable_panel(
+        right[2],
+        composite,
+        ("nslr_heating_rate_approx", "nssr_heating_rate_approx"),
+        ylabel="[K hr-1]",
+    )
+    _plot_split_multi_variable_panel(
+        right[3],
+        composite,
+        ("sshf_heating_rate_approx", "slhf_heating_rate_approx"),
+        ylabel="[K hr-1]",
+    )
+    _plot_split_soil_moisture_cloud_panel(right[4], composite)
+
+    for ax in axes.ravel():
+        ax.axvline(0, color="0.2", linewidth=1.0, linestyle="--", alpha=0.8)
+        ax.grid(True, linewidth=0.5, alpha=0.35)
+
+    n_events = _split_total_events(composite)
+    pre_days = int(composite.attrs.get("pre_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
+    post_days = int(composite.attrs.get("post_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
+    smoothing_window = composite.attrs.get("smoothing_window")
+    smoothing_label = (
+        f", {int(smoothing_window)}-hour running mean"
+        if smoothing_window is not None
+        else ""
+    )
+    split_variable = composite.attrs.get("split_variable", "event metric")
+    fig.suptitle(
+        f"HW event-mean composites split by {split_variable} "
+        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})",
+        fontsize=18,
+    )
+    left[-1].set_xlabel("Lag from event peak (hours)")
+    right[-1].set_xlabel("Lag from event peak (hours)")
+    return fig
+
+
+def _plot_extended_top_event_timeseries(
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    *,
+    reference_composite: xr.Dataset | None,
+) -> Figure:
+    """Return a 5x2 extended diagnostic figure for one selected event."""
+    _require_dataset_variables(
+        event_window,
+        EXTENDED_PLOT_VARIABLES,
+        dataset_label="event window",
+    )
+    if reference_composite is not None:
+        _require_dataset_variables(
+            reference_composite,
+            EXTENDED_PLOT_VARIABLES,
+            dataset_label="reference composite",
+        )
+
+    peak_time = _event_time_value(event, "peak_time")
+    start_time = _event_time_value(event, "start_time")
+    end_time = _event_time_value(event, "end_time")
+
+    fig, axes = plt.subplots(
+        nrows=5,
+        ncols=2,
+        figsize=(18, 14),
+        sharex=True,
+        constrained_layout=True,
+    )
+    left = axes[:, 0]
+    right = axes[:, 1]
+
+    _plot_top_event_temperature_volume_panel(
+        left[0],
+        event_window,
+        event,
+        reference_composite=reference_composite,
+    )
+    _plot_top_event_single_variable_panel(
+        left[1],
+        event_window,
+        event,
+        "dTdt",
+        ylabel="[K hr-1]",
+        reference_composite=reference_composite,
+    )
+    for ax, name in zip(left[2:], ("advection", "adiabatic", "diabatic"), strict=True):
+        _plot_top_event_single_variable_panel(
+            ax,
+            event_window,
+            event,
+            name,
+            ylabel="[K hr-1]",
+            reference_composite=reference_composite,
+        )
+
+    _plot_top_event_lwa_panel(
+        right[0],
+        event_window,
+        event,
+        reference_composite=reference_composite,
+    )
+    _plot_top_event_pbl_pressure_panel(
+        right[1],
+        event_window,
+        event,
+        reference_composite=reference_composite,
+    )
+    _plot_top_event_multi_variable_panel(
+        right[2],
+        event_window,
+        event,
+        ("nslr_heating_rate_approx", "nssr_heating_rate_approx"),
+        ylabel="[K hr-1]",
+        reference_composite=reference_composite,
+    )
+    _plot_top_event_multi_variable_panel(
+        right[3],
+        event_window,
+        event,
+        ("sshf_heating_rate_approx", "slhf_heating_rate_approx"),
+        ylabel="[K hr-1]",
+        reference_composite=reference_composite,
+    )
+    _plot_top_event_soil_moisture_cloud_panel(
+        right[4],
+        event_window,
+        event,
+        reference_composite=reference_composite,
+    )
+
+    for ax in axes.ravel():
+        ax.axvline(start_time, color="tab:orange", linewidth=1.2, linestyle=":", alpha=0.9)
+        ax.axvline(end_time, color="tab:orange", linewidth=1.2, linestyle=":", alpha=0.9)
+        ax.axvline(peak_time, color="0.2", linewidth=1.0, linestyle="--", alpha=0.8)
+        ax.grid(True, linewidth=0.5, alpha=0.35)
+
+    event_id = int(event["event_id"].item())
+    rank = int(event["selection_rank"].item()) if "selection_rank" in event else event_id
+    peak_value = float(event["tas_peak"].item()) if "tas_peak" in event else np.nan
+    smoothing_window = event_window.attrs.get("smoothing_window")
+    smoothing_label = (
+        f", {int(smoothing_window)}-hour running mean"
+        if smoothing_window is not None
+        else ""
+    )
+    fig.suptitle(
+        f"Rank {rank} HW event {event_id}: peak tas={peak_value:.2f}{smoothing_label}",
+        fontsize=13,
+    )
+    left[-1].set_xlabel("Time")
+    right[-1].set_xlabel("Time")
+    _format_datetime_xaxis(axes.ravel())
     return fig
 
 
@@ -219,11 +535,12 @@ def _plot_line(
     label: str | None = None,
     linestyle: str = "-",
     linewidth: float | None = None,
+    scale: float = 1.0,
 ) -> None:
     """Plot one named variable from a dataset against an explicit x coordinate."""
     ax.plot(
         x,
-        ds[name].values,
+        ds[name].values * scale,
         color=color,
         label=label or name,
         linestyle=linestyle,
@@ -256,14 +573,26 @@ def smooth_composite_for_display(
     return out
 
 
+def _format_datetime_xaxis(axes: Sequence[Axes]) -> None:
+    locator = mdates.AutoDateLocator(minticks=4, maxticks=8)
+    formatter = mdates.ConciseDateFormatter(locator)
+    for ax in axes:
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+
 def write_composite_timeseries_plot(
     composite: xr.Dataset,
     output_path: Path,
+    *,
+    plot_extended_variables: bool = False,
 ) -> Path:
-    """Write a four-panel composite time-series figure."""
+    """Write a composite time-series figure."""
     output_path = output_path.expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig = plot_composite_timeseries(composite)
+    fig = plot_composite_timeseries(
+        composite,
+        plot_extended_variables=plot_extended_variables,
+    )
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
     return output_path
@@ -272,11 +601,16 @@ def write_composite_timeseries_plot(
 def write_split_composite_timeseries_plot(
     composite: xr.Dataset,
     output_path: Path,
+    *,
+    plot_extended_variables: bool = False,
 ) -> Path:
-    """Write a four-panel split composite time-series figure."""
+    """Write a split composite time-series figure."""
     output_path = output_path.expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig = plot_split_composite_timeseries(composite)
+    fig = plot_split_composite_timeseries(
+        composite,
+        plot_extended_variables=plot_extended_variables,
+    )
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
     return output_path
@@ -289,15 +623,28 @@ def write_composite_timeseries_outputs(
     smoothed_output_path: Path,
     smoothing_window: int,
     smoothed_variables: Sequence[str],
+    plot_extended_variables: bool = False,
 ) -> list[Path]:
     """Write raw and display-smoothed composite time-series figures."""
-    written = [write_composite_timeseries_plot(composite, output_path)]
+    written = [
+        write_composite_timeseries_plot(
+            composite,
+            output_path,
+            plot_extended_variables=plot_extended_variables,
+        )
+    ]
     smoothed = smooth_composite_for_display(
         composite,
         variables=smoothed_variables,
         smoothing_window=smoothing_window,
     )
-    written.append(write_composite_timeseries_plot(smoothed, smoothed_output_path))
+    written.append(
+        write_composite_timeseries_plot(
+            smoothed,
+            smoothed_output_path,
+            plot_extended_variables=plot_extended_variables,
+        )
+    )
     return written
 
 
@@ -308,15 +655,28 @@ def write_split_composite_timeseries_outputs(
     smoothed_output_path: Path,
     smoothing_window: int,
     smoothed_variables: Sequence[str],
+    plot_extended_variables: bool = False,
 ) -> list[Path]:
     """Write raw and display-smoothed split composite time-series figures."""
-    written = [write_split_composite_timeseries_plot(composite, output_path)]
+    written = [
+        write_split_composite_timeseries_plot(
+            composite,
+            output_path,
+            plot_extended_variables=plot_extended_variables,
+        )
+    ]
     smoothed = smooth_composite_for_display(
         composite,
         variables=smoothed_variables,
         smoothing_window=smoothing_window,
     )
-    written.append(write_split_composite_timeseries_plot(smoothed, smoothed_output_path))
+    written.append(
+        write_split_composite_timeseries_plot(
+            smoothed,
+            smoothed_output_path,
+            plot_extended_variables=plot_extended_variables,
+        )
+    )
     return written
 
 
@@ -452,6 +812,52 @@ def _plot_single_variable_panel(
     ax.legend(loc="upper left")
 
 
+def _plot_composite_variable_panel(
+    ax: Axes,
+    ds: xr.Dataset,
+    name: str,
+    *,
+    ylabel: str,
+) -> None:
+    """Plot one composite variable using its configured color."""
+    color = VARIABLE_COLORS[name]
+    ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color=color)
+    _plot_event_percentile_band(
+        ax,
+        ds["lag_hour"].values,
+        ds,
+        name,
+        color=color,
+    )
+    ax.axhline(0, color="0.2", linewidth=1.0)
+    ax.set_ylabel(ylabel)
+    ax.legend(handles=[_variable_legend_handle(name)], loc="upper left")
+    ax.legend(loc="upper left")
+
+
+def _plot_composite_multi_variable_panel(
+    ax: Axes,
+    ds: xr.Dataset,
+    names: Sequence[str],
+    *,
+    ylabel: str,
+) -> None:
+    """Plot multiple composite variables on one axis."""
+    for name in names:
+        color = VARIABLE_COLORS[name]
+        ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color=color)
+        _plot_event_percentile_band(
+            ax,
+            ds["lag_hour"].values,
+            ds,
+            name,
+            color=color,
+        )
+    ax.axhline(0, color="0.2", linewidth=1.0)
+    ax.set_ylabel(ylabel)
+    ax.legend(loc="upper left")
+
+
 def _plot_top_event_single_variable_panel(
     ax: Axes,
     event_window: xr.Dataset,
@@ -484,6 +890,39 @@ def _plot_top_event_single_variable_panel(
     ax.legend(loc="upper left")
 
 
+def _plot_top_event_multi_variable_panel(
+    ax: Axes,
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    names: Sequence[str],
+    *,
+    ylabel: str,
+    reference_composite: xr.Dataset | None,
+) -> None:
+    """Plot top-event variables with optional all-event reference."""
+    for name in names:
+        color = VARIABLE_COLORS[name]
+        _plot_line(
+            ax,
+            event_window["time"].values,
+            event_window,
+            name,
+            color=color,
+            linestyle="--",
+        )
+        if reference_composite is not None:
+            _plot_top_event_reference(
+                ax,
+                event,
+                reference_composite,
+                name,
+                color=color,
+            )
+    ax.axhline(0, color="0.2", linewidth=1.0)
+    ax.set_ylabel(ylabel)
+    ax.legend(loc="upper left")
+
+
 def _plot_split_single_variable_panel(
     ax: Axes,
     ds: xr.Dataset,
@@ -501,6 +940,32 @@ def _plot_split_single_variable_panel(
     )
     ax.axhline(0, color="0.2", linewidth=1.0)
     ax.set_ylabel(ylabel)
+    ax.legend(handles=[_variable_legend_handle(name)], loc="upper left")
+
+
+def _plot_split_multi_variable_panel(
+    ax: Axes,
+    ds: xr.Dataset,
+    names: Sequence[str],
+    *,
+    ylabel: str,
+) -> None:
+    """Plot multiple split-bin composite variables on one axis."""
+    for name in names:
+        _plot_split_lines(
+            ax,
+            ds["lag_hour"].values,
+            ds,
+            name,
+            color=VARIABLE_COLORS[name],
+        )
+    ax.axhline(0, color="0.2", linewidth=1.0)
+    ax.set_ylabel(ylabel)
+    variable_legend = ax.legend(
+        handles=[_variable_legend_handle(name) for name in names],
+        loc="upper left",
+    )
+    ax.add_artist(variable_legend)
 
 
 def _plot_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
@@ -593,6 +1058,121 @@ def _plot_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
     ax.legend(loc="upper left")
 
 
+def _plot_pbl_pressure_panel(ax: Axes, ds: xr.Dataset) -> None:
+    """Plot PBL top pressure mean and spatial bounds in hPa."""
+    lag = ds["lag_hour"].values
+    color = VARIABLE_COLORS["pbl_p_mean"]
+    ax.plot(
+        lag,
+        ds["pbl_p_mean"].values * PBL_PRESSURE_TO_HPA,
+        label="pbl_p_mean",
+        color=color,
+    )
+    _plot_event_percentile_band(
+        ax,
+        lag,
+        ds,
+        "pbl_p_mean",
+        color=color,
+        scale=PBL_PRESSURE_TO_HPA,
+    )
+    ax.fill_between(
+        lag,
+        ds["pbl_p_p05"].values * PBL_PRESSURE_TO_HPA,
+        ds["pbl_p_p95"].values * PBL_PRESSURE_TO_HPA,
+        color=color,
+        alpha=0.14,
+        linewidth=0,
+        label="pbl_p_p05-p95",
+    )
+    ax.set_ylabel("PBL top pressure [hPa]")
+    ax.invert_yaxis()
+    ax.legend(loc="upper left")
+
+
+def _plot_split_pbl_pressure_panel(ax: Axes, ds: xr.Dataset) -> None:
+    """Plot split-bin PBL top pressure mean in hPa with event-IQR bounds."""
+    _plot_split_lines(
+        ax,
+        ds["lag_hour"].values,
+        ds,
+        "pbl_p_mean",
+        color=VARIABLE_COLORS["pbl_p_mean"],
+        scale=PBL_PRESSURE_TO_HPA,
+    )
+    ax.set_ylabel("PBL top pressure [hPa]")
+    ax.invert_yaxis()
+    variable_legend = ax.legend(
+        handles=[_variable_legend_handle("pbl_p_mean")],
+        loc="upper left",
+    )
+    ax.add_artist(variable_legend)
+
+
+def _plot_top_event_pbl_pressure_panel(
+    ax: Axes,
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    *,
+    reference_composite: xr.Dataset | None,
+) -> None:
+    """Plot top-event PBL top pressure mean and spatial bounds in hPa."""
+    time = event_window["time"].values
+    color = VARIABLE_COLORS["pbl_p_mean"]
+    _plot_line(
+        ax,
+        time,
+        event_window,
+        "pbl_p_mean",
+        color=color,
+        linestyle="--",
+        scale=PBL_PRESSURE_TO_HPA,
+    )
+    for name in ("pbl_p_p05", "pbl_p_p95"):
+        _plot_line(
+            ax,
+            time,
+            event_window,
+            name,
+            color=color,
+            label=f"_{name}",
+            linestyle=":",
+            linewidth=1.0,
+            scale=PBL_PRESSURE_TO_HPA,
+        )
+    if reference_composite is not None:
+        reference_time = _reference_composite_time(event, reference_composite)
+        _plot_line(
+            ax,
+            reference_time,
+            reference_composite,
+            "pbl_p_mean",
+            color=color,
+            label="_all_event_average",
+            linewidth=1.8,
+            scale=PBL_PRESSURE_TO_HPA,
+        )
+        _plot_event_percentile_band(
+            ax,
+            reference_time,
+            reference_composite,
+            "pbl_p_mean",
+            color=color,
+            scale=PBL_PRESSURE_TO_HPA,
+        )
+        ax.fill_between(
+            reference_time,
+            reference_composite["pbl_p_p05"].values * PBL_PRESSURE_TO_HPA,
+            reference_composite["pbl_p_p95"].values * PBL_PRESSURE_TO_HPA,
+            color=color,
+            alpha=0.14,
+            linewidth=0,
+        )
+    ax.set_ylabel("PBL top pressure [hPa]")
+    ax.invert_yaxis()
+    ax.legend(loc="upper left")
+
+
 def _plot_top_event_lwa_panel(
     ax: Axes,
     event_window: xr.Dataset,
@@ -644,6 +1224,120 @@ def _plot_split_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
     ax.add_artist(variable_legend)
 
 
+def _plot_soil_moisture_cloud_panel(ax: Axes, ds: xr.Dataset) -> None:
+    """Plot soil moisture and cloud cover with separate y axes."""
+    lag = ds["lag_hour"].values
+    soil_color = VARIABLE_COLORS["soil_moisture"]
+    cloud_color = VARIABLE_COLORS["cloud_cover"]
+    ax.plot(lag, ds["soil_moisture"].values, color=soil_color, label="soil_moisture")
+    _plot_event_percentile_band(ax, lag, ds, "soil_moisture", color=soil_color)
+    ax.set_ylabel("soil moisture [m3 m-3]", color=soil_color)
+    ax.tick_params(axis="y", labelcolor=soil_color)
+
+    ax_cloud = ax.twinx()
+    ax_cloud.plot(lag, ds["cloud_cover"].values, color=cloud_color, label="cloud_cover")
+    _plot_event_percentile_band(ax_cloud, lag, ds, "cloud_cover", color=cloud_color)
+    ax_cloud.set_ylabel("cloud cover fraction", color=cloud_color)
+    ax_cloud.tick_params(axis="y", labelcolor=cloud_color)
+    ax_cloud.set_ylim(0, 1)
+
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax_cloud.get_legend_handles_labels()
+    ax.legend(lines + lines2, labels + labels2, loc="upper left")
+
+
+def _plot_split_soil_moisture_cloud_panel(ax: Axes, ds: xr.Dataset) -> None:
+    """Plot split-bin soil moisture and cloud cover with separate y axes."""
+    lag = ds["lag_hour"].values
+    soil_color = VARIABLE_COLORS["soil_moisture"]
+    cloud_color = VARIABLE_COLORS["cloud_cover"]
+    _plot_split_lines(
+        ax,
+        lag,
+        ds,
+        "soil_moisture",
+        color=soil_color,
+    )
+    ax.set_ylabel("soil moisture [m3 m-3]", color=soil_color)
+    ax.tick_params(axis="y", labelcolor=soil_color)
+
+    ax_cloud = ax.twinx()
+    _plot_split_lines(
+        ax_cloud,
+        lag,
+        ds,
+        "cloud_cover",
+        color=cloud_color,
+    )
+    ax_cloud.set_ylabel("cloud cover fraction", color=cloud_color)
+    ax_cloud.tick_params(axis="y", labelcolor=cloud_color)
+    ax_cloud.set_ylim(0, 1)
+
+    ax.legend(
+        handles=[
+            _variable_legend_handle("soil_moisture"),
+            _variable_legend_handle("cloud_cover"),
+        ],
+        loc="upper left",
+    )
+
+
+def _plot_top_event_soil_moisture_cloud_panel(
+    ax: Axes,
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    *,
+    reference_composite: xr.Dataset | None,
+) -> None:
+    """Plot top-event soil moisture and cloud cover with separate y axes."""
+    time = event_window["time"].values
+    soil_color = VARIABLE_COLORS["soil_moisture"]
+    cloud_color = VARIABLE_COLORS["cloud_cover"]
+    _plot_line(
+        ax,
+        time,
+        event_window,
+        "soil_moisture",
+        color=soil_color,
+        linestyle="--",
+    )
+    if reference_composite is not None:
+        _plot_top_event_reference(
+            ax,
+            event,
+            reference_composite,
+            "soil_moisture",
+            color=soil_color,
+        )
+    ax.set_ylabel("soil moisture [m3 m-3]", color=soil_color)
+    ax.tick_params(axis="y", labelcolor=soil_color)
+
+    ax_cloud = ax.twinx()
+    _plot_line(
+        ax_cloud,
+        time,
+        event_window,
+        "cloud_cover",
+        color=cloud_color,
+        linestyle="--",
+    )
+    if reference_composite is not None:
+        _plot_top_event_reference(
+            ax_cloud,
+            event,
+            reference_composite,
+            "cloud_cover",
+            color=cloud_color,
+        )
+    ax_cloud.set_ylabel("cloud cover fraction", color=cloud_color)
+    ax_cloud.tick_params(axis="y", labelcolor=cloud_color)
+    ax_cloud.set_ylim(0, 1)
+
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax_cloud.get_legend_handles_labels()
+    ax.legend(lines + lines2, labels + labels2, loc="upper left")
+
+
 def _plot_split_lines(
     ax: Axes,
     lag: np.ndarray,
@@ -651,6 +1345,7 @@ def _plot_split_lines(
     name: str,
     *,
     color: str,
+    scale: float = 1.0,
 ) -> None:
     """Plot split-bin mean traces and low-alpha event percentile bounds."""
     for index in range(ds.sizes[SPLIT_BIN_DIM]):
@@ -658,7 +1353,7 @@ def _plot_split_lines(
         subset = ds.isel({SPLIT_BIN_DIM: index})
         ax.plot(
             lag,
-            subset[name].values,
+            subset[name].values * scale,
             color=color,
             linestyle=style,
             linewidth=1.8,
@@ -670,6 +1365,7 @@ def _plot_split_lines(
             name,
             color=color,
             linestyle=style,
+            scale=scale,
         )
 
 
@@ -680,6 +1376,7 @@ def _plot_event_percentile_band(
     name: str,
     *,
     color: str,
+    scale: float = 1.0,
 ) -> None:
     """Shade the event percentile envelope for one variable."""
     bounds = _event_percentile_bounds(ds, name)
@@ -689,8 +1386,8 @@ def _plot_event_percentile_band(
     lower, upper = bounds
     ax.fill_between(
         lag,
-        lower.values,
-        upper.values,
+        lower.values * scale,
+        upper.values * scale,
         color=color,
         alpha=0.18,
         linewidth=0,
@@ -705,6 +1402,7 @@ def _plot_event_percentile_bound_lines(
     *,
     color: str,
     linestyle: str,
+    scale: float = 1.0,
 ) -> None:
     """Draw event percentile bounds as faint lines for split overlays."""
     bounds = _event_percentile_bounds(ds, name)
@@ -715,7 +1413,7 @@ def _plot_event_percentile_bound_lines(
     for bound in (lower, upper):
         ax.plot(
             lag,
-            bound.values,
+            bound.values * scale,
             color=color,
             linestyle=linestyle,
             alpha=0.28,
@@ -852,6 +1550,21 @@ def _split_total_events(ds: xr.Dataset) -> int:
     if "split_n_events" in ds.coords:
         return int(np.asarray(ds["split_n_events"].values, dtype=np.int64).sum())
     return int(ds.attrs.get("n_events", 0))
+
+
+def _require_dataset_variables(
+    ds: xr.Dataset,
+    names: Sequence[str],
+    *,
+    dataset_label: str,
+) -> None:
+    """Raise a clear error when an extended plot input is missing variables."""
+    missing = [name for name in names if name not in ds]
+    if missing:
+        values = ", ".join(missing)
+        raise ValueError(
+            f"Extended plot requires missing variables in {dataset_label}: {values}."
+        )
 
 
 def _display_smoothing_variable_names(

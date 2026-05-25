@@ -43,6 +43,17 @@ TOP_EVENT_VARIABLES: tuple[str, ...] = (
     "lwa_a_region",
     "lwa_c_region",
 )
+EXTENDED_TOP_EVENT_VARIABLES: tuple[str, ...] = TOP_EVENT_VARIABLES + (
+    "pbl_p_mean",
+    "pbl_p_p05",
+    "pbl_p_p95",
+    "nslr_heating_rate_approx",
+    "nssr_heating_rate_approx",
+    "sshf_heating_rate_approx",
+    "slhf_heating_rate_approx",
+    "soil_moisture",
+    "cloud_cover",
+)
 SMOOTHED_TOP_EVENT_VARIABLES: tuple[str, ...] = (
     "T_mean",
     "volume",
@@ -50,6 +61,17 @@ SMOOTHED_TOP_EVENT_VARIABLES: tuple[str, ...] = (
     "advection",
     "adiabatic",
     "diabatic",
+)
+EXTENDED_SMOOTHED_TOP_EVENT_VARIABLES: tuple[str, ...] = SMOOTHED_TOP_EVENT_VARIABLES + (
+    "pbl_p_mean",
+    "pbl_p_p05",
+    "pbl_p_p95",
+    "nslr_heating_rate_approx",
+    "nssr_heating_rate_approx",
+    "sshf_heating_rate_approx",
+    "slhf_heating_rate_approx",
+    "soil_moisture",
+    "cloud_cover",
 )
 REFERENCE_EVENT_PERCENTILES: tuple[float, ...] = (0.25, 0.5, 0.75)
 
@@ -88,6 +110,11 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=DEFAULT_SMOOTHING_WINDOW,
         help="Hourly running-mean window for the smoothed top-event figures.",
+    )
+    parser.add_argument(
+        "--plot-extended-variables",
+        action="store_true",
+        help="Plot optional extended diagnostics when present in the input dataset.",
     )
     return parser.parse_args()
 
@@ -133,6 +160,7 @@ def write_top_event_plots(
     output_dir: Path,
     window_days: int = DEFAULT_WINDOW_DAYS,
     smoothing_window: int = DEFAULT_SMOOTHING_WINDOW,
+    plot_extended_variables: bool = False,
 ) -> list[Path]:
     """Write raw and display-smoothed time-series figures per selected event."""
     if window_days < 0:
@@ -145,16 +173,18 @@ def write_top_event_plots(
     if selected_events.sizes.get("event", 0) == 0:
         return written
 
+    variables = _top_event_variables(plot_extended_variables)
+    smoothed_variables = _smoothed_top_event_variables(plot_extended_variables)
     reference_composite = composites.all_event_peak_aligned_composite(
         ds,
-        variables=TOP_EVENT_VARIABLES,
+        variables=variables,
         pre_days=window_days,
         post_days=window_days,
         event_percentiles=REFERENCE_EVENT_PERCENTILES,
     )
     smoothed_reference_composite = plotting.smooth_composite_for_display(
         reference_composite,
-        variables=SMOOTHED_TOP_EVENT_VARIABLES,
+        variables=smoothed_variables,
         smoothing_window=smoothing_window,
     )
     for event_index in range(selected_events.sizes.get("event", 0)):
@@ -164,6 +194,7 @@ def write_top_event_plots(
             event,
             window_days=window_days,
             reference_composite=reference_composite,
+            plot_extended_variables=plot_extended_variables,
         )
         path = output_dir / _event_figure_filename(event)
         fig.savefig(path, dpi=150)
@@ -176,6 +207,7 @@ def write_top_event_plots(
             window_days=window_days,
             reference_composite=smoothed_reference_composite,
             smoothing_window=smoothing_window,
+            plot_extended_variables=plot_extended_variables,
         )
         path = output_dir / _smoothed_event_figure_filename(event)
         fig.savefig(path, dpi=150)
@@ -191,15 +223,16 @@ def plot_one_top_event(
     window_days: int = DEFAULT_WINDOW_DAYS,
     reference_composite: xr.Dataset | None = None,
     smoothing_window: int | None = None,
+    plot_extended_variables: bool = False,
 ) -> plt.Figure: # type: ignore
-    """Return a four-panel figure for one selected event."""
+    """Return a figure for one selected event."""
     peak_time = _event_time_value(event, "peak_time")
     window = np.timedelta64(window_days, "D")
     ds_window = ds.sel(time=slice(peak_time - window, peak_time + window))
     if smoothing_window is not None:
         ds_window = plotting.smooth_composite_for_display(
             ds_window,
-            variables=SMOOTHED_TOP_EVENT_VARIABLES,
+            variables=_smoothed_top_event_variables(plot_extended_variables),
             smoothing_window=smoothing_window,
             lag_dim="time",
         )
@@ -208,6 +241,7 @@ def plot_one_top_event(
         ds_window,
         event,
         reference_composite=reference_composite,
+        plot_extended_variables=plot_extended_variables,
     )
 
 
@@ -245,6 +279,7 @@ def main() -> int:
             output_dir=args.output_dir,
             window_days=args.window_days,
             smoothing_window=args.smoothing_window,
+            plot_extended_variables=args.plot_extended_variables,
         )
         print(f"Wrote {len(written)} top-event figures:")
         for path in written:
@@ -260,6 +295,20 @@ def _display_path(path: Path) -> str:
         return str(path.resolve().relative_to(REPO_ROOT))
     except ValueError:
         return str(path)
+
+
+def _top_event_variables(plot_extended_variables: bool) -> tuple[str, ...]:
+    """Return variables required for the selected top-event plot layout."""
+    if plot_extended_variables:
+        return EXTENDED_TOP_EVENT_VARIABLES
+    return TOP_EVENT_VARIABLES
+
+
+def _smoothed_top_event_variables(plot_extended_variables: bool) -> tuple[str, ...]:
+    """Return display-smoothed variables for the selected top-event layout."""
+    if plot_extended_variables:
+        return EXTENDED_SMOOTHED_TOP_EVENT_VARIABLES
+    return SMOOTHED_TOP_EVENT_VARIABLES
 
 
 if __name__ == "__main__":

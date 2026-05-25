@@ -24,5 +24,6 @@ echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hos
 /usr/bin/time -v python plot_composite_timeseries_all.py \
     --window-days 7 \
     --season-months 6 7 8 \
+    --plot-extended-variables \
     --require-full-event
 echo "[info] $(date -Is) done"

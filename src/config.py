@@ -95,7 +95,9 @@ tas_thresh_p95_win31 (dayofyear) - daily HW threshold for each day of year, spat
 '''
 
 #eulerian heat budget, spatially aggregated from ERA5 native grid, hourly
-ERA5_HEAT_BUDGET_ROOT: str = "/home/mhpereir/eulerian_heat_budget/results/production/pnw_full_run/annual"
+# ERA5_HEAT_BUDGET_ROOT: str = "/home/mhpereir/eulerian_heat_budget/results/production/pnw_full_run/annual" #pnw_bartusek surface-700 hPa
+ERA5_HEAT_BUDGET_ROOT: str = "/home/mhpereir/eulerian_heat_budget/results/production/pnw_hotz_surface_700_hPa/annual" #pnw_bartusek 700-500 hPa
+
 #heat_budget_{year}.nc
 '''
 dimensions

@@ -17,6 +17,7 @@ def test_parse_args_uses_default_input_path(monkeypatch):
     assert args.input_path == analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH
     assert args.season_months is None
     assert not args.require_full_event
+    assert not args.plot_extended_variables
 
 
 def test_parse_args_accepts_season_months(monkeypatch):
@@ -28,6 +29,17 @@ def test_parse_args_accepts_season_months(monkeypatch):
     args = plot_composite_timeseries.parse_args()
 
     assert args.season_months == [6, 7, 8]
+
+
+def test_parse_args_accepts_plot_extended_variables(monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        ["plot_composite_timeseries_all.py", "--plot-extended-variables"],
+    )
+
+    args = plot_composite_timeseries.parse_args()
+
+    assert args.plot_extended_variables
 
 
 def test_validate_args_rejects_negative_window_days():
@@ -128,8 +140,59 @@ def test_main_orchestrates_dataset_composite_and_plotting(monkeypatch, tmp_path,
         "smoothed_output_path": output_path.with_name("composite_smoothed.png"),
         "smoothing_window": 6,
         "smoothed_variables": plot_composite_timeseries.SMOOTHED_VARIABLES,
+        "plot_extended_variables": False,
     }
     assert "Wrote HW all-event composite figures:" in capsys.readouterr().out
+
+
+def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
+    input_path = tmp_path / "stage1.nc"
+    output_path = tmp_path / "composite.png"
+    opened = xr.Dataset()
+    composite = xr.Dataset()
+    captured = {}
+
+    def fake_open(path):
+        return opened
+
+    def fake_composite(ds, **kwargs):
+        captured["composite_kwargs"] = kwargs
+        return composite
+
+    def fake_write(ds, output, **kwargs):
+        captured["plot_kwargs"] = kwargs
+        return [output, kwargs["smoothed_output_path"]]
+
+    monkeypatch.setattr("sys.argv", [
+        "plot_composite_timeseries_all.py",
+        "--input-path",
+        str(input_path),
+        "--output-path",
+        str(output_path),
+        "--plot-extended-variables",
+    ])
+    monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", fake_open)
+    monkeypatch.setattr(
+        plot_composite_timeseries.composites,
+        "all_event_peak_aligned_composite",
+        fake_composite,
+    )
+    monkeypatch.setattr(
+        plot_composite_timeseries.plotting,
+        "write_composite_timeseries_outputs",
+        fake_write,
+    )
+
+    result = plot_composite_timeseries.main()
+
+    assert result == 0
+    assert captured["composite_kwargs"]["variables"] == (
+        plot_composite_timeseries.EXTENDED_COMPOSITE_VARIABLES
+    )
+    assert captured["plot_kwargs"]["smoothed_variables"] == (
+        plot_composite_timeseries.EXTENDED_SMOOTHED_VARIABLES
+    )
+    assert captured["plot_kwargs"]["plot_extended_variables"]
 
 
 def test_main_filters_event_table_before_composite_when_season_requested(monkeypatch, tmp_path):

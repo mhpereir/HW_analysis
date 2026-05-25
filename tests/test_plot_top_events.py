@@ -15,6 +15,7 @@ def test_parse_args_uses_default_input_path(monkeypatch):
 
     assert args.input_path == analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH
     assert args.smoothing_window == plot_top_events.DEFAULT_SMOOTHING_WINDOW
+    assert not args.plot_extended_variables
 
 
 def test_parse_args_accepts_custom_input_path(monkeypatch, tmp_path):
@@ -27,6 +28,14 @@ def test_parse_args_accepts_custom_input_path(monkeypatch, tmp_path):
     args = plot_top_events.parse_args()
 
     assert args.input_path == input_path
+
+
+def test_parse_args_accepts_plot_extended_variables(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["plot_top_events.py", "--plot-extended-variables"])
+
+    args = plot_top_events.parse_args()
+
+    assert args.plot_extended_variables
 
 
 def test_open_harmonized_dataset_delegates_to_analysis_io(monkeypatch, tmp_path):
@@ -103,8 +112,15 @@ def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp
         smoothed.attrs["smoothing_window"] = kwargs["smoothing_window"]
         return smoothed
 
-    def fake_plot(event_window, event, *, reference_composite=None):
+    def fake_plot(
+        event_window,
+        event,
+        *,
+        reference_composite=None,
+        plot_extended_variables=False,
+    ):
         captured["plot_references"].append(reference_composite)
+        captured.setdefault("plot_extended_variables", []).append(plot_extended_variables)
         fig = plt.figure()
         fig.add_subplot(111)
         return fig
@@ -148,6 +164,7 @@ def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp
         reference_composite,
         smoothed_reference_composite,
     ]
+    assert captured["plot_extended_variables"] == [False, False, False, False]
     assert len(captured["smooth_calls"]) == 3
     first_smooth_source, first_smooth_kwargs = captured["smooth_calls"][0]
     assert first_smooth_source is reference_composite
@@ -164,6 +181,69 @@ def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp
         for _, kwargs in captured["smooth_calls"][1:]
     )
     assert all(path.exists() for path in written)
+
+
+def test_write_top_event_plots_uses_extended_variables_when_requested(monkeypatch, tmp_path):
+    ds = _make_plot_dataset()
+    selected = plot_top_events.select_top_tas_events(ds, n=1)
+    reference_composite = xr.Dataset()
+    smoothed_reference_composite = xr.Dataset()
+    captured = {"plot_extended_variables": []}
+
+    def fake_composite(source, **kwargs):
+        captured["composite_kwargs"] = kwargs
+        return reference_composite
+
+    def fake_smooth(source, **kwargs):
+        captured.setdefault("smooth_kwargs", []).append(kwargs)
+        if source is reference_composite:
+            return smoothed_reference_composite
+        return source
+
+    def fake_plot(
+        event_window,
+        event,
+        *,
+        reference_composite=None,
+        plot_extended_variables=False,
+    ):
+        captured["plot_extended_variables"].append(plot_extended_variables)
+        fig = plt.figure()
+        fig.add_subplot(111)
+        return fig
+
+    monkeypatch.setattr(
+        plot_top_events.composites,
+        "all_event_peak_aligned_composite",
+        fake_composite,
+    )
+    monkeypatch.setattr(
+        plot_top_events.plotting,
+        "plot_top_event_timeseries",
+        fake_plot,
+    )
+    monkeypatch.setattr(
+        plot_top_events.plotting,
+        "smooth_composite_for_display",
+        fake_smooth,
+    )
+
+    written = plot_top_events.write_top_event_plots(
+        ds,
+        selected,
+        output_dir=tmp_path,
+        window_days=1,
+        plot_extended_variables=True,
+    )
+
+    assert len(written) == 2
+    assert captured["composite_kwargs"]["variables"] == (
+        plot_top_events.EXTENDED_TOP_EVENT_VARIABLES
+    )
+    assert captured["smooth_kwargs"][0]["variables"] == (
+        plot_top_events.EXTENDED_SMOOTHED_TOP_EVENT_VARIABLES
+    )
+    assert captured["plot_extended_variables"] == [True, True]
 
 
 def _make_plot_dataset() -> xr.Dataset:

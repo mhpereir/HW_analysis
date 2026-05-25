@@ -23,5 +23,6 @@ cd /home/mhpereir/HW_analysis/scripts
 echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hostname)"
 /usr/bin/time -v python plot_top_events.py \
     --top-n 10 \
+    --plot-extended-variables \
     --window-days 7
 echo "[info] $(date -Is) done"

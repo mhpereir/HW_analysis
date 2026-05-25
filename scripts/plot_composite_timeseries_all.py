@@ -28,6 +28,17 @@ COMPOSITE_VARIABLES: tuple[str, ...] = (
     "lwa_a_region",
     "lwa_c_region",
 )
+EXTENDED_COMPOSITE_VARIABLES: tuple[str, ...] = COMPOSITE_VARIABLES + (
+    "pbl_p_mean",
+    "pbl_p_p05",
+    "pbl_p_p95",
+    "nslr_heating_rate_approx",
+    "nssr_heating_rate_approx",
+    "sshf_heating_rate_approx",
+    "slhf_heating_rate_approx",
+    "soil_moisture",
+    "cloud_cover",
+)
 SMOOTHED_VARIABLES: tuple[str, ...] = (
     "T_mean",
     "volume",
@@ -35,6 +46,17 @@ SMOOTHED_VARIABLES: tuple[str, ...] = (
     "advection",
     "adiabatic",
     "diabatic",
+)
+EXTENDED_SMOOTHED_VARIABLES: tuple[str, ...] = SMOOTHED_VARIABLES + (
+    "pbl_p_mean",
+    "pbl_p_p05",
+    "pbl_p_p95",
+    "nslr_heating_rate_approx",
+    "nssr_heating_rate_approx",
+    "sshf_heating_rate_approx",
+    "slhf_heating_rate_approx",
+    "soil_moisture",
+    "cloud_cover",
 )
 
 
@@ -80,6 +102,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Require the full event interval to fall within --season-months.",
     )
+    parser.add_argument(
+        "--plot-extended-variables",
+        action="store_true",
+        help="Plot optional extended diagnostics when present in the input dataset.",
+    )
     return parser.parse_args()
 
 
@@ -102,8 +129,10 @@ def main() -> int:
 
     ds = analysis_io.open_harmonized_timeseries(args.input_path)
     try:
+        variables = _composite_variables(args.plot_extended_variables)
+        smoothed_variables = _smoothed_variables(args.plot_extended_variables)
         composite_kwargs = {
-            "variables": COMPOSITE_VARIABLES,
+            "variables": variables,
             "pre_days": args.window_days,
             "post_days": args.window_days,
             "event_percentiles": (0.25, 0.5, 0.75),
@@ -128,7 +157,8 @@ def main() -> int:
             args.output_path,
             smoothed_output_path=_smoothed_output_path(args.output_path),
             smoothing_window=args.smoothing_window,
-            smoothed_variables=SMOOTHED_VARIABLES,
+            smoothed_variables=smoothed_variables,
+            plot_extended_variables=args.plot_extended_variables,
         )
         print("Wrote HW all-event composite figures:")
         for path in written:
@@ -144,6 +174,20 @@ def _validate_season_months(months: list[int]) -> None:
     if invalid:
         values = ", ".join(str(month) for month in invalid)
         raise ValueError(f"--season-months values must be between 1 and 12; got {values}.")
+
+
+def _composite_variables(plot_extended_variables: bool) -> tuple[str, ...]:
+    """Return variables required for the selected composite plot layout."""
+    if plot_extended_variables:
+        return EXTENDED_COMPOSITE_VARIABLES
+    return COMPOSITE_VARIABLES
+
+
+def _smoothed_variables(plot_extended_variables: bool) -> tuple[str, ...]:
+    """Return display-smoothed variables for the selected plot layout."""
+    if plot_extended_variables:
+        return EXTENDED_SMOOTHED_VARIABLES
+    return SMOOTHED_VARIABLES
 
 
 def _smoothed_output_path(output_path: Path) -> Path:
