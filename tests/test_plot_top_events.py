@@ -8,12 +8,43 @@ from scripts import plot_top_events
 from src import analysis_io
 
 
-def test_parse_args_uses_default_input_path(monkeypatch):
-    monkeypatch.setattr("sys.argv", ["plot_top_events.py"])
+RUN_ARGS = [
+    "--region", "pnw_hotz",
+    "--bottom-boundary", "surface",
+    "--top-boundary", "700",
+    "--threshold-variable", "tas",
+    "--quantile", "90",
+    "--start-year", "1940",
+    "--end-year", "2024",
+]
+
+
+def _argv(*extra: str) -> list[str]:
+    return ["plot_top_events.py", *RUN_ARGS, *extra]
+
+
+def test_parse_args_builds_default_paths(monkeypatch):
+    monkeypatch.setattr("sys.argv", _argv())
 
     args = plot_top_events.parse_args()
 
-    assert args.input_path == analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH
+    assert args.input_path == analysis_io.default_harmonized_timeseries_path(
+        region="pnw_hotz",
+        bottom_boundary="surface",
+        top_boundary="700hPa",
+        threshold_variable="tas",
+        quantile="90",
+        start_year=1940,
+        end_year=2024,
+    )
+    assert args.output_dir == (
+        plot_top_events.REPO_ROOT
+        / "results"
+        / "plots_top_events"
+        / "region_pnw_hotz"
+        / "boundary_surface_700hPa"
+        / "time_range_1940_2024"
+    )
     assert args.smoothing_window == plot_top_events.DEFAULT_SMOOTHING_WINDOW
     assert not args.plot_extended_variables
 
@@ -22,7 +53,7 @@ def test_parse_args_accepts_custom_input_path(monkeypatch, tmp_path):
     input_path = tmp_path / "stage1.nc"
     monkeypatch.setattr(
         "sys.argv",
-        ["plot_top_events.py", "--input-path", str(input_path)],
+        _argv("--input-path", str(input_path)),
     )
 
     args = plot_top_events.parse_args()
@@ -31,7 +62,7 @@ def test_parse_args_accepts_custom_input_path(monkeypatch, tmp_path):
 
 
 def test_parse_args_accepts_plot_extended_variables(monkeypatch):
-    monkeypatch.setattr("sys.argv", ["plot_top_events.py", "--plot-extended-variables"])
+    monkeypatch.setattr("sys.argv", _argv("--plot-extended-variables"))
 
     args = plot_top_events.parse_args()
 

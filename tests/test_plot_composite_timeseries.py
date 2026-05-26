@@ -9,12 +9,44 @@ from scripts import plot_composite_timeseries_all as plot_composite_timeseries
 from src import analysis_io
 
 
-def test_parse_args_uses_default_input_path(monkeypatch):
-    monkeypatch.setattr("sys.argv", ["plot_composite_timeseries_all.py"])
+RUN_ARGS = [
+    "--region", "pnw_hotz",
+    "--bottom-boundary", "surface",
+    "--top-boundary", "700",
+    "--threshold-variable", "tas",
+    "--quantile", "90",
+    "--start-year", "1940",
+    "--end-year", "2024",
+]
+
+
+def _argv(*extra: str) -> list[str]:
+    return ["plot_composite_timeseries_all.py", *RUN_ARGS, *extra]
+
+
+def test_parse_args_builds_default_paths(monkeypatch):
+    monkeypatch.setattr("sys.argv", _argv())
 
     args = plot_composite_timeseries.parse_args()
 
-    assert args.input_path == analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH
+    assert args.input_path == analysis_io.default_harmonized_timeseries_path(
+        region="pnw_hotz",
+        bottom_boundary="surface",
+        top_boundary="700hPa",
+        threshold_variable="tas",
+        quantile="90",
+        start_year=1940,
+        end_year=2024,
+    )
+    assert args.output_path == (
+        plot_composite_timeseries.REPO_ROOT
+        / "results"
+        / "plots_composite_timeseries_all"
+        / "region_pnw_hotz"
+        / "boundary_surface_700hPa"
+        / "time_range_1940_2024"
+        / "hw_all_events_composite.png"
+    )
     assert args.season_months is None
     assert not args.require_full_event
     assert not args.plot_extended_variables
@@ -23,7 +55,7 @@ def test_parse_args_uses_default_input_path(monkeypatch):
 def test_parse_args_accepts_season_months(monkeypatch):
     monkeypatch.setattr(
         "sys.argv",
-        ["plot_composite_timeseries_all.py", "--season-months", "6", "7", "8"],
+        _argv("--season-months", "6", "7", "8"),
     )
 
     args = plot_composite_timeseries.parse_args()
@@ -34,7 +66,7 @@ def test_parse_args_accepts_season_months(monkeypatch):
 def test_parse_args_accepts_plot_extended_variables(monkeypatch):
     monkeypatch.setattr(
         "sys.argv",
-        ["plot_composite_timeseries_all.py", "--plot-extended-variables"],
+        _argv("--plot-extended-variables"),
     )
 
     args = plot_composite_timeseries.parse_args()
@@ -101,7 +133,7 @@ def test_main_orchestrates_dataset_composite_and_plotting(monkeypatch, tmp_path,
         return [output, kwargs["smoothed_output_path"]]
 
     monkeypatch.setattr("sys.argv", [
-        "plot_composite_timeseries_all.py",
+        *_argv(
         "--input-path",
         str(input_path),
         "--output-path",
@@ -110,6 +142,7 @@ def test_main_orchestrates_dataset_composite_and_plotting(monkeypatch, tmp_path,
         "3",
         "--smoothing-window",
         "6",
+        ),
     ])
     monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", fake_open)
     monkeypatch.setattr(
@@ -164,12 +197,13 @@ def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
         return [output, kwargs["smoothed_output_path"]]
 
     monkeypatch.setattr("sys.argv", [
-        "plot_composite_timeseries_all.py",
+        *_argv(
         "--input-path",
         str(input_path),
         "--output-path",
         str(output_path),
         "--plot-extended-variables",
+        ),
     ])
     monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", fake_open)
     monkeypatch.setattr(
@@ -215,7 +249,7 @@ def test_main_filters_event_table_before_composite_when_season_requested(monkeyp
         return [output, kwargs["smoothed_output_path"]]
 
     monkeypatch.setattr("sys.argv", [
-        "plot_composite_timeseries_all.py",
+        *_argv(
         "--input-path",
         str(input_path),
         "--output-path",
@@ -223,6 +257,7 @@ def test_main_filters_event_table_before_composite_when_season_requested(monkeyp
         "--season-months",
         "6",
         "--require-full-event",
+        ),
     ])
     monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", fake_open)
     monkeypatch.setattr(

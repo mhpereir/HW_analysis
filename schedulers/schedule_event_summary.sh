@@ -1,10 +1,10 @@
 #!/bin/bash
-#PBS -N stage_2_plot_top_events
-#PBS -l select=1:ncpus=4:mem=32gb
+#PBS -N stage_2_plot_event_summary
+#PBS -l select=1:ncpus=4:mem=8gb
 #PBS -j oe
 #PBS -o /dev/null
 
-LOGFILE="/home/mhpereir/HW_analysis/logs/${PBS_JOBID}_plot_top_events.log"
+LOGFILE="/home/mhpereir/HW_analysis/logs/${PBS_JOBID}_plot_event_summary.log"
 exec > >(tee -a "${LOGFILE}") 2>&1
 
 # export OMP_NUM_THREADS=1
@@ -28,8 +28,8 @@ TIME_END=2024
 
 cd /home/mhpereir/HW_analysis/scripts
 
-echo "[info] $(date -Is) starting plot generation on host $(hostname)"
-/usr/bin/time -v python plot_top_events.py \
+echo "[info] $(date -Is) starting event summary plotting on host $(hostname)"
+/usr/bin/time -v python plot_event_summary.py \
     --region "${REGION}" \
     --bottom-boundary "${BOTTOM_BOUNDARY}" \
     --top-boundary "${TOP_BOUNDARY}" \
@@ -37,7 +37,6 @@ echo "[info] $(date -Is) starting plot generation on host $(hostname)"
     --quantile "${QUANTILE}" \
     --start-year "${TIME_START}" \
     --end-year "${TIME_END}" \
-    --top-n 10 \
-    --plot-extended-variables \
-    --window-days 7
+    --season-months 6 7 8 \
+    --require-full-event
 echo "[info] $(date -Is) done"

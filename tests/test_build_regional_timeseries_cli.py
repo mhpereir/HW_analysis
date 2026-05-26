@@ -52,17 +52,32 @@ def test_parse_args_builds_inclusive_analysis_years(monkeypatch):
     assert args.start_year == 1940
     assert args.end_year == 1942
     assert args.analysis_years == [1940, 1941, 1942]
+    assert args.bottom_boundary == "surface"
+    assert args.top_boundary == "700hPa"
+    assert args.start_year_ehb == 1940
+    assert args.end_year_ehb == 2025
+    assert args.heat_budget_root == (
+        build_regional_timeseries.data_io.era5_heat_budget_annual_root(
+            region="pnw_bartusek",
+            bottom_boundary="surface",
+            top_boundary="700hPa",
+            start_year_ehb=1940,
+            end_year_ehb=2025,
+        )
+    )
     assert args.threshold_variable == "tas"
     assert args.add_full_diagnostics is False
     assert args.output_path == analysis_io.default_harmonized_timeseries_path(
         region="pnw_bartusek",
+        bottom_boundary="surface",
+        top_boundary="700hPa",
         threshold_variable="tas",
         quantile="90",
         start_year=1940,
         end_year=1942,
     )
     assert args.output_path.name == (
-        "harmonized_regional_timeseries_pnw_bartusek_tas_q90_1940_1942.nc"
+        "harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_1942.nc"
     )
 
 
@@ -77,6 +92,10 @@ def test_parse_args_builds_run_specific_output_path(monkeypatch):
             "97p5",
             "--threshold-variable",
             "lwa_c",
+            "--bottom-boundary",
+            "700hPa",
+            "--top-boundary",
+            "500",
             "--start-year",
             "1950",
             "--end-year",
@@ -87,8 +106,10 @@ def test_parse_args_builds_run_specific_output_path(monkeypatch):
     args = build_regional_timeseries.parse_args()
 
     assert args.output_path.name == (
-        "harmonized_regional_timeseries_western_canada_lwa_c_q97p5_1950_1951.nc"
+        "harmonized_regional_timeseries_western_canada_700hPa_500hPa_lwa_c_q97p5_1950_1951.nc"
     )
+    assert args.heat_budget_root.name == "annual"
+    assert args.heat_budget_root.parent.name == "western_canada_700hPa_500hPa_1940_2025"
 
 
 def test_parse_args_accepts_custom_output_path(monkeypatch, tmp_path):
@@ -129,14 +150,40 @@ def test_parse_args_accepts_add_full_diagnostics_flag(monkeypatch):
     assert args.add_full_diagnostics is True
 
 
+def test_parse_args_accepts_custom_ehb_year_tokens(monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "build_regional_timeseries.py",
+            "--start-year",
+            "1950",
+            "--end-year",
+            "1951",
+            "--start-year-ehb",
+            "1940",
+            "--end-year-ehb",
+            "2026",
+        ],
+    )
+
+    args = build_regional_timeseries.parse_args()
+
+    assert args.heat_budget_root.parent.name == "pnw_bartusek_surface_700hPa_1940_2026"
+
+
 def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch):
     calls = []
+    heat_budget_calls = []
 
     monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_tas", lambda **kwargs: xr.Dataset())
     monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_lwa", lambda **kwargs: xr.Dataset())
     monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_lwa_threshold", lambda **kwargs: xr.Dataset())
     monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_hw_threshold", lambda **kwargs: xr.Dataset())
-    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_heat_budget", lambda **kwargs: xr.Dataset())
+    def fake_open_heat_budget(**kwargs):
+        heat_budget_calls.append(kwargs)
+        return xr.Dataset()
+
+    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_heat_budget", fake_open_heat_budget)
 
     def fake_load_full(args):
         calls.append(args)
@@ -149,11 +196,16 @@ def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch
         region="pnw_bartusek",
         quantile="90",
         zg_level=500,
+        heat_budget_root="/data/heat_budget/annual",
         add_full_diagnostics=False,
     )
     datasets = build_regional_timeseries.load_era5_inputs(args)
 
     assert calls == []
+    assert heat_budget_calls[-1] == {
+        "years": [1940],
+        "heat_budget_root": "/data/heat_budget/annual",
+    }
     assert "pbl_p" not in datasets
 
     args.add_full_diagnostics = True

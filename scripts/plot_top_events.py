@@ -25,10 +25,11 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from src import analysis_io, composites, plotting, selectors
+from src import analysis_io, composites, plot_paths, plotting, selectors
 
 
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "plots_top_events"
+PLOT_NAME = "top_events"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / f"plots_{PLOT_NAME}"
 DEFAULT_TOP_N = 10
 DEFAULT_WINDOW_DAYS = 7
 DEFAULT_RANK_METRIC = "tas_peak"
@@ -81,16 +82,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot top-event diagnostics from a harmonized Stage-1 dataset."
     )
-    parser.add_argument(
-        "--input-path",
-        type=Path,
-        default=analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH,
-        help="Path to the saved harmonized Stage-1 regional dataset.",
-    )
+    plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=DEFAULT_OUTPUT_DIR,
+        default=None,
         help="Directory where top-event figures will be written.",
     )
     parser.add_argument(
@@ -116,11 +112,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Plot optional extended diagnostics when present in the input dataset.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    return plot_paths.finalize_stage1_plot_paths(
+        args,
+        parser,
+        plot_name=PLOT_NAME,
+    )
 
 
 def open_harmonized_dataset(
-    path: str | Path = analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH,
+    path: str | Path,
     *,
     chunks: Mapping[str, int] | None = None,
 ) -> xr.Dataset:

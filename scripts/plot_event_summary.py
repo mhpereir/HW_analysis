@@ -22,10 +22,12 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-from src import analysis_io, selectors
+from src import analysis_io, plot_paths, selectors
 
 
-DEFAULT_OUTPUT_PATH = REPO_ROOT / "results" / "plots_event_summary" / "event_summary_histograms.png"
+PLOT_NAME = "event_summary"
+DEFAULT_OUTPUT_FILENAME = "event_summary_histograms.png"
+DEFAULT_OUTPUT_PATH = REPO_ROOT / "results" / f"plots_{PLOT_NAME}" / DEFAULT_OUTPUT_FILENAME
 DEFAULT_BINS = 30
 DEFAULT_EVENT_DIM = "event"
 DEFAULT_EXCLUDED_VARIABLES: frozenset[str] = frozenset(
@@ -43,16 +45,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot histograms of variables in the saved event summary table."
     )
-    parser.add_argument(
-        "--input-path",
-        type=Path,
-        default=analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH,
-        help="Path to the saved harmonized Stage-1 regional dataset.",
-    )
+    plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(
         "--output-path",
         type=Path,
-        default=DEFAULT_OUTPUT_PATH,
+        default=None,
         help="Path where the histogram PNG will be written.",
     )
     parser.add_argument(
@@ -84,7 +81,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Require the full event interval to fall within --season-months.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    return plot_paths.finalize_stage1_plot_paths(
+        args,
+        parser,
+        plot_name=PLOT_NAME,
+        default_output_filename=DEFAULT_OUTPUT_FILENAME,
+    )
 
 
 def validate_args(args: argparse.Namespace) -> None:

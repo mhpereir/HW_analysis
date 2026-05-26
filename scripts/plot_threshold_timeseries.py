@@ -1,16 +1,10 @@
-"""Plot annual threshold/event diagnostics for current ERA5 regional products.
-
-This script is self-contained: it loads the required ERA5 inputs, rebuilds the
-daily HW and LWA_a event-ID products, and writes one threshold-timeseries figure
-per selected year. It does not depend on stage-1 output files.
-"""
+"""Plot annual threshold/event diagnostics from a Stage-1 harmonized dataset."""
 
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
-import typing
 from matplotlib.axes import Axes
 
 import matplotlib
@@ -25,32 +19,18 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from src import data_io, events, preprocess
+from src import analysis_io, plot_paths, preprocess
 
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "plots_diagnostics"
+PLOT_NAME = "threshold_timeseries"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / f"plots_{PLOT_NAME}"
 
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line options for threshold-timeseries diagnostics."""
     parser = argparse.ArgumentParser(
-        description="Plot annual ERA5 threshold/event diagnostic time series."
+        description="Plot annual Stage-1 threshold/event diagnostic time series."
     )
-    parser.add_argument(
-        "--region",
-        default="pnw_bartusek",
-        help="Region key used by threshold products.",
-    )
-    parser.add_argument(
-        "--quantile",
-        default="95",
-        help="Threshold quantile token, for example 95 or 97p5.",
-    )
-    parser.add_argument(
-        "--zg-level",
-        type=int,
-        default=500,
-        help="Pressure level used for the LWA products.",
-    )
+    plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(
         "--years",
         type=int,
@@ -64,18 +44,17 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--min-duration",
-        type=int,
-        default=1,
-        help="Minimum contiguous exceedance duration retained as an event.",
-    )
-    parser.add_argument(
         "--output-dir",
         type=Path,
-        default=DEFAULT_OUTPUT_DIR,
+        default=None,
         help="Directory where diagnostic PNG files will be written.",
     )
     args = parser.parse_args()
+    args = plot_paths.finalize_stage1_plot_paths(
+        args,
+        parser,
+        plot_name=PLOT_NAME,
+    )
     if args.years is not None:
         if len(args.years) == 1:
             args.years = [args.years[0]]
@@ -87,82 +66,32 @@ def parse_args() -> argparse.Namespace:
         else:
             parser.error("--years accepts either one year or two years: START END.")
 
-    if args.output_dir == DEFAULT_OUTPUT_DIR:
-        args.output_dir = DEFAULT_OUTPUT_DIR / f"q{args.quantile}"
-
     return args
 
 
-def load_plot_inputs(args: argparse.Namespace) -> dict[str, xr.Dataset]:
-    """Open only the ERA5 inputs required by the plot workflow."""
+def build_hw_plot_products(ds: xr.Dataset) -> dict[str, xr.DataArray]:
+    """Build HW plot inputs from a harmonized Stage-1 dataset."""
     return {
-        "tas": data_io.open_era5_tas(years=args.years),
-        "lwa": data_io.open_era5_lwa(zg_level=args.zg_level),
-        "lwa_threshold": data_io.open_era5_lwa_threshold(
-            region=args.region,
-            quantile=args.quantile,
-            zg_level=args.zg_level,
-        ),
-        "hw_threshold": data_io.open_era5_hw_threshold(
-            region=args.region,
-            quantile=args.quantile,
-            method="evolving",
-        ),
+        "series": ds["tas_region"],
+        "climatology": ds["tas_climatology"],
+        "threshold": ds["hw_threshold"],
+        "mask": ds["hw_flag"].astype(bool),
+        "event_id": ds["hw_event_id"],
     }
 
 
-def build_hw_plot_products(
-    tas: xr.DataArray,
-    hw_threshold: xr.DataArray,
-    hw_climatology: xr.DataArray,
-    *,
-    region: str,
-    min_duration: int,
-) -> dict[str, xr.DataArray]:
-    """Build regional HW plot inputs from tas and HW threshold products."""
-    products = events.build_hw_event_ids(
-        tas,
-        hw_threshold,
-        hw_climatology,
-        region=region,
-        min_duration=min_duration,
-    )
-    return {
-        "series": products["tas_region"],
-        "climatology": products["tas_climatology"],
-        "threshold": products["hw_threshold"],
-        "mask": products["hw_exceedance_mask"],
-        "event_id": products["hw_event_id"],
-    }
-
-
-def build_lwa_a_plot_products(
-    lwa_a: xr.DataArray,
-    lwa_a_threshold: xr.DataArray,
-    *,
-    region: str,
-    years: list[int] | None,
-    min_duration: int,
-) -> dict[str, xr.DataArray]:
-    """Build regional LWA_a plot inputs from LWA_a and LWA threshold products."""
-    products = events.build_lwa_event_ids(
-        lwa_a,
-        lwa_a_threshold,
-        region=region,
-        variable="LWA_a",
-        years=years,
-        min_duration=min_duration,
-    )
+def build_lwa_a_plot_products(ds: xr.Dataset) -> dict[str, xr.DataArray]:
+    """Build LWA_a plot inputs from a harmonized Stage-1 dataset."""
     climatology_time = _compute_dayofyear_climatology(
-        products["lwa_a_region"],
+        ds["lwa_a_region"],
         name="lwa_a_climatology",
     )
     return {
-        "series": products["lwa_a_region"],
+        "series": ds["lwa_a_region"],
         "climatology": climatology_time,
-        "threshold": products["lwa_a_threshold"],
-        "mask": products["lwa_a_exceedance_mask"],
-        "event_id": products["lwa_a_event_id"],
+        "threshold": ds["lwa_a_threshold"],
+        "mask": ds["lwa_a_flag"].astype(bool),
+        "event_id": ds["lwa_a_event_id"],
     }
 
 
@@ -259,6 +188,17 @@ def _compute_dayofyear_climatology(
         series["time"],
         name=name,
     )
+
+
+def _filter_plot_products_years(
+    product: dict[str, xr.DataArray],
+    years: list[int],
+) -> dict[str, xr.DataArray]:
+    """Restrict every time-indexed plot product to selected calendar years."""
+    return {
+        name: da.where(da["time"].dt.year.isin(years), drop=True)
+        for name, da in product.items()
+    }
 
 
 def _years_in_time(da: xr.DataArray) -> list[int]:
@@ -368,38 +308,29 @@ def _display_path(path: Path) -> str:
 
 
 def main() -> int:
-    """Load data, build event products, and write diagnostic plots."""
+    """Open Stage-1 data, build plot products, and write diagnostic plots."""
     args = parse_args()
-    datasets = load_plot_inputs(args)
+    ds = analysis_io.open_harmonized_timeseries(args.input_path)
+    try:
+        hw = build_hw_plot_products(ds)
+        lwa_a = transform_lwa_a_for_plot(build_lwa_a_plot_products(ds))
+        if args.years is not None:
+            hw = _filter_plot_products_years(hw, args.years)
+            lwa_a = _filter_plot_products_years(lwa_a, args.years)
 
-    hw = build_hw_plot_products(
-        datasets["tas"]["tas"],
-        datasets["hw_threshold"]["threshold"],
-        datasets["hw_threshold"]["climatology"],
-        region=args.region,
-        min_duration=args.min_duration,
-    )
-    lwa_a = build_lwa_a_plot_products(
-        datasets["lwa"]["LWA_a"],
-        datasets["lwa_threshold"]["LWA_a"],
-        region=args.region,
-        years=args.years,
-        min_duration=args.min_duration,
-    )
-    lwa_a = transform_lwa_a_for_plot(lwa_a)
+        written = write_threshold_timeseries_plots(
+            hw,
+            lwa_a,
+            region=args.region,
+            quantile=args.quantile,
+            output_dir=args.output_dir,
+        )
 
-    written = write_threshold_timeseries_plots(
-        hw,
-        lwa_a,
-        region=args.region,
-        quantile=args.quantile,
-        output_dir=args.output_dir,
-    )
-
-    print("Threshold timeseries plots:")
-    for path in written:
-        print(f"  {_display_path(path)}")
-
+        print("Threshold timeseries plots:")
+        for path in written:
+            print(f"  {_display_path(path)}")
+    finally:
+        ds.close()
     return 0
 
 

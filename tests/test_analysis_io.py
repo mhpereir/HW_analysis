@@ -9,11 +9,28 @@ from src import analysis_io
 
 def test_default_harmonized_timeseries_path_constant_uses_stage1_filename():
     assert analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH.name == (
-        "harmonized_regional_timeseries_pnw_bartusek_tas_q90_1940_2024.nc"
+        "harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
     )
 
 
 def test_default_harmonized_timeseries_path_includes_run_tokens():
+    path = analysis_io.default_harmonized_timeseries_path(
+        region="pnw_bartusek",
+        bottom_boundary="surface",
+        top_boundary=700,
+        threshold_variable="lwa",
+        quantile="q97p5",
+        start_year=1940,
+        end_year=2024,
+    )
+
+    assert path.parent == analysis_io.DEFAULT_STAGE1_OUTPUT_DIR
+    assert path.name == (
+        "harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_lwa_q97p5_1940_2024.nc"
+    )
+
+
+def test_default_harmonized_timeseries_path_omits_boundaries_when_not_given():
     path = analysis_io.default_harmonized_timeseries_path(
         region="pnw_bartusek",
         threshold_variable="lwa",
@@ -22,7 +39,6 @@ def test_default_harmonized_timeseries_path_includes_run_tokens():
         end_year=2024,
     )
 
-    assert path.parent == analysis_io.DEFAULT_STAGE1_OUTPUT_DIR
     assert path.name == (
         "harmonized_regional_timeseries_pnw_bartusek_lwa_q97p5_1940_2024.nc"
     )

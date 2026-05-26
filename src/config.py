@@ -25,6 +25,8 @@ EARTH_RADIUS_M: float = 6.371e6
 
 REGIONS: dict[str, tuple[slice, slice]] = {
     "pnw_bartusek": (slice(40, 60), slice(-130.0, -110.0)),
+    "pnw_hotz":     (slice(49, 59), slice(-125, -115)),
+
 }
 
 #standard grid, daily
@@ -95,8 +97,7 @@ tas_thresh_p95_win31 (dayofyear) - daily HW threshold for each day of year, spat
 '''
 
 #eulerian heat budget, spatially aggregated from ERA5 native grid, hourly
-# ERA5_HEAT_BUDGET_ROOT: str = "/home/mhpereir/eulerian_heat_budget/results/production/pnw_full_run/annual" #pnw_bartusek surface-700 hPa
-ERA5_HEAT_BUDGET_ROOT: str = "/home/mhpereir/eulerian_heat_budget/results/production/pnw_hotz_surface_700_hPa/annual" #pnw_bartusek 700-500 hPa
+ERA5_HEAT_BUDGET_SAVED_RESULTS_ROOT: str = "/home/mhpereir/eulerian_heat_budget/saved_results"
 
 #heat_budget_{year}.nc
 '''

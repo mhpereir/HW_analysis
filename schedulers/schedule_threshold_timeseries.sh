@@ -20,11 +20,22 @@ set -euo pipefail
 
 TIME_START=1940
 TIME_END=2024
+REGION="pnw_hotz"
+BOTTOM_BOUNDARY="surface"
+TOP_BOUNDARY=700
+THRESHOLD_VARIABLE="tas"
+QUANTILE=90
 
 cd /home/mhpereir/HW_analysis/scripts
 
-echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hostname)"
+echo "[info] $(date -Is) starting plot generation on host $(hostname)"
 /usr/bin/time -v python plot_threshold_timeseries.py \
-    --years ${TIME_START} ${TIME_END}  \
-    --quantile 90
+    --region "${REGION}" \
+    --bottom-boundary "${BOTTOM_BOUNDARY}" \
+    --top-boundary "${TOP_BOUNDARY}" \
+    --threshold-variable "${THRESHOLD_VARIABLE}" \
+    --quantile "${QUANTILE}" \
+    --start-year "${TIME_START}" \
+    --end-year "${TIME_END}" \
+    --years ${TIME_START} ${TIME_END}
 echo "[info] $(date -Is) done"

@@ -25,6 +25,18 @@ def test_filter_yearly_files_filters_requested_years():
     assert filtered == ["/tmp/heat_budget_1940.nc", "/tmp/heat_budget_1942.nc"]
 
 
+def test_filter_yearly_files_ignores_year_tokens_in_parent_directories():
+    paths = [
+        "/tmp/pnw_bartusek_surface_700hPa_1940_2025/annual/heat_budget_1940.nc",
+        "/tmp/pnw_bartusek_surface_700hPa_1940_2025/annual/heat_budget_1941.nc",
+        "/tmp/pnw_bartusek_surface_700hPa_1940_2025/annual/heat_budget_1942.nc",
+    ]
+
+    filtered = data_io._filter_yearly_files(paths, [1941, 1942])
+
+    assert filtered == paths[1:]
+
+
 def test_filter_yearly_files_raises_when_no_year_matches():
     with pytest.raises(FileNotFoundError, match="requested years"):
         data_io._filter_yearly_files(["/tmp/heat_budget_1940.nc"], [1999])
@@ -264,12 +276,65 @@ def test_open_era5_heat_budget_filters_requested_years(monkeypatch):
 
     out = data_io.open_era5_heat_budget(years=[1940])
 
-    assert captured["pattern"].endswith("/heat_budget_*.nc")
+    assert captured["pattern"].endswith(
+        "/pnw_bartusek_surface_700hPa_1940_2025/annual/heat_budget_*.nc"
+    )
     assert captured["paths"] == ["/data/heat_budget_1940.nc"]
     assert captured["combine"] == "by_coords"
     assert captured["chunks"] == data_io.DEFAULT_HEAT_BUDGET_CHUNKS
     assert {"dT_dt", "adiabatic_term", "diabatic_term", "T_domain_avg", "domain_volume", "advection_term"} <= set(out.data_vars)
     assert "time" in out.coords
+
+
+def test_era5_heat_budget_annual_root_uses_saved_results_tokens():
+    root = data_io.era5_heat_budget_annual_root(
+        region="pnw_bartusek",
+        bottom_boundary="surface",
+        top_boundary=700,
+        start_year_ehb=1940,
+        end_year_ehb=2025,
+    )
+
+    assert root.name == "annual"
+    assert root.parent.name == "pnw_bartusek_surface_700hPa_1940_2025"
+
+
+def test_era5_heat_budget_annual_root_accepts_pressure_bottom_boundary():
+    root = data_io.era5_heat_budget_annual_root(
+        region="pnw_bartusek",
+        bottom_boundary=700,
+        top_boundary="500hPa",
+        start_year_ehb=1940,
+        end_year_ehb=2025,
+    )
+
+    assert root.parent.name == "pnw_bartusek_700hPa_500hPa_1940_2025"
+
+
+def test_open_era5_heat_budget_accepts_explicit_root(monkeypatch):
+    captured = {}
+    ds = xr.Dataset(
+        data_vars={"dT_dt": ("time", [1.0])},
+        coords={"time": [0]},
+    )
+
+    def fake_glob_required(pattern):
+        captured["pattern"] = pattern
+        return ["/custom/annual/heat_budget_1940.nc"]
+
+    monkeypatch.setattr(data_io, "_glob_required", fake_glob_required)
+    monkeypatch.setattr(
+        data_io,
+        "_open_multiple_datasets",
+        lambda paths, *, combine, chunks: ds,
+    )
+
+    data_io.open_era5_heat_budget(
+        years=[1940],
+        heat_budget_root="/custom/annual",
+    )
+
+    assert captured["pattern"] == "/custom/annual/heat_budget_*.nc"
 
 
 def test_open_era5_surface_diagnostic_builds_expected_path(monkeypatch):

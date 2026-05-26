@@ -21,6 +21,7 @@ from __future__ import annotations
 import glob
 import re
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any, TypeAlias
 
 import xarray as xr
@@ -134,10 +135,24 @@ def open_era5_hw_threshold(
 def open_era5_heat_budget(
     *,
     years: Sequence[int] | None = None,
+    heat_budget_root: str | Path | None = None,
+    region: str = "pnw_bartusek",
+    bottom_boundary: str | int = "surface",
+    top_boundary: str | int = 700,
+    start_year_ehb: int = 1940,
+    end_year_ehb: int = 2025,
     chunks: Mapping[str, int] | None = None,
 ) -> xr.Dataset:
     """Open hourly regional ERA5 heat-budget diagnostics."""
-    pattern = f"{config.ERA5_HEAT_BUDGET_ROOT}/heat_budget_*.nc"
+    if heat_budget_root is None:
+        heat_budget_root = era5_heat_budget_annual_root(
+            region=region,
+            bottom_boundary=bottom_boundary,
+            top_boundary=top_boundary,
+            start_year_ehb=start_year_ehb,
+            end_year_ehb=end_year_ehb,
+        )
+    pattern = str(Path(heat_budget_root) / "heat_budget_*.nc")
     paths = _glob_required(pattern)
     paths = _filter_yearly_files(paths, years)
     ds = _open_multiple_datasets(
@@ -146,6 +161,70 @@ def open_era5_heat_budget(
         chunks=chunks or DEFAULT_HEAT_BUDGET_CHUNKS,
     )
     return _standardize_common_structure(ds)
+
+
+def era5_heat_budget_annual_root(
+    *,
+    region: str,
+    bottom_boundary: str | int,
+    top_boundary: str | int,
+    start_year_ehb: int,
+    end_year_ehb: int,
+) -> Path:
+    """Return the annual-file directory for a saved Eulerian heat-budget run."""
+    return (
+        Path(config.ERA5_HEAT_BUDGET_SAVED_RESULTS_ROOT)
+        / era5_heat_budget_run_name(
+            region=region,
+            bottom_boundary=bottom_boundary,
+            top_boundary=top_boundary,
+            start_year_ehb=start_year_ehb,
+            end_year_ehb=end_year_ehb,
+        )
+        / "annual"
+    )
+
+
+def era5_heat_budget_run_name(
+    *,
+    region: str,
+    bottom_boundary: str | int,
+    top_boundary: str | int,
+    start_year_ehb: int,
+    end_year_ehb: int,
+) -> str:
+    """Return the saved-results directory name for a heat-budget run."""
+    if start_year_ehb > end_year_ehb:
+        raise ValueError("start_year_ehb must be less than or equal to end_year_ehb.")
+    return (
+        f"{region}_"
+        f"{normalize_heat_budget_bottom_boundary(bottom_boundary)}_"
+        f"{normalize_heat_budget_top_boundary(top_boundary)}_"
+        f"{start_year_ehb}_{end_year_ehb}"
+    )
+
+
+def normalize_heat_budget_bottom_boundary(boundary: str | int) -> str:
+    """Return the canonical token for the heat-budget bottom boundary."""
+    token = str(boundary).strip()
+    if token.lower() == "surface":
+        return "surface"
+    return normalize_heat_budget_top_boundary(boundary)
+
+
+def normalize_heat_budget_top_boundary(boundary: str | int) -> str:
+    """Return the canonical pressure-boundary token, for example ``700hPa``."""
+    token = str(boundary).strip()
+    if not token:
+        raise ValueError("Heat-budget pressure boundary cannot be empty.")
+
+    pressure = token[:-3] if token.lower().endswith("hpa") else token
+    if not pressure.isdigit():
+        raise ValueError(
+            "Heat-budget pressure boundaries must be integer hPa values, "
+            f"got {boundary!r}."
+        )
+    return f"{int(pressure)}hPa"
 
 
 def open_era5_surface_diagnostic(
@@ -252,7 +331,7 @@ def _filter_yearly_files(
     selected = []
     matched_years = set()
     for path in paths:
-        match = re.search(r"(?<!\d)(\d{4})(?!\d)", path)
+        match = re.search(r"(?<!\d)(\d{4})(?!\d)", Path(path).name)
         if match and match.group(1) in year_tokens:
             selected.append(path)
             matched_years.add(match.group(1))

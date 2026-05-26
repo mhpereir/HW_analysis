@@ -24,15 +24,12 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from src import analysis_io
+from src import analysis_io, plot_paths
 
 
-DEFAULT_OUTPUT_PATH = (
-    REPO_ROOT
-    / "results"
-    / "plots_diurnal_cycle"
-    / "hw_non_hw_diurnal_cycle_jja_local.png"
-)
+PLOT_NAME = "diurnal_cycle"
+DEFAULT_OUTPUT_FILENAME = "hw_non_hw_diurnal_cycle_jja_local.png"
+DEFAULT_OUTPUT_PATH = REPO_ROOT / "results" / f"plots_{PLOT_NAME}" / DEFAULT_OUTPUT_FILENAME
 DEFAULT_SEASON_MONTHS: tuple[int, ...] = (6, 7, 8)
 DEFAULT_LOCAL_UTC_OFFSET_HOURS = -7
 DIURNAL_VARIABLES: tuple[str, ...] = (
@@ -80,16 +77,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot local-time HW and non-HW diurnal cycles for summer days."
     )
-    parser.add_argument(
-        "--input-path",
-        type=Path,
-        default=analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH,
-        help="Path to the saved harmonized Stage-1 regional dataset.",
-    )
+    plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(
         "--output-path",
         type=Path,
-        default=DEFAULT_OUTPUT_PATH,
+        default=None,
         help="Path where the diurnal-cycle PNG will be written.",
     )
     parser.add_argument(
@@ -106,7 +98,13 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_LOCAL_UTC_OFFSET_HOURS,
         help="Fixed local-time offset from UTC in hours, default: -7 for PDT.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    return plot_paths.finalize_stage1_plot_paths(
+        args,
+        parser,
+        plot_name=PLOT_NAME,
+        default_output_filename=DEFAULT_OUTPUT_FILENAME,
+    )
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -136,19 +134,6 @@ def build_diurnal_composite(
         hw_event_id_name=hw_event_id_name,
     )
 
-    # Classify HW/non-HW samples first in the dataset's native time convention
-    # (GMT/UTC), then shift the selected samples onto local-hour coordinates.
-    native_month = ds[time_dim].dt.month
-    season_mask = native_month.isin(months)
-    hw_event_id = ds[hw_event_id_name].fillna(0)
-
-    class_masks = (
-        season_mask & (hw_event_id > 0),
-        season_mask & (hw_event_id == 0),
-    )
-
-    # Shift only after the native-time masks have been defined.
-
     local_times = utc_to_local_time_values(ds[time_dim], offset)
     local_index = pd.DatetimeIndex(local_times)
     local_hour = xr.DataArray(
@@ -157,19 +142,12 @@ def build_diurnal_composite(
         coords={time_dim: ds[time_dim]},
         name="local_hour",
     )
-    # local_month = xr.DataArray(
-    #     np.asarray(local_index.month, dtype=np.int64),
-    #     dims=(time_dim,),
-    #     coords={time_dim: ds[time_dim]},
-    #     name="local_month",
-    # )
-
-    # season_mask = local_month.isin(months)
-    # hw_event_id = ds[hw_event_id_name].fillna(0)
-    # class_masks = (
-    #     season_mask & (hw_event_id > 0),
-    #     season_mask & (hw_event_id == 0),
-    # )
+    season_mask = ds[time_dim].dt.month.isin(months)
+    hw_event_id = ds[hw_event_id_name].fillna(0)
+    class_masks = (
+        season_mask & (hw_event_id > 0),
+        season_mask & (hw_event_id == 0),
+    )
 
     source = ds[list(variables)].assign_coords(
         local_hour=local_hour,

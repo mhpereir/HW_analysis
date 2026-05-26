@@ -8,14 +8,28 @@ from scripts import plot_composite_timeseries_split as plot_split
 from src import analysis_io
 
 
+RUN_ARGS = [
+    "--region", "pnw_hotz",
+    "--bottom-boundary", "surface",
+    "--top-boundary", "700",
+    "--threshold-variable", "tas",
+    "--quantile", "90",
+    "--start-year", "1940",
+    "--end-year", "2024",
+]
+
+
+def _argv(*extra: str) -> list[str]:
+    return ["plot_composite_timeseries_split.py", *RUN_ARGS, *extra]
+
+
 def test_parse_args_defaults_to_base_plot(monkeypatch):
-    monkeypatch.setattr("sys.argv", [
-        "plot_composite_timeseries_split.py",
+    monkeypatch.setattr("sys.argv", _argv(
         "--split-variable",
         "duration",
         "--split-quantiles",
         "0.5",
-    ])
+    ))
 
     args = plot_split.parse_args()
 
@@ -23,14 +37,13 @@ def test_parse_args_defaults_to_base_plot(monkeypatch):
 
 
 def test_parse_args_accepts_plot_extended_variables(monkeypatch):
-    monkeypatch.setattr("sys.argv", [
-        "plot_composite_timeseries_split.py",
+    monkeypatch.setattr("sys.argv", _argv(
         "--split-variable",
         "duration",
         "--split-quantiles",
         "0.5",
         "--plot-extended-variables",
-    ])
+    ))
 
     args = plot_split.parse_args()
 
@@ -279,7 +292,7 @@ def test_main_filters_event_table_before_quantile_splitting(monkeypatch, tmp_pat
         return [output, kwargs["smoothed_output_path"]]
 
     monkeypatch.setattr("sys.argv", [
-        "plot_composite_timeseries_split.py",
+        *_argv(
         "--input-path",
         str(tmp_path / "stage1.nc"),
         "--output-path",
@@ -291,6 +304,7 @@ def test_main_filters_event_table_before_quantile_splitting(monkeypatch, tmp_pat
         "--season-months",
         "6",
         "7",
+        ),
     ])
     monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", lambda path: opened)
     monkeypatch.setattr(plot_split, "build_split_quantile_composite", fake_build)
@@ -327,7 +341,7 @@ def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
         return [output, kwargs["smoothed_output_path"]]
 
     monkeypatch.setattr("sys.argv", [
-        "plot_composite_timeseries_split.py",
+        *_argv(
         "--input-path",
         str(tmp_path / "stage1.nc"),
         "--output-path",
@@ -337,6 +351,7 @@ def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
         "--split-quantiles",
         "0.5",
         "--plot-extended-variables",
+        ),
     ])
     monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", lambda path: opened)
     monkeypatch.setattr(plot_split, "build_split_quantile_composite", fake_build)
@@ -382,7 +397,7 @@ def test_main_filters_event_table_before_year_splitting(monkeypatch, tmp_path):
         return [output, kwargs["smoothed_output_path"]]
 
     monkeypatch.setattr("sys.argv", [
-        "plot_composite_timeseries_split.py",
+        *_argv(
         "--input-path",
         str(tmp_path / "stage1.nc"),
         "--output-path",
@@ -394,6 +409,7 @@ def test_main_filters_event_table_before_year_splitting(monkeypatch, tmp_path):
         "--season-months",
         "6",
         "7",
+        ),
     ])
     monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", lambda path: opened)
     monkeypatch.setattr(plot_split, "build_split_year_composite", fake_build)

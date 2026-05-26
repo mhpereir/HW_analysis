@@ -31,7 +31,7 @@ DEFAULT_HARMONIZED_TIMESERIES_PATH = (
     REPO_ROOT
     / "results"
     / "stage1"
-    / "harmonized_regional_timeseries_pnw_bartusek_tas_q90_1940_2024.nc"
+    / "harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
 )
 DEFAULT_STAGE1_OUTPUT_DIR = REPO_ROOT / "results" / "stage1"
 EXPECTED_PIPELINE_STAGE = "stage_1_harmonized_regional_timeseries"
@@ -72,15 +72,33 @@ def default_harmonized_timeseries_path(
     quantile: str | int | float,
     start_year: int,
     end_year: int,
+    bottom_boundary: str | int | None = None,
+    top_boundary: str | int | None = None,
 ) -> Path:
     """Return the run-specific default Stage-1 harmonized output path."""
     q_token = _normalize_filename_quantile_token(quantile)
+    boundary_tokens: tuple[str, ...] = ()
+    if bottom_boundary is not None or top_boundary is not None:
+        if bottom_boundary is None or top_boundary is None:
+            raise ValueError(
+                "bottom_boundary and top_boundary must be provided together."
+            )
+        boundary_tokens = (
+            _normalize_bottom_boundary_token(bottom_boundary),
+            _normalize_pressure_boundary_token(top_boundary),
+        )
+
+    run_tokens = (
+        _filename_token(region),
+        *boundary_tokens,
+        _filename_token(threshold_variable),
+        f"q{q_token}",
+        str(start_year),
+        str(end_year),
+    )
     filename = (
         "harmonized_regional_timeseries_"
-        f"{_filename_token(region)}_"
-        f"{_filename_token(threshold_variable)}_"
-        f"q{q_token}_"
-        f"{start_year}_{end_year}.nc"
+        f"{'_'.join(run_tokens)}.nc"
     )
     return DEFAULT_STAGE1_OUTPUT_DIR / filename
 
@@ -185,6 +203,29 @@ def _normalize_filename_quantile_token(quantile: str | int | float) -> str:
         return _filename_token(format(quantile, "g").replace(".", "p"))
 
     raise TypeError(f"Unsupported quantile type: {type(quantile)!r}")
+
+
+def _normalize_bottom_boundary_token(boundary: str | int) -> str:
+    """Return the filename token for a heat-budget bottom boundary."""
+    token = str(boundary).strip()
+    if token.lower() == "surface":
+        return "surface"
+    return _normalize_pressure_boundary_token(boundary)
+
+
+def _normalize_pressure_boundary_token(boundary: str | int) -> str:
+    """Return the filename token for a heat-budget pressure boundary."""
+    token = str(boundary).strip()
+    if not token:
+        raise ValueError("Heat-budget pressure boundary cannot be empty.")
+
+    pressure = token[:-3] if token.lower().endswith("hpa") else token
+    if not pressure.isdigit():
+        raise ValueError(
+            "Heat-budget pressure boundaries must be integer hPa values, "
+            f"got {boundary!r}."
+        )
+    return f"{int(pressure)}hPa"
 
 
 def _filename_token(value: object) -> str:

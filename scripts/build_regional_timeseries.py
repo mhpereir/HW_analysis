@@ -49,7 +49,35 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--region",
         default="pnw_bartusek",
-        help="Region key used by threshold products.",
+        help="Region key used by threshold products and heat-budget source paths.",
+    )
+    parser.add_argument(
+        "--bottom-boundary",
+        default="surface",
+        help=(
+            "Eulerian heat-budget bottom boundary used in the saved-results path. "
+            "Use 'surface' or an integer hPa value."
+        ),
+    )
+    parser.add_argument(
+        "--top-boundary",
+        default="700",
+        help=(
+            "Eulerian heat-budget top boundary used in the saved-results path. "
+            "Use an integer hPa value."
+        ),
+    )
+    parser.add_argument(
+        "--start-year-ehb",
+        type=int,
+        default=1940,
+        help="First year token in the Eulerian heat-budget saved-results path.",
+    )
+    parser.add_argument(
+        "--end-year-ehb",
+        type=int,
+        default=2025,
+        help="Last year token in the Eulerian heat-budget saved-results path.",
     )
     parser.add_argument(
         "--quantile",
@@ -97,11 +125,32 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.start_year > args.end_year:
         parser.error("--start-year must be less than or equal to --end-year.")
+    if args.start_year_ehb > args.end_year_ehb:
+        parser.error("--start-year-ehb must be less than or equal to --end-year-ehb.")
+
+    try:
+        args.bottom_boundary = data_io.normalize_heat_budget_bottom_boundary(
+            args.bottom_boundary
+        )
+        args.top_boundary = data_io.normalize_heat_budget_top_boundary(
+            args.top_boundary
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
 
     args.analysis_years = list(range(args.start_year, args.end_year + 1))
+    args.heat_budget_root = data_io.era5_heat_budget_annual_root(
+        region=args.region,
+        bottom_boundary=args.bottom_boundary,
+        top_boundary=args.top_boundary,
+        start_year_ehb=args.start_year_ehb,
+        end_year_ehb=args.end_year_ehb,
+    )
     if args.output_path is None:
         args.output_path = analysis_io.default_harmonized_timeseries_path(
             region=args.region,
+            bottom_boundary=args.bottom_boundary,
+            top_boundary=args.top_boundary,
             threshold_variable=args.threshold_variable,
             quantile=args.quantile,
             start_year=args.start_year,
@@ -129,7 +178,10 @@ def load_era5_inputs(args: argparse.Namespace) -> dict[str, object]:
             method="evolving",
             years=args.analysis_years,
         ),
-        "heat_budget": data_io.open_era5_heat_budget(years=args.analysis_years),
+        "heat_budget": data_io.open_era5_heat_budget(
+            years=args.analysis_years,
+            heat_budget_root=args.heat_budget_root,
+        ),
     }
     if args.add_full_diagnostics:
         datasets.update(load_full_diagnostic_inputs(args))
@@ -352,6 +404,11 @@ def main() -> int:
             "region": args.region,
             "quantile": str(args.quantile),
             "threshold_variable": args.threshold_variable,
+            "heat_budget_bottom_boundary": args.bottom_boundary,
+            "heat_budget_top_boundary": args.top_boundary,
+            "start_year_ehb": args.start_year_ehb,
+            "end_year_ehb": args.end_year_ehb,
+            "heat_budget_root": str(args.heat_budget_root),
             "start_year": args.start_year,
             "end_year": args.end_year,
             "zg_level": args.zg_level,

@@ -25,11 +25,15 @@ cd /home/mhpereir/HW_analysis/scripts
 
 echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hostname)"
 /usr/bin/time -v python build_regional_timeseries.py \
-    --output-path /home/mhpereir/HW_analysis/results/stage1/harmonized_regional_timeseries_pnw_bartusek_700_500hPa_tas_q90_1940_2024.nc \
     --start-year ${TIME_START} --end-year ${TIME_END} \
     --quantile 90 \
-    --region "pnw_bartusek" \
+    --region "pnw_hotz" \
+    --bottom-boundary "surface" \
+    --top-boundary 700 \
+    --start-year-ehb 1940 \
+    --end-year-ehb 2025 \
     --threshold-variable "tas"
+
 echo "[info] $(date -Is) done"
 
 

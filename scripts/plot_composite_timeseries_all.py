@@ -12,10 +12,12 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from src import analysis_io, composites, plotting, selectors
+from src import analysis_io, composites, plot_paths, plotting, selectors
 
 
-DEFAULT_OUTPUT_PATH = REPO_ROOT / "results" / "plots_composites" / "hw_all_events_composite.png"
+PLOT_NAME = "composite_timeseries_all"
+DEFAULT_OUTPUT_FILENAME = "hw_all_events_composite.png"
+DEFAULT_OUTPUT_PATH = REPO_ROOT / "results" / f"plots_{PLOT_NAME}" / DEFAULT_OUTPUT_FILENAME
 DEFAULT_WINDOW_DAYS = 7
 DEFAULT_SMOOTHING_WINDOW = 24
 COMPOSITE_VARIABLES: tuple[str, ...] = (
@@ -65,16 +67,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot peak-aligned composite time series for all HW events."
     )
-    parser.add_argument(
-        "--input-path",
-        type=Path,
-        default=analysis_io.DEFAULT_HARMONIZED_TIMESERIES_PATH,
-        help="Path to the saved harmonized Stage-1 regional dataset.",
-    )
+    plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(
         "--output-path",
         type=Path,
-        default=DEFAULT_OUTPUT_PATH,
+        default=None,
         help="Path where the composite PNG will be written.",
     )
     parser.add_argument(
@@ -107,7 +104,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Plot optional extended diagnostics when present in the input dataset.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    return plot_paths.finalize_stage1_plot_paths(
+        args,
+        parser,
+        plot_name=PLOT_NAME,
+        default_output_filename=DEFAULT_OUTPUT_FILENAME,
+    )
 
 
 def validate_args(args: argparse.Namespace) -> None:
