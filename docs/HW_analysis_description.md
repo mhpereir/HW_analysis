@@ -1,5 +1,9 @@
 # HW Analysis Script
 
+> Legacy note: this early sketch is retained for historical context. The
+> current canonical architecture and product-stage documentation starts at
+> [pipeline_overview.md](pipeline_overview.md).
+
 This document outlines the code for the HW analysis project. This project brings together data products for other projects, namely LWA calculation, HW thresholds, Eulerian Heat Budget calculations, and PBL height (in pressure units). It will also make use of some variables that are only avaliable on ARCO.
 
 ## Variables needed
