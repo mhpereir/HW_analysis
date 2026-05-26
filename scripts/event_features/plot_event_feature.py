@@ -155,8 +155,17 @@ def main() -> int:
             point_size=args.point_size,
             alpha=args.alpha,
         )
-        print("Wrote event-feature tendency scatter figure:")
+        standardized_written = write_tendency_scatter_plot(
+            features,
+            standardized_output_path(args.output_path),
+            color_variable=args.color_variable,
+            point_size=args.point_size,
+            alpha=args.alpha,
+            standardized=True,
+        )
+        print("Wrote event-feature tendency scatter figures:")
         print(f"  {_display_path(written)}")
+        print(f"  {_display_path(standardized_written)}")
     finally:
         features.close()
     return 0
@@ -175,6 +184,7 @@ def write_tendency_scatter_plot(
     color_variable: str | None = None,
     point_size: float = 24.0,
     alpha: float = 0.75,
+    standardized: bool = False,
 ) -> Path:
     """Write the integrated tendency scatter figure."""
     output_path = Path(output_path).expanduser().resolve()
@@ -184,6 +194,7 @@ def write_tendency_scatter_plot(
         color_variable=color_variable,
         point_size=point_size,
         alpha=alpha,
+        standardized=standardized,
     )
     fig.savefig(output_path, dpi=180, bbox_inches="tight")
     plt.close(fig)
@@ -196,6 +207,7 @@ def plot_tendency_scatter(
     color_variable: str | None = None,
     point_size: float = 24.0,
     alpha: float = 0.75,
+    standardized: bool = False,
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return a multi-panel feature scatter figure."""
     validate_feature_variables(features, color_variable=color_variable)
@@ -208,6 +220,8 @@ def plot_tendency_scatter(
         constrained_layout=True,
     )
     color_values = feature_values(features, color_variable) if color_variable else None
+    if standardized and color_values is not None:
+        color_values = standardized_values(color_values)
 
     mappable = None
     for ax, y_variable in zip(np.ravel(axes), Y_VARIABLES):
@@ -219,13 +233,17 @@ def plot_tendency_scatter(
             color_variable=color_variable,
             point_size=point_size,
             alpha=alpha,
+            standardized=standardized,
         )
 
     if color_variable is not None and mappable is not None:
         cbar = fig.colorbar(mappable, ax=np.ravel(axes), shrink=0.86)
-        cbar.set_label(variable_label(color_variable))
+        cbar.set_label(variable_label(color_variable, standardized=standardized))
 
-    fig.suptitle("Event Fixed-Window Heat-Budget Feature Relationships", fontsize=13)
+    title = "Event Fixed-Window Heat-Budget Feature Relationships"
+    if standardized:
+        title = f"{title} (Standardized)"
+    fig.suptitle(title, fontsize=13)
     return fig
 
 
@@ -238,10 +256,14 @@ def plot_one_tendency_panel(
     color_variable: str | None,
     point_size: float,
     alpha: float,
+    standardized: bool,
 ):
     """Plot one y-variable against integrated temperature tendency."""
     x_values = feature_values(features, X_VARIABLE)
     y_values = feature_values(features, y_variable)
+    if standardized:
+        x_values = standardized_values(x_values)
+        y_values = standardized_values(y_values)
     finite = np.isfinite(x_values) & np.isfinite(y_values)
     if color_values is not None:
         finite &= np.isfinite(color_values)
@@ -267,8 +289,8 @@ def plot_one_tendency_panel(
     if y_variable in INTEGRATED_HEAT_BUDGET_VARIABLES:
         add_one_to_one_line(ax, x_values[finite], y_values[finite])
     ax.set_title(PANEL_TITLES[y_variable])
-    ax.set_xlabel(variable_label(X_VARIABLE))
-    ax.set_ylabel(variable_label(y_variable))
+    ax.set_xlabel(variable_label(X_VARIABLE, standardized=standardized))
+    ax.set_ylabel(variable_label(y_variable, standardized=standardized))
     ax.grid(True, color="0.88", linewidth=0.8)
     ax.text(
         0.03,
@@ -339,6 +361,19 @@ def heat_budget_fraction_values(features: xr.Dataset, variable: str) -> np.ndarr
     return np.where(denominator != 0.0, numerator / denominator, np.nan)
 
 
+def standardized_values(values: np.ndarray) -> np.ndarray:
+    """Return z-scored values using finite-sample mean and standard deviation."""
+    out = np.asarray(values, dtype=float)
+    finite = np.isfinite(out)
+    if not finite.any():
+        return np.full(out.shape, np.nan, dtype=float)
+    mean = float(np.nanmean(out[finite]))
+    std = float(np.nanstd(out[finite]))
+    if std == 0.0 or not np.isfinite(std):
+        return np.full(out.shape, np.nan, dtype=float)
+    return (out - mean) / std
+
+
 def source_variable_name(variable: str) -> str:
     """Return the dataset variable needed for a plot variable."""
     source = DERIVED_VARIABLE_SOURCES.get(variable, variable)
@@ -355,12 +390,16 @@ def source_variable_names(variable: str) -> tuple[str, ...]:
     return (source,)
 
 
-def variable_label(variable: str) -> str:
+def variable_label(variable: str, *, standardized: bool = False) -> str:
     """Return a readable axis or colorbar label."""
     if variable in VARIABLE_LABELS:
-        return VARIABLE_LABELS[variable]
-    units = ""
-    return variable if not units else f"{variable} ({units})"
+        label = VARIABLE_LABELS[variable]
+    else:
+        units = ""
+        label = variable if not units else f"{variable} ({units})"
+    if standardized:
+        return f"standardized {label}"
+    return label
 
 
 def add_zero_reference_lines(ax: Axes) -> None:
@@ -391,6 +430,12 @@ def _display_path(path: Path) -> str:
         return str(path.relative_to(REPO_ROOT))
     except ValueError:
         return str(path)
+
+
+def standardized_output_path(path: str | Path) -> Path:
+    """Return an output path with _standardized before the file suffix."""
+    output_path = Path(path)
+    return output_path.with_name(f"{output_path.stem}_standardized{output_path.suffix}")
 
 
 if __name__ == "__main__":

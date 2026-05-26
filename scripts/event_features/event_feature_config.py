@@ -36,7 +36,7 @@ EVENT_ID_NAME = "event_id"
 # Fixed windows in hours relative to peak_time. Timestamp slices are inclusive.
 WINDOWS = {
     "heat_budget_pre": (-96, 0),
-    "lwa_pre_peak": (-96, 24),
+    "lwa_pre_peak": (-96, 0),
     "antecedent_state": (-168, -24),
     "antecedent_change": (-168, 0),
     "near_peak": (-24, 24),
