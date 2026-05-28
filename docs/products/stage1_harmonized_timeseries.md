@@ -13,7 +13,7 @@ results/stage1/harmonized_regional_timeseries_*.nc
 ## Producer
 
 ```text
-scripts/build_regional_timeseries.py
+scripts/build_stage1_harmonized_timeseries.py
 ```
 
 The producer assembles the product through the raw loading, preprocessing,
@@ -126,7 +126,7 @@ source paths or source identifiers where practical.
 
 ## Downstream Consumers
 
-- `scripts/event_features/build_event_features.py`
+- `scripts/event_features/build_stage2_event_features.py`
 - composite plotting workflows
 - top-event plotting workflows
 - diagnostic plots that inspect the harmonized time series

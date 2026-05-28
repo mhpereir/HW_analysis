@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -N stage_1_build_regional_timeseries
+#PBS -N threshold_timeseries
 #PBS -l select=1:ncpus=12:mem=32gb
 #PBS -j oe
 #PBS -o /dev/null

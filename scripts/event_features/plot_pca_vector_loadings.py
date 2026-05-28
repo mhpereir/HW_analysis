@@ -1,6 +1,7 @@
 """Explore PCA products before clustering.
 
-This script loads the PCA NetCDF product produced by ``build_event_feature_pca.py``
+This script loads the PCA NetCDF product produced by
+``build_stage3_event_feature_pca.py``
 and writes a small set of diagnostic figures:
 
 - explained-variance scree plot,
@@ -29,14 +30,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
+REGION = "pnw_hotz"
 
 DEFAULT_INPUT_PATH = (
     REPO_ROOT
     / "results"
-    / "event_features"
-    / "hw_event_feature_pca_pnw_bartusek_tas_q90_1940_2024.nc"
+    / "stage3_event_feature_pca"
+    / f"hw_event_feature_pca_{REGION}_tas_q90_1940_2024.nc"
 )
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "event_features" / "pca_clustering"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "stage3_event_feature_pca" / "diagnostics" / REGION
 DEFAULT_COLOR_VARIABLES = (
     "tas_anom_peak",
     "log10_tas_excess_integral",

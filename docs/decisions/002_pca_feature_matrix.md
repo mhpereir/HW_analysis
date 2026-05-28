@@ -7,7 +7,7 @@ Accepted current default, with supported alternatives documented.
 ## Decision
 
 The default PCA matrix emphasizes event pathway structure and uses the current
-default feature tuple from `scripts/event_features/build_event_feature_pca.py`:
+default feature tuple from `scripts/event_features/build_stage3_event_feature_pca.py`:
 
 ```text
 I_dTdt_pre

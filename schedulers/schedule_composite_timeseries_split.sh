@@ -18,7 +18,7 @@ mamba activate dev_env
 
 set -euo pipefail
 
-REGION="pnw_hotz"
+REGION="pnw_bartusek"
 BOTTOM_BOUNDARY="surface"
 TOP_BOUNDARY=700
 THRESHOLD_VARIABLE="tas"
@@ -27,6 +27,24 @@ TIME_START=1940
 TIME_END=2024
 
 cd /home/mhpereir/HW_analysis/scripts
+
+# echo "[info] $(date -Is) starting plot generation on host $(hostname)"
+# /usr/bin/time -v python plot_composite_timeseries_split.py \
+#     --region "${REGION}" \
+#     --bottom-boundary "${BOTTOM_BOUNDARY}" \
+#     --top-boundary "${TOP_BOUNDARY}" \
+#     --threshold-variable "${THRESHOLD_VARIABLE}" \
+#     --quantile "${QUANTILE}" \
+#     --start-year "${TIME_START}" \
+#     --end-year "${TIME_END}" \
+#     --window-days 7 \
+#     --split-variable "tas_excess_integral" \
+#     --split-quantiles 0.90 \
+#     --season-months 6 7 8 \
+#     --require-full-event \
+#     --plot-extended-variables
+# echo "[info] $(date -Is) done"
+
 
 echo "[info] $(date -Is) starting plot generation on host $(hostname)"
 /usr/bin/time -v python plot_composite_timeseries_split.py \
@@ -38,9 +56,11 @@ echo "[info] $(date -Is) starting plot generation on host $(hostname)"
     --start-year "${TIME_START}" \
     --end-year "${TIME_END}" \
     --window-days 7 \
-    --split-variable "tas_excess_peak" \
-    --plot-extended-variables \
-    --split-quantiles 0.90 \
+    --split-variable "peak_time" \
+    --split-years 1982 \
     --season-months 6 7 8 \
-    --require-full-event
+    --require-full-event \
+    --plot-extended-variables
 echo "[info] $(date -Is) done"
+
+#     --plot-extended-variables \

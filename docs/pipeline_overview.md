@@ -47,10 +47,10 @@ cluster composites / PCA diagnostics / interpretation figures
 
 | Product stage | Durable artifact | Producer | Main consumers |
 | --- | --- | --- | --- |
-| Stage 1 | `results/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_regional_timeseries.py` | event features, composites, top-event plots |
-| Stage 2 | event-feature table | `scripts/event_features/build_event_features.py` | PCA, feature plots, exploratory diagnostics |
-| Stage 3 | event-feature PCA product | `scripts/event_features/build_event_feature_pca.py` | PCA diagnostics, clustering |
-| Stage 4 | event-feature cluster product | `scripts/event_features/build_pca_clustering.py` | cluster interpretation, cluster composites |
+| Stage 1 | `results/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_stage1_harmonized_timeseries.py` | event features, composites, top-event plots |
+| Stage 2 | event-feature table | `scripts/event_features/build_stage2_event_features.py` | PCA, feature plots, exploratory diagnostics |
+| Stage 3 | event-feature PCA product | `scripts/event_features/build_stage3_event_feature_pca.py` | PCA diagnostics, clustering |
+| Stage 4 | event-feature cluster product | `scripts/event_features/build_stage4_event_feature_clusters.py` | cluster interpretation, cluster composites |
 
 Stage-4 cluster labels are method- and feature-dependent derived products; they should be interpreted through PCA loadings, event metadata, and cluster-conditioned composites rather than treated as physical mechanisms by default.
 
@@ -79,11 +79,11 @@ HW_analysis/
 |   |-- workflows/
 |   `-- decisions/
 scripts/
-|-- build_regional_timeseries.py
+|-- build_stage1_harmonized_timeseries.py
 `-- event_features/
-    |-- build_event_features.py
-    |-- build_event_feature_pca.py
-    |-- build_pca_clustering.py
+    |-- build_stage2_event_features.py
+    |-- build_stage3_event_feature_pca.py
+    |-- build_stage4_event_feature_clusters.py
     |-- plot_event_feature.py
     |-- plot_pca_vector_loadings.py
     `-- event_feature_grid_plot.py
@@ -91,8 +91,9 @@ scripts/
 |-- tests/
 results/
 |-- stage1/
-`-- event_features/
-    `-- pca_clustering/
+|-- stage2_event_features/
+|-- stage3_event_feature_pca/
+`-- stage4_event_feature_clusters/
 ```
 
 Product filenames should encode enough run context to distinguish region,
@@ -112,6 +113,9 @@ dataset contents rather than one exact run filename.
 - [Composites](workflows/composites.md)
 - [PCA diagnostics](workflows/pca_diagnostics.md)
 - [Cluster interpretation](workflows/cluster_interpretation.md)
+
+Diagnostic and plotting scripts are workflow consumers, so their names describe
+the diagnostic they make rather than a product stage they produce.
 
 ## Decision Records
 

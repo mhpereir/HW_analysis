@@ -8,22 +8,24 @@ product. The Stage-3 PCA source file must remain reusable and method-neutral.
 Typical outputs:
 
 ```text
-results/event_features/pca_clustering/*_clusters_<method>_k<n>_<pcs>.nc
+results/stage4_event_feature_clusters/hw_event_feature_clusters_<run>_<method>_k<n>_<pcs>.nc
 ```
 
 The current implementation copies the PCA dataset into a derived output file and
 adds cluster variables and summaries. This is acceptable because the source PCA
 file is not modified destructively.
 
+Older generated artifacts may still exist under `results/event_features/`, but
+new defaults use the stage-specific directory above.
+
 ## Producer
 
 ```text
-scripts/event_features/build_pca_clustering.py
+scripts/event_features/build_stage4_event_feature_clusters.py
 ```
 
-`scripts/event_features/cluster_event_feature_pca.py` is an acceptable future
-rename, but the current documented implementation name is
-`build_pca_clustering.py`.
+Diagnostic scripts that consume this product are workflow consumers and are not
+named as product-stage builders.
 
 ## Consumes
 

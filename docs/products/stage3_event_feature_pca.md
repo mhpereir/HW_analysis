@@ -9,13 +9,16 @@ parameters, and provenance metadata. It does not assign clusters.
 Typical output:
 
 ```text
-results/event_features/hw_event_feature_pca*.nc
+results/stage3_event_feature_pca/hw_event_feature_pca*.nc
 ```
+
+Older generated artifacts may still exist under `results/event_features/`, but
+new defaults use the stage-specific directory above.
 
 ## Producer
 
 ```text
-scripts/event_features/build_event_feature_pca.py
+scripts/event_features/build_stage3_event_feature_pca.py
 ```
 
 ## Consumes

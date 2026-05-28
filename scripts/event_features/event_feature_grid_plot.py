@@ -29,13 +29,14 @@ from matplotlib.axes import Axes
 DEFAULT_INPUT_PATH = (
     REPO_ROOT
     / "results"
-    / "event_features"
+    / "stage2_event_features"
     / "hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc"
 )
 DEFAULT_OUTPUT_PATH = (
     REPO_ROOT
     / "results"
-    / "event_features"
+    / "stage2_event_features"
+    / "diagnostics"
     / "event_feature_tendency_scatter.png"
 )
 

@@ -25,10 +25,10 @@ if str(REPO_ROOT) not in sys.path:
 DEFAULT_INPUT_PATH = (
     REPO_ROOT
     / "results"
-    / "event_features"
+    / "stage3_event_feature_pca"
     / "hw_event_feature_pca_pnw_bartusek_tas_q90_1940_2024.nc"
 )
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "event_features" / "pca_clustering"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "stage4_event_feature_clusters"
 
 EVENT_DIM = "event"
 PC_DIM = "pc"
@@ -50,8 +50,10 @@ DEFAULT_TRACKED_VARIABLES = (
     "f_advection_pre",
     "sqrt_I_lwa_a_pre_peak",
     "T_anom_mean_ant",
+    "cos_days_from_solstice",
     "duration",
     "tas_anom_peak",
+    "log10_tas_excess_integral",
     "tas_excess_integral",
 )
 INTEGRATED_HEAT_BUDGET_VARIABLES = (
@@ -337,6 +339,17 @@ def resolve_tracked_variable(pca_ds: xr.Dataset, name: str) -> np.ndarray:
         out[valid] = np.sqrt(source[valid])
         return out
 
+    if name == "cos_days_from_solstice" and "days_from_solstice" in pca_ds:
+        source = data_array_to_float_vector(pca_ds["days_from_solstice"])
+        return np.cos(source * 2.0 * np.pi / 365.0)
+
+    if name == "log10_tas_excess_integral" and "tas_excess_integral" in pca_ds:
+        source = data_array_to_float_vector(pca_ds["tas_excess_integral"])
+        out = np.full(source.shape, np.nan, dtype=float)
+        valid = np.isfinite(source) & (source > 0.0)
+        out[valid] = np.log10(source[valid])
+        return out
+
     raise ValueError(f"PCA dataset does not contain tracked variable {name!r}.")
 
 
@@ -554,8 +567,11 @@ def cluster_output_path(
 ) -> Path:
     """Return the output path for one method/cluster-count/PC selection."""
     input_stem = Path(input_path).stem
+    run_stem = input_stem.removeprefix("hw_event_feature_pca_")
     pc_slug = "-".join(pc.lower() for pc in pcs)
-    filename = f"{input_stem}_clusters_{method}_k{n_clusters}_{pc_slug}.nc"
+    filename = (
+        f"hw_event_feature_clusters_{run_stem}_{method}_k{n_clusters}_{pc_slug}.nc"
+    )
     return Path(output_dir) / filename
 
 

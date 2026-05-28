@@ -8,16 +8,18 @@ event-level row of fixed-window features centered on `peak_time`.
 Typical outputs:
 
 ```text
-results/event_features/hw_event_features_fixed_windows*.nc
-results/event_features/hw_event_features_fixed_windows*.csv
+results/stage2_event_features/hw_event_features_fixed_windows*.nc
+results/stage2_event_features/hw_event_features_fixed_windows*.csv
 ```
 
 The NetCDF product is canonical. CSV output is an optional convenience export.
+Older generated artifacts may still exist under `results/event_features/`, but
+new defaults use the stage-specific directory above.
 
 ## Producer
 
 ```text
-scripts/event_features/build_event_features.py
+scripts/event_features/build_stage2_event_features.py
 ```
 
 Configuration lives in:

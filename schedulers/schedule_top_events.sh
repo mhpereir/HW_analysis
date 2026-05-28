@@ -38,6 +38,6 @@ echo "[info] $(date -Is) starting plot generation on host $(hostname)"
     --start-year "${TIME_START}" \
     --end-year "${TIME_END}" \
     --top-n 10 \
-    --plot-extended-variables \
     --window-days 7
+    # --plot-extended-variables \
 echo "[info] $(date -Is) done"

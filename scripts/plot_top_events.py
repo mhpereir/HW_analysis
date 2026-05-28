@@ -1,7 +1,7 @@
 """Plot top-event diagnostics from the saved Stage-1 harmonized dataset.
 
 This script consumes the harmonized regional time-series product written by
-``build_regional_timeseries.py``. Event ranking and plotting will be layered on
+``build_stage1_harmonized_timeseries.py``. Event ranking and plotting will be layered on
 top of this Stage-2 entrypoint.
 """
 
