@@ -4,3 +4,4 @@
 logs/*
 results/stage1/*.nc
 *.old
+*.nc

@@ -4,15 +4,15 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts import build_regional_timeseries
+from scripts import build_stage1_harmonized_timeseries as stage1_builder
 from src import analysis_io
 
 
 def test_parse_args_requires_start_and_end_year(monkeypatch):
-    monkeypatch.setattr("sys.argv", ["build_regional_timeseries.py"])
+    monkeypatch.setattr("sys.argv", ["build_stage1_harmonized_timeseries.py"])
 
     with pytest.raises(SystemExit) as excinfo:
-        build_regional_timeseries.parse_args()
+        stage1_builder.parse_args()
 
     assert excinfo.value.code == 2
 
@@ -21,7 +21,7 @@ def test_parse_args_rejects_descending_year_range(monkeypatch):
     monkeypatch.setattr(
         "sys.argv",
         [
-            "build_regional_timeseries.py",
+            "build_stage1_harmonized_timeseries.py",
             "--start-year",
             "2024",
             "--end-year",
@@ -30,7 +30,7 @@ def test_parse_args_rejects_descending_year_range(monkeypatch):
     )
 
     with pytest.raises(SystemExit) as excinfo:
-        build_regional_timeseries.parse_args()
+        stage1_builder.parse_args()
 
     assert excinfo.value.code == 2
 
@@ -39,7 +39,7 @@ def test_parse_args_builds_inclusive_analysis_years(monkeypatch):
     monkeypatch.setattr(
         "sys.argv",
         [
-            "build_regional_timeseries.py",
+            "build_stage1_harmonized_timeseries.py",
             "--start-year",
             "1940",
             "--end-year",
@@ -47,7 +47,7 @@ def test_parse_args_builds_inclusive_analysis_years(monkeypatch):
         ],
     )
 
-    args = build_regional_timeseries.parse_args()
+    args = stage1_builder.parse_args()
 
     assert args.start_year == 1940
     assert args.end_year == 1942
@@ -57,7 +57,7 @@ def test_parse_args_builds_inclusive_analysis_years(monkeypatch):
     assert args.start_year_ehb == 1940
     assert args.end_year_ehb == 2025
     assert args.heat_budget_root == (
-        build_regional_timeseries.data_io.era5_heat_budget_annual_root(
+        stage1_builder.data_io.era5_heat_budget_annual_root(
             region="pnw_bartusek",
             bottom_boundary="surface",
             top_boundary="700hPa",
@@ -85,7 +85,7 @@ def test_parse_args_builds_run_specific_output_path(monkeypatch):
     monkeypatch.setattr(
         "sys.argv",
         [
-            "build_regional_timeseries.py",
+            "build_stage1_harmonized_timeseries.py",
             "--region",
             "western_canada",
             "--quantile",
@@ -103,7 +103,7 @@ def test_parse_args_builds_run_specific_output_path(monkeypatch):
         ],
     )
 
-    args = build_regional_timeseries.parse_args()
+    args = stage1_builder.parse_args()
 
     assert args.output_path.name == (
         "harmonized_regional_timeseries_western_canada_700hPa_500hPa_lwa_c_q97p5_1950_1951.nc"
@@ -117,7 +117,7 @@ def test_parse_args_accepts_custom_output_path(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "sys.argv",
         [
-            "build_regional_timeseries.py",
+            "build_stage1_harmonized_timeseries.py",
             "--start-year",
             "1940",
             "--end-year",
@@ -127,7 +127,7 @@ def test_parse_args_accepts_custom_output_path(monkeypatch, tmp_path):
         ],
     )
 
-    args = build_regional_timeseries.parse_args()
+    args = stage1_builder.parse_args()
 
     assert args.output_path == output_path
 
@@ -136,7 +136,7 @@ def test_parse_args_accepts_add_full_diagnostics_flag(monkeypatch):
     monkeypatch.setattr(
         "sys.argv",
         [
-            "build_regional_timeseries.py",
+            "build_stage1_harmonized_timeseries.py",
             "--start-year",
             "1940",
             "--end-year",
@@ -145,7 +145,7 @@ def test_parse_args_accepts_add_full_diagnostics_flag(monkeypatch):
         ],
     )
 
-    args = build_regional_timeseries.parse_args()
+    args = stage1_builder.parse_args()
 
     assert args.add_full_diagnostics is True
 
@@ -154,7 +154,7 @@ def test_parse_args_accepts_custom_ehb_year_tokens(monkeypatch):
     monkeypatch.setattr(
         "sys.argv",
         [
-            "build_regional_timeseries.py",
+            "build_stage1_harmonized_timeseries.py",
             "--start-year",
             "1950",
             "--end-year",
@@ -166,7 +166,7 @@ def test_parse_args_accepts_custom_ehb_year_tokens(monkeypatch):
         ],
     )
 
-    args = build_regional_timeseries.parse_args()
+    args = stage1_builder.parse_args()
 
     assert args.heat_budget_root.parent.name == "pnw_bartusek_surface_700hPa_1940_2026"
 
@@ -175,21 +175,21 @@ def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch
     calls = []
     heat_budget_calls = []
 
-    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_tas", lambda **kwargs: xr.Dataset())
-    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_lwa", lambda **kwargs: xr.Dataset())
-    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_lwa_threshold", lambda **kwargs: xr.Dataset())
-    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_hw_threshold", lambda **kwargs: xr.Dataset())
+    monkeypatch.setattr(stage1_builder.data_io, "open_era5_tas", lambda **kwargs: xr.Dataset())
+    monkeypatch.setattr(stage1_builder.data_io, "open_era5_lwa", lambda **kwargs: xr.Dataset())
+    monkeypatch.setattr(stage1_builder.data_io, "open_era5_lwa_threshold", lambda **kwargs: xr.Dataset())
+    monkeypatch.setattr(stage1_builder.data_io, "open_era5_hw_threshold", lambda **kwargs: xr.Dataset())
     def fake_open_heat_budget(**kwargs):
         heat_budget_calls.append(kwargs)
         return xr.Dataset()
 
-    monkeypatch.setattr(build_regional_timeseries.data_io, "open_era5_heat_budget", fake_open_heat_budget)
+    monkeypatch.setattr(stage1_builder.data_io, "open_era5_heat_budget", fake_open_heat_budget)
 
     def fake_load_full(args):
         calls.append(args)
         return {"pbl_p": xr.Dataset()}
 
-    monkeypatch.setattr(build_regional_timeseries, "load_full_diagnostic_inputs", fake_load_full)
+    monkeypatch.setattr(stage1_builder, "load_full_diagnostic_inputs", fake_load_full)
 
     args = Namespace(
         analysis_years=[1940],
@@ -199,7 +199,7 @@ def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch
         heat_budget_root="/data/heat_budget/annual",
         add_full_diagnostics=False,
     )
-    datasets = build_regional_timeseries.load_era5_inputs(args)
+    datasets = stage1_builder.load_era5_inputs(args)
 
     assert calls == []
     assert heat_budget_calls[-1] == {
@@ -209,7 +209,7 @@ def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch
     assert "pbl_p" not in datasets
 
     args.add_full_diagnostics = True
-    datasets = build_regional_timeseries.load_era5_inputs(args)
+    datasets = stage1_builder.load_era5_inputs(args)
 
     assert calls == [args]
     assert "pbl_p" in datasets
@@ -218,7 +218,7 @@ def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch
 def test_append_event_summary_table_defaults_to_tas_events():
     ds = _make_harmonized_timeseries_for_events()
 
-    out = build_regional_timeseries.append_event_summary_table(ds)
+    out = stage1_builder.append_event_summary_table(ds)
 
     assert out.sizes["time"] == 4
     assert out.sizes["event"] == 2
@@ -233,7 +233,7 @@ def test_append_event_summary_table_defaults_to_tas_events():
 def test_append_hw_event_summary_table_keeps_legacy_tas_behavior():
     ds = _make_harmonized_timeseries_for_events()
 
-    out = build_regional_timeseries.append_hw_event_summary_table(ds)
+    out = stage1_builder.append_hw_event_summary_table(ds)
 
     assert out.attrs["event_id_source"] == "hw_event_id"
     assert out.attrs["peak_variable"] == "tas_region"
@@ -255,7 +255,7 @@ def test_append_event_summary_table_selects_threshold_variable_products(
 ):
     ds = _make_harmonized_timeseries_for_events()
 
-    out = build_regional_timeseries.append_event_summary_table(
+    out = stage1_builder.append_event_summary_table(
         ds,
         threshold_variable=threshold_variable,
     )
@@ -267,7 +267,7 @@ def test_append_event_summary_table_selects_threshold_variable_products(
 
 def test_event_summary_variables_rejects_unknown_threshold_variable():
     with pytest.raises(ValueError, match="Unsupported threshold variable"):
-        build_regional_timeseries.event_summary_variables("other")
+        stage1_builder.event_summary_variables("other")
 
 
 def _make_harmonized_timeseries_for_events() -> xr.Dataset:
