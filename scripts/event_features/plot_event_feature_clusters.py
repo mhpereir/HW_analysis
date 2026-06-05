@@ -21,7 +21,16 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-REGION = "pnw_hotz"
+plt.rcParams.update({
+    "axes.titlesize": 18,
+    "axes.labelsize": 16,
+    "xtick.labelsize": 14,
+    "ytick.labelsize": 14,
+    "legend.fontsize": 12,
+    "figure.titlesize": 20,
+})
+
+REGION = "pnw_bartusek"
 
 DEFAULT_INPUT_DIR = REPO_ROOT / "results" / "stage4_event_feature_clusters" / REGION
 DEFAULT_OUTPUT_DIR = DEFAULT_INPUT_DIR / "diagnostics" / REGION
