@@ -35,20 +35,21 @@ changeable analysis choices live in `docs/decisions/`.
 raw inputs
   ->
 Product Stage 1: harmonized regional time series
-  ->
-Product Stage 2: event-feature table
-  ->
-Product Stage 3: event-feature PCA product
-  ->
-Product Stage 4: event-feature cluster product
-  ->
-cluster composites / PCA diagnostics / interpretation figures
+  |-> Product Stage 2: baseline-day feature table
+  `-> Product Stage 2: event-feature table
+        ->
+      Product Stage 3: event-feature PCA product
+        ->
+      Product Stage 4: event-feature cluster product
+        ->
+      cluster composites / PCA diagnostics / interpretation figures
 ```
 
 | Product stage | Durable artifact | Producer | Main consumers |
 | --- | --- | --- | --- |
-| Stage 1 | `results/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_stage1_harmonized_timeseries.py` | event features, composites, top-event plots |
+| Stage 1 | `results/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_stage1_harmonized_timeseries.py` | event features, baseline features, composites, top-event plots |
 | Stage 2 | event-feature table | `scripts/event_features/build_stage2_event_features.py` | PCA, feature plots, exploratory diagnostics |
+| Stage 2 | baseline-day feature table | `scripts/event_features/build_stage2_baseline_features.py` | event/baseline comparisons, exploratory diagnostics |
 | Stage 3 | event-feature PCA product | `scripts/event_features/build_stage3_event_feature_pca.py` | PCA diagnostics, clustering |
 | Stage 4 | event-feature cluster product | `scripts/event_features/build_stage4_event_feature_clusters.py` | cluster interpretation, cluster composites |
 
@@ -65,6 +66,7 @@ Stage-4 cluster labels are method- and feature-dependent derived products; they 
 | `src/analysis_io.py` | Save/open internal products, especially the Stage-1 handoff, and validate metadata. |
 | src/selectors.py | Filter event tables and build reusable event/time selection masks. |
 | `src/events.py` | Convert masks into event IDs, peaks, durations, ranks, and event summaries. |
+| `scripts/event_features/fixed_window_features.py` | Shared fixed-window reductions for event and baseline Stage-2 products. |
 | `src/composites.py` | Build event-centered extracts, means, spreads, and top-event products. |
 | `src/diagnostics.py` | Domain-specific derived diagnostics such as residual checks and heating-rate approximations. |
 | `src/plotting.py` | Plot prepared products without raw loading or event generation. |
@@ -82,6 +84,7 @@ scripts/
 |-- build_stage1_harmonized_timeseries.py
 `-- event_features/
     |-- build_stage2_event_features.py
+    |-- build_stage2_baseline_features.py
     |-- build_stage3_event_feature_pca.py
     |-- build_stage4_event_feature_clusters.py
     |-- plot_event_feature.py
@@ -92,6 +95,7 @@ scripts/
 results/
 |-- stage1/
 |-- stage2_event_features/
+|-- stage2_baseline_features/
 |-- stage3_event_feature_pca/
 `-- stage4_event_feature_clusters/
 ```
@@ -105,6 +109,7 @@ dataset contents rather than one exact run filename.
 
 - [Stage 1: harmonized regional time series](products/stage1_harmonized_timeseries.md)
 - [Stage 2: event features](products/stage2_event_features.md)
+- [Stage 2: baseline-day features](products/stage2_baseline_features.md)
 - [Stage 3: event-feature PCA](products/stage3_event_feature_pca.md)
 - [Stage 4: event-feature clusters](products/stage4_event_feature_clusters.md)
 
