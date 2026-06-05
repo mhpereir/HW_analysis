@@ -27,15 +27,12 @@ echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hos
 /usr/bin/time -v python build_stage1_harmonized_timeseries.py \
     --start-year ${TIME_START} --end-year ${TIME_END} \
     --quantile 90 \
-    --region "pnw_hotz" \
+    --region "pnw_bartusek" \
     --bottom-boundary "surface" \
     --top-boundary 700 \
     --start-year-ehb 1940 \
     --end-year-ehb 2025 \
-    --threshold-variable "tas"
+    --threshold-variable "lwa_a" \
+    --add-full-diagnostics \
 
 echo "[info] $(date -Is) done"
-
-
-
-#    --add-full-diagnostics \
