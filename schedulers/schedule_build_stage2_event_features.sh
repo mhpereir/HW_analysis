@@ -18,8 +18,12 @@ mamba activate dev_env
 
 set -euo pipefail
 
-INPUT_PATH="/home/mhpereir/HW_analysis/results/stage1/harmonized_regional_timeseries_pnw_hotz_surface_700hPa_tas_q90_1940_2024.nc"
-OUTPUT_PATH="/home/mhpereir/HW_analysis/results/stage2_event_features/hw_event_features_fixed_windows_pnw_hotz_tas_q90_1940_2024.nc"
+REGION="pnw_bartusek"
+THRESHOLD_VARIABLE="lwa_a"
+QUANTILE_THRESHOLD="q90"
+
+INPUT_PATH="/home/mhpereir/HW_analysis/results/stage1/harmonized_regional_timeseries_${REGION}_surface_700hPa_${THRESHOLD_VARIABLE}_${QUANTILE_THRESHOLD}_1940_2024.nc"
+OUTPUT_PATH="/home/mhpereir/HW_analysis/results/stage2_event_features/hw_event_features_fixed_windows_${REGION}_${THRESHOLD_VARIABLE}_${QUANTILE_THRESHOLD}_1940_2024.nc"
 
 cd /home/mhpereir/HW_analysis/scripts
 
