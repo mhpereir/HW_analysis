@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-import warnings
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -18,6 +17,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.event_features import event_feature_config as config
+from scripts.event_features import fixed_window_features as fixed
 from src import analysis_io, selectors
 
 
@@ -113,7 +113,7 @@ def build_event_features(
     if all_seasons and season_months is not None:
         raise ValueError("Pass season_months or all_seasons=True, not both.")
 
-    ds = ensure_tas_anom(ds)
+    ds = fixed.ensure_tas_anom(ds)
     event_table = event_summary_table(ds)
     if season_months is not None:
         event_table = selectors.select_events_by_season(
@@ -124,7 +124,7 @@ def build_event_features(
     if event_table.sizes.get(config.EVENT_DIM, 0) == 0:
         raise ValueError("No events remain after event-universe selection.")
 
-    feature_spec = active_feature_spec(
+    feature_spec = fixed.active_feature_spec(
         ds,
         use_extended_variables=use_extended_variables,
         allow_missing_extended=allow_missing_extended,
@@ -134,16 +134,31 @@ def build_event_features(
     event_table, dropped_boundary_events = drop_boundary_events(
         event_table,
         ds,
-        active_window_names(feature_spec),
+        fixed.active_window_names(feature_spec),
     )
+    peak_times = event_peak_values(event_table)
+    reducer = fixed.WindowReducer(ds)
 
     out = xr.Dataset(coords={config.EVENT_DIM: event_table[config.EVENT_DIM]})
     copy_event_summary_features(out, event_table)
-    add_sample_count_features(out, ds, event_table, active_window_names(feature_spec))
-    add_integral_features(out, ds, event_table, feature_spec["integral"])
-    add_mean_features(out, ds, event_table, feature_spec["mean"])
-    add_change_features(out, ds, event_table, feature_spec["change"])
-    add_days_from_solstice(out, event_table)
+    fixed.add_window_features(
+        out,
+        ds,
+        reducer,
+        peak_times,
+        row_dim=config.EVENT_DIM,
+        feature_spec=feature_spec,
+        feature_name_for_source=lambda source, operation: feature_name_for_source(
+            source,
+            operation=operation,
+        ),
+    )
+    fixed.add_days_from_solstice(
+        out,
+        peak_times,
+        row_dim=config.EVENT_DIM,
+        source_variable=config.PEAK_TIME_NAME,
+    )
     add_global_attrs(
         out,
         input_path=input_path,
@@ -172,21 +187,7 @@ def event_summary_table(ds: xr.Dataset, event_dim: str = config.EVENT_DIM) -> xr
 
 def ensure_tas_anom(ds: xr.Dataset) -> xr.Dataset:
     """Return a view with tas_anom available for feature extraction."""
-    if "tas_anom" in ds:
-        return ds
-    if "tas_region" not in ds or "tas_climatology" not in ds:
-        return ds
-    out = ds.copy(deep=False)
-    out["tas_anom"] = out["tas_region"] - out["tas_climatology"]
-    out["tas_anom"].attrs.update(
-        {
-            "description": "Derived tas_region minus tas_climatology.",
-            "source_variables": "tas_region,tas_climatology",
-        }
-    )
-    if "units" in out["tas_region"].attrs:
-        out["tas_anom"].attrs["units"] = out["tas_region"].attrs["units"]
-    return out
+    return fixed.ensure_tas_anom(ds)
 
 
 def active_feature_spec(
@@ -196,42 +197,11 @@ def active_feature_spec(
     allow_missing_extended: bool,
 ) -> dict[str, dict[str, str]]:
     """Return active source-variable to window-name feature mappings."""
-    spec = {
-        "integral": dict(config.DEFAULT_INTEGRAL_FEATURES),
-        "mean": dict(config.DEFAULT_MEAN_FEATURES),
-        "change": {},
-    }
-    if not use_extended_variables:
-        return spec
-
-    extended = {
-        "integral": dict(config.EXTENDED_INTEGRAL_FEATURES),
-        "mean": dict(config.EXTENDED_MEAN_FEATURES),
-        "change": dict(config.EXTENDED_CHANGE_FEATURES),
-    }
-    missing = sorted({
-        name
-        for group in extended.values()
-        for name in group
-        if name not in ds
-    })
-    if missing and not allow_missing_extended:
-        raise ValueError(
-            "Input dataset is missing required extended variables: "
-            f"{', '.join(missing)}."
-        )
-    if missing:
-        warnings.warn(
-            "Skipping missing extended variables: " + ", ".join(missing),
-            RuntimeWarning,
-            stacklevel=2,
-        )
-
-    for operation, mapping in extended.items():
-        for name, window_name in mapping.items():
-            if name in ds:
-                spec[operation][name] = window_name
-    return spec
+    return fixed.active_feature_spec(
+        ds,
+        use_extended_variables=use_extended_variables,
+        allow_missing_extended=allow_missing_extended,
+    )
 
 
 def validate_required_variables(
@@ -274,21 +244,12 @@ def drop_boundary_events(
 ) -> tuple[xr.Dataset, int]:
     """Drop events whose active feature windows are outside the dataset time range."""
     time_values = np.asarray(ds[config.TIME_DIM].values, dtype="datetime64[ns]")
-    if time_values.size == 0:
-        raise ValueError("Input dataset has an empty time coordinate.")
-    data_start = time_values[0]
-    data_end = time_values[-1]
     peak_times = np.asarray(
         event_table[config.PEAK_TIME_NAME].compute().values,
         dtype="datetime64[ns]",
     )
 
-    keep = np.ones(peak_times.shape, dtype=bool)
-    for window_name in window_names:
-        start_lag, end_lag = config.WINDOWS[window_name]
-        starts = peak_times + np.timedelta64(start_lag, "h")
-        ends = peak_times + np.timedelta64(end_lag, "h")
-        keep &= (starts >= data_start) & (ends <= data_end)
+    keep = fixed.complete_anchor_mask(time_values, peak_times, window_names)
 
     dropped = int((~keep).sum())
     out = event_table.isel({config.EVENT_DIM: np.flatnonzero(keep)})
@@ -313,13 +274,14 @@ def add_sample_count_features(
     window_names: Sequence[str],
 ) -> None:
     """Add one timestamp-count diagnostic per active feature window."""
+    reducer = fixed.WindowReducer(ds)
+    peak_times = event_peak_values(event_table)
     for window_name in window_names:
-        values = [
-            int(window_for_peak(ds, peak_time, window_name).sizes.get(config.TIME_DIM, 0))
-            for peak_time in event_peak_values(event_table)
-        ]
         feature_name = f"n_samples_{window_name}"
-        out[feature_name] = (config.EVENT_DIM, np.asarray(values, dtype=np.int64))
+        out[feature_name] = (
+            config.EVENT_DIM,
+            reducer.sample_counts(peak_times, window_name),
+        )
         add_feature_attrs(
             out[feature_name],
             source_variable=config.TIME_DIM,
@@ -336,13 +298,14 @@ def add_integral_features(
     integral_features: Mapping[str, str],
 ) -> None:
     """Add hourly-sum integral/exposure features."""
+    reducer = fixed.WindowReducer(ds)
+    peak_times = event_peak_values(event_table)
     for source_name, window_name in integral_features.items():
         feature_name = feature_name_for_source(source_name, operation="integral")
-        values = [
-            nansum_or_nan(window_for_peak(ds, peak_time, window_name)[source_name].values)
-            for peak_time in event_peak_values(event_table)
-        ]
-        out[feature_name] = (config.EVENT_DIM, np.asarray(values, dtype=float))
+        out[feature_name] = (
+            config.EVENT_DIM,
+            reducer.sums(source_name, peak_times, window_name),
+        )
         source_units = ds[source_name].attrs.get("units")
         if source_units == "K hr-1":
             out[feature_name].attrs["units"] = "K"
@@ -368,13 +331,14 @@ def add_mean_features(
     mean_features: Mapping[str, str],
 ) -> None:
     """Add window-mean antecedent-state features."""
+    reducer = fixed.WindowReducer(ds)
+    peak_times = event_peak_values(event_table)
     for source_name, window_name in mean_features.items():
         feature_name = feature_name_for_source(source_name, operation="mean")
-        values = [
-            nanmean_or_nan(window_for_peak(ds, peak_time, window_name)[source_name].values)
-            for peak_time in event_peak_values(event_table)
-        ]
-        out[feature_name] = (config.EVENT_DIM, np.asarray(values, dtype=float))
+        out[feature_name] = (
+            config.EVENT_DIM,
+            reducer.means(source_name, peak_times, window_name),
+        )
         if "units" in ds[source_name].attrs:
             out[feature_name].attrs["units"] = ds[source_name].attrs["units"]
         add_feature_attrs(
@@ -392,13 +356,14 @@ def add_change_features(
     change_features: Mapping[str, str],
 ) -> None:
     """Add robust end-minus-start change features."""
+    reducer = fixed.WindowReducer(ds)
+    peak_times = event_peak_values(event_table)
     for source_name, window_name in change_features.items():
         feature_name = feature_name_for_source(source_name, operation="change")
-        values = [
-            robust_window_change(ds, peak_time, source_name, window_name)
-            for peak_time in event_peak_values(event_table)
-        ]
-        out[feature_name] = (config.EVENT_DIM, np.asarray(values, dtype=float))
+        out[feature_name] = (
+            config.EVENT_DIM,
+            reducer.changes(source_name, peak_times, window_name),
+        )
         if "units" in ds[source_name].attrs:
             out[feature_name].attrs["units"] = ds[source_name].attrs["units"]
         add_feature_attrs(
@@ -412,23 +377,11 @@ def add_change_features(
 
 def add_days_from_solstice(out: xr.Dataset, event_table: xr.Dataset) -> None:
     """Add event peak timing relative to June 21 in each event year."""
-    values = []
-    for peak_time in event_peak_values(event_table):
-        peak_day = peak_time.astype("datetime64[D]")
-        year = str(peak_day.astype("datetime64[Y]")).split("-")[0]
-        solstice = np.datetime64(
-            f"{year}-{config.SOLSTICE_MONTH:02d}-{config.SOLSTICE_DAY:02d}",
-            "D",
-        )
-        values.append(float((peak_day - solstice) / np.timedelta64(1, "D")))
-    out["days_from_solstice"] = (config.EVENT_DIM, np.asarray(values, dtype=float))
-    out["days_from_solstice"].attrs.update(
-        {
-            "source_variable": config.PEAK_TIME_NAME,
-            "operation": "calendar_day_difference",
-            "reference_date": f"{config.SOLSTICE_MONTH:02d}-{config.SOLSTICE_DAY:02d}",
-            "units": "days",
-        }
+    fixed.add_days_from_solstice(
+        out,
+        event_peak_values(event_table),
+        row_dim=config.EVENT_DIM,
+        source_variable=config.PEAK_TIME_NAME,
     )
 
 
@@ -447,18 +400,9 @@ def robust_window_change(
     window_name: str,
 ) -> float:
     """Return final 24 h mean minus first 24 h mean within a configured window."""
-    start_lag, end_lag = config.WINDOWS[window_name]
-    first_start = peak_time + np.timedelta64(start_lag, "h")
-    first_end = first_start + np.timedelta64(24, "h")
-    final_end = peak_time + np.timedelta64(end_lag, "h")
-    final_start = final_end - np.timedelta64(24, "h")
-    first = ds.sel({config.TIME_DIM: slice(first_start, first_end)})[source_name].values
-    final = ds.sel({config.TIME_DIM: slice(final_start, final_end)})[source_name].values
-    first_mean = nanmean_or_nan(first)
-    final_mean = nanmean_or_nan(final)
-    if np.isnan(first_mean) or np.isnan(final_mean):
-        return np.nan
-    return final_mean - first_mean
+    reducer = fixed.WindowReducer(ds)
+    anchors = np.asarray([peak_time], dtype="datetime64[ns]")
+    return float(reducer.changes(source_name, anchors, window_name)[0])
 
 
 def event_peak_values(event_table: xr.Dataset) -> np.ndarray:
@@ -471,12 +415,7 @@ def event_peak_values(event_table: xr.Dataset) -> np.ndarray:
 
 def active_window_names(feature_spec: Mapping[str, Mapping[str, str]]) -> tuple[str, ...]:
     """Return active window names in config order."""
-    active = {
-        window_name
-        for mapping in feature_spec.values()
-        for window_name in mapping.values()
-    }
-    return tuple(name for name in config.WINDOWS if name in active)
+    return fixed.active_window_names(feature_spec)
 
 
 def add_feature_attrs(
@@ -488,17 +427,13 @@ def add_feature_attrs(
     units: str | None = None,
 ) -> None:
     """Add common fixed-window feature metadata."""
-    start_lag, end_lag = config.WINDOWS[window_name]
-    attrs = {
-        "source_variable": source_variable,
-        "window_name": window_name,
-        "window_lag_hours": f"{start_lag},{end_lag}",
-        "operation": operation,
-        "window_endpoint_inclusion": "inclusive",
-    }
-    if units is not None:
-        attrs["units"] = units
-    da.attrs.update(attrs)
+    fixed.add_feature_attrs(
+        da,
+        source_variable=source_variable,
+        window_name=window_name,
+        operation=operation,
+        units=units,
+    )
 
 
 def add_global_attrs(
@@ -575,18 +510,12 @@ def write_feature_outputs(
 
 def nansum_or_nan(values: np.ndarray) -> float:
     """Return nansum or NaN for empty/all-NaN values."""
-    arr = np.asarray(values, dtype=float)
-    if arr.size == 0 or np.all(np.isnan(arr)):
-        return np.nan
-    return float(np.nansum(arr))
+    return fixed.nansum_or_nan(values)
 
 
 def nanmean_or_nan(values: np.ndarray) -> float:
     """Return nanmean or NaN for empty/all-NaN values."""
-    arr = np.asarray(values, dtype=float)
-    if arr.size == 0 or np.all(np.isnan(arr)):
-        return np.nan
-    return float(np.nanmean(arr))
+    return fixed.nanmean_or_nan(values)
 
 
 def _validate_output_path(path: Path, *, overwrite: bool) -> None:
