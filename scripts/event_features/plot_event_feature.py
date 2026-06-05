@@ -25,7 +25,16 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-REGION = "pnw_hotz"
+plt.rcParams.update({
+    "axes.titlesize": 18,
+    "axes.labelsize": 16,
+    "xtick.labelsize": 14,
+    "ytick.labelsize": 14,
+    "legend.fontsize": 12,
+    "figure.titlesize": 20,
+})
+
+REGION = "pnw_bartusek"
 
 DEFAULT_INPUT_PATH = (
     REPO_ROOT
@@ -54,16 +63,19 @@ HEAT_BUDGET_Y_VARIABLES = (
     "f_advection_pre",
 )
 Y_VARIABLES = (
-    *HEAT_BUDGET_Y_VARIABLES,
+    *INTEGRATED_HEAT_BUDGET_VARIABLES,
     "sqrt_I_lwa_a_pre_peak",
     "T_anom_mean_ant",
     "cos_days_from_solstice",
     "duration",
     "tas_anom_peak",
-    "log10_tas_excess_integral",
+    "tas_peak",
 )
 VARIABLE_LABELS = {
     "I_dTdt_pre": "Integrated dT/dt (K)",
+    "I_adiabatic_pre": "Integrated adiabatic tendency (K)",
+    "I_diabatic_pre": "Integrated diabatic tendency (K)",
+    "I_advection_pre": "Integrated advective tendency (K)",
     "f_adiabatic_pre": "I_adiabatic / sum(|budget terms|)",
     "f_diabatic_pre": "I_diabatic / sum(|budget terms|)",
     "f_advection_pre": "I_advection / sum(|budget terms|)",
@@ -72,9 +84,12 @@ VARIABLE_LABELS = {
     "cos_days_from_solstice": "cos(days from solstice * 2pi / 365)",
     "duration": "Duration (days)",
     "tas_anom_peak": "Peak TAS anomaly (K)",
-    "log10_tas_excess_integral": "log10(TAS excess integral)",
+    "tas_peak": "Peak TAS (K)",
 }
 PANEL_TITLES = {
+    "I_adiabatic_pre": "Adiabatic",
+    "I_diabatic_pre": "Diabatic",
+    "I_advection_pre": "Advection",
     "f_adiabatic_pre": "Adiabatic Fraction",
     "f_diabatic_pre": "Diabatic Fraction",
     "f_advection_pre": "Advection Fraction",
@@ -83,7 +98,7 @@ PANEL_TITLES = {
     "cos_days_from_solstice": "Season Phase",
     "duration": "Duration",
     "tas_anom_peak": "Peak TAS Anomaly",
-    "log10_tas_excess_integral": "Log TAS Excess Integral",
+    "tas_peak": "Peak TAS",
 }
 DERIVED_VARIABLE_SOURCES = {
     "f_adiabatic_pre": INTEGRATED_HEAT_BUDGET_VARIABLES,
