@@ -110,6 +110,11 @@ lwa_a_peak(event)
 lwa_c_peak(event)
 ```
 
+These variables are reductions over detected event intervals. In particular,
+`tas_peak` and `tas_anom_peak` are not defined for non-event days and must not
+be interpreted as time-indexed diagnostics. Baseline-day workflows derive
+fixed-window features directly from the core time-indexed Stage-1 variables.
+
 ## Required Metadata
 
 The product must carry:
@@ -127,6 +132,7 @@ source paths or source identifiers where practical.
 ## Downstream Consumers
 
 - `scripts/event_features/build_stage2_event_features.py`
+- `scripts/event_features/build_stage2_baseline_features.py`
 - composite plotting workflows
 - top-event plotting workflows
 - diagnostic plots that inspect the harmonized time series
