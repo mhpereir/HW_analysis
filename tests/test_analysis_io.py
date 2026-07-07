@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from src import analysis_io
+from HW_analysis.src import analysis_io
 
 
 def test_default_harmonized_timeseries_path_constant_uses_stage1_filename():

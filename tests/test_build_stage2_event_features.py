@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts.event_features import build_stage2_event_features as build_event_features
-from scripts.event_features import event_feature_config as feature_config
+from HW_analysis.scripts.event_features import build_stage2_event_features as build_event_features
+from HW_analysis.scripts.event_features import event_feature_config as feature_config
 
 
 def test_config_uses_expected_default_windows():

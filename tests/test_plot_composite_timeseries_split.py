@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts import plot_composite_timeseries_split as plot_split
-from src import analysis_io
+from HW_analysis.scripts import plot_composite_timeseries_split as plot_split
+from HW_analysis.src import analysis_io
 
 
 RUN_ARGS = [
@@ -306,7 +306,11 @@ def test_main_filters_event_table_before_quantile_splitting(monkeypatch, tmp_pat
         "7",
         ),
     ])
-    monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", lambda path: opened)
+    monkeypatch.setattr(
+        plot_split.analysis_io,
+        "open_harmonized_timeseries",
+        lambda path: opened,
+    )
     monkeypatch.setattr(plot_split, "build_split_quantile_composite", fake_build)
     monkeypatch.setattr(
         plot_split.plotting,
@@ -353,7 +357,11 @@ def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
         "--plot-extended-variables",
         ),
     ])
-    monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", lambda path: opened)
+    monkeypatch.setattr(
+        plot_split.analysis_io,
+        "open_harmonized_timeseries",
+        lambda path: opened,
+    )
     monkeypatch.setattr(plot_split, "build_split_quantile_composite", fake_build)
     monkeypatch.setattr(
         plot_split.plotting,
@@ -411,7 +419,11 @@ def test_main_filters_event_table_before_year_splitting(monkeypatch, tmp_path):
         "7",
         ),
     ])
-    monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", lambda path: opened)
+    monkeypatch.setattr(
+        plot_split.analysis_io,
+        "open_harmonized_timeseries",
+        lambda path: opened,
+    )
     monkeypatch.setattr(plot_split, "build_split_year_composite", fake_build)
     monkeypatch.setattr(
         plot_split.plotting,

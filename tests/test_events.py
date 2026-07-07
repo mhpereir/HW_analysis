@@ -2,7 +2,7 @@ import numpy as np
 import xarray as xr
 import pytest
 
-from src import events
+from HW_analysis.src import events
 
 
 def test_mask_to_event_ids_labels_contiguous_true_runs():

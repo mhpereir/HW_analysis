@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from src import selectors
+from HW_analysis.src import selectors
 
 
 def test_select_events_by_season_uses_peak_month_with_drop_true():

@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts import plot_diurnal_cycle
-from src import analysis_io
+from HW_analysis.scripts import plot_diurnal_cycle
+from HW_analysis.src import analysis_io
 
 
 RUN_ARGS = [
@@ -223,7 +223,11 @@ def test_main_orchestrates_open_composite_write_and_close(monkeypatch, tmp_path,
             ),
         ],
     )
-    monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", fake_open)
+    monkeypatch.setattr(
+        plot_diurnal_cycle.analysis_io,
+        "open_harmonized_timeseries",
+        fake_open,
+    )
     monkeypatch.setattr(plot_diurnal_cycle, "build_diurnal_composite", fake_composite)
     monkeypatch.setattr(plot_diurnal_cycle, "write_diurnal_cycle_plot", fake_write)
 

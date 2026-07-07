@@ -1,7 +1,7 @@
 import numpy as np
 import xarray as xr
 
-from src import composites
+from HW_analysis.src import composites
 
 
 def test_all_event_peak_aligned_composite_uses_dataset_event_table_by_default():

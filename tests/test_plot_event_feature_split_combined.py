@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts.event_features import plot_event_feature_split_combined as plot_combined
+from HW_analysis.scripts.event_features import plot_event_feature_split_combined as plot_combined
 
 
 def test_parse_and_validate_args_do_not_require_split_cli(monkeypatch, tmp_path):

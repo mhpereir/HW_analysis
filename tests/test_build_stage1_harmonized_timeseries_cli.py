@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts import build_stage1_harmonized_timeseries as stage1_builder
-from src import analysis_io
+from HW_analysis.scripts import build_stage1_harmonized_timeseries as stage1_builder
+from HW_analysis.src import analysis_io
 
 
 def test_parse_args_requires_start_and_end_year(monkeypatch):

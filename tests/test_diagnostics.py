@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from src import config, diagnostics
+from HW_analysis.src import config, diagnostics
 
 
 def test_approximate_surface_energy_heating_rate_applies_pressure_volume_formula():

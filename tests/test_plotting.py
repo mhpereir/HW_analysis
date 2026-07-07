@@ -3,7 +3,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import xarray as xr
 
-from src import plotting
+from HW_analysis.src import plotting
 
 
 def test_smooth_composite_for_display_smooths_only_requested_variables():

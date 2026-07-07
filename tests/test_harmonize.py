@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from src import config, harmonize, preprocess
+from HW_analysis.src import config, harmonize, preprocess
 
 
 def test_project_daily_to_hourly_replicates_daily_values_by_date():

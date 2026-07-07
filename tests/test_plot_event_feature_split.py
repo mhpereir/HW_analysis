@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts.event_features import plot_event_feature_split as plot_split
+from HW_analysis.scripts.event_features import plot_event_feature_split as plot_split
 
 
 def test_validate_args_rejects_bad_quantile_and_non_panel_variable():

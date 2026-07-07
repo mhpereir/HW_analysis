@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from src import preprocess
+from HW_analysis.src import preprocess
 
 
 def test_floor_daily_time_floors_dataarray_time_to_midnight():

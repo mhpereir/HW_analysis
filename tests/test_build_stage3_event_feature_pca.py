@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts.event_features import build_stage3_event_feature_pca as build_event_feature_pca
+from HW_analysis.scripts.event_features import build_stage3_event_feature_pca as build_event_feature_pca
 
 
 def test_build_event_feature_pca_uses_default_derived_features_and_metadata():

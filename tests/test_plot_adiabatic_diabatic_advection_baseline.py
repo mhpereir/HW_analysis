@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts.event_features import (
+from HW_analysis.scripts.event_features import (
     plot_adiabatic_diabatic_advection_baseline as plot_diag,
 )
 

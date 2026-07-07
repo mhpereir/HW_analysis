@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts.event_features import plot_adiabatic_diabatic_advection as plot_diag
+from HW_analysis.scripts.event_features import plot_adiabatic_diabatic_advection as plot_diag
 
 
 def test_plot_tendency_scatter_creates_three_data_axes_and_colorbar():

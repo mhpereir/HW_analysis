@@ -2,7 +2,7 @@ import numpy as np
 import xarray as xr
 import pytest
 
-from src import data_io
+from HW_analysis.src import data_io
 
 
 def test_normalize_quantile_token_handles_numeric_and_string_inputs():

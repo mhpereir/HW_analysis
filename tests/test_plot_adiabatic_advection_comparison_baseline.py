@@ -1,17 +1,10 @@
 from pathlib import Path
-import sys
 
 import numpy as np
 import pytest
 import xarray as xr
 
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-
-from scripts.event_features import (  # noqa: E402
+from HW_analysis.scripts.event_features import (
     plot_adiabatic_advection_comparison_baseline as plot_diag,
 )
 

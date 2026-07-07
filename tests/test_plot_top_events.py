@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
-from scripts import plot_top_events
-from src import analysis_io
+from HW_analysis.scripts import plot_top_events
+from HW_analysis.src import analysis_io
 
 
 RUN_ARGS = [
@@ -78,7 +78,11 @@ def test_open_harmonized_dataset_delegates_to_analysis_io(monkeypatch, tmp_path)
         captured["chunks"] = chunks
         return expected
 
-    monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", fake_open)
+    monkeypatch.setattr(
+        plot_top_events.analysis_io,
+        "open_harmonized_timeseries",
+        fake_open,
+    )
 
     out = plot_top_events.open_harmonized_dataset(
         tmp_path / "stage1.nc",

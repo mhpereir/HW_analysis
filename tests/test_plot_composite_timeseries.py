@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts import plot_composite_timeseries_all as plot_composite_timeseries
-from src import analysis_io
+from HW_analysis.scripts import plot_composite_timeseries_all as plot_composite_timeseries
+from HW_analysis.src import analysis_io
 
 
 RUN_ARGS = [
@@ -144,7 +144,11 @@ def test_main_orchestrates_dataset_composite_and_plotting(monkeypatch, tmp_path,
         "6",
         ),
     ])
-    monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", fake_open)
+    monkeypatch.setattr(
+        plot_composite_timeseries.analysis_io,
+        "open_harmonized_timeseries",
+        fake_open,
+    )
     monkeypatch.setattr(
         plot_composite_timeseries.composites,
         "all_event_peak_aligned_composite",
@@ -205,7 +209,11 @@ def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
         "--plot-extended-variables",
         ),
     ])
-    monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", fake_open)
+    monkeypatch.setattr(
+        plot_composite_timeseries.analysis_io,
+        "open_harmonized_timeseries",
+        fake_open,
+    )
     monkeypatch.setattr(
         plot_composite_timeseries.composites,
         "all_event_peak_aligned_composite",
@@ -259,7 +267,11 @@ def test_main_filters_event_table_before_composite_when_season_requested(monkeyp
         "--require-full-event",
         ),
     ])
-    monkeypatch.setattr(analysis_io, "open_harmonized_timeseries", fake_open)
+    monkeypatch.setattr(
+        plot_composite_timeseries.analysis_io,
+        "open_harmonized_timeseries",
+        fake_open,
+    )
     monkeypatch.setattr(
         plot_composite_timeseries.composites,
         "all_event_peak_aligned_composite",

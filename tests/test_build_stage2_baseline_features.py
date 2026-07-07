@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from scripts.event_features import build_stage2_baseline_features as build_baseline
+from HW_analysis.scripts.event_features import build_stage2_baseline_features as build_baseline
 
 
 def test_parse_args_requires_explicit_baseline_universe(monkeypatch):
