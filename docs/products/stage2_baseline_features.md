@@ -65,6 +65,10 @@ n_samples_antecedent_state(baseline_day)
 Extended mode adds the same land, cloud, PBL, and surface-energy features as
 the event-feature product.
 
+Season selection applies to `reference_time` only. Fixed windows use the
+complete Stage-1 time axis and may cross selected-season boundaries; see
+[decision 004](../decisions/004_baseline_season_windows.md).
+
 ## Event-only Variables
 
 Event-summary reductions remain event-only and are intentionally absent:

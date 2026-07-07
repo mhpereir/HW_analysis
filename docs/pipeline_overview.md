@@ -127,3 +127,5 @@ the diagnostic they make rather than a product stage they produce.
 - [001: event-feature windows](decisions/001_event_feature_windows.md)
 - [002: PCA feature matrix](decisions/002_pca_feature_matrix.md)
 - [003: clustering strategy](decisions/003_clustering_strategy.md)
+- [004: baseline season and window boundaries](decisions/004_baseline_season_windows.md)
+- [005: Stage-1 event peak semantics](decisions/005_stage1_event_peak_semantics.md)
