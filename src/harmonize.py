@@ -39,7 +39,7 @@ HEAT_BUDGET_VARIABLE_MAP: dict[str, str] = {
 
 HEAT_BUDGET_RATE_VARIABLE_SIGNS: dict[str, int] = {
     "dT_dt": 1,
-    "advection_term": -1,
+    "advection_term": 1,
     "adiabatic_term": 1,
     "diabatic_term": 1,
 }
@@ -252,9 +252,9 @@ def _prepare_heat_budget_variables(
                     "normalized_by": "domain_volume",
                     "time_conversion_factor": SECONDS_PER_HOUR,
                     "sign_convention": (
-                        "advection_term multiplied by -1 to match "
-                        "eulerian heat-budget diagnostic plotting convention"
-                        if sign < 0
+                        "source sign retained; positive values indicate "
+                        "advection into the domain"
+                        if source_name == "advection_term"
                         else "source sign retained"
                     ),
                 }

@@ -166,7 +166,7 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
     np.testing.assert_allclose(out["T_mean"].values, [1.0, 2.0, 3.0])
     np.testing.assert_allclose(out["volume"].values, [2.0, 3.0, 4.0])
     np.testing.assert_allclose(out["dTdt"].values, [5400.0, 4800.0, 4500.0])
-    np.testing.assert_allclose(out["advection"].values, [-7200.0, -6000.0, -5400.0])
+    np.testing.assert_allclose(out["advection"].values, [7200.0, 6000.0, 5400.0])
     np.testing.assert_allclose(out["adiabatic"].values, [9000.0, 7200.0, 6300.0])
     np.testing.assert_allclose(out["diabatic"].values, [10800.0, 8400.0, 7200.0])
     np.testing.assert_allclose(out["tas_region"].values, [280.0, 280.0, 285.0])
@@ -182,7 +182,9 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
     assert out["T_mean"].attrs["native_time_resolution"] == "hourly"
     assert out["dTdt"].attrs["units"] == "K hr-1"
     assert out["dTdt"].attrs["normalized_by"] == "domain_volume"
-    assert "multiplied by -1" in out["advection"].attrs["sign_convention"]
+    assert out["advection"].attrs["sign_convention"] == (
+        "source sign retained; positive values indicate advection into the domain"
+    )
 
 
 def test_build_regional_analysis_dataset_raises_for_missing_daily_dates():
