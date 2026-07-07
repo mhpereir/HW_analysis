@@ -112,7 +112,8 @@ def test_write_top_event_plots_writes_raw_and_smoothed_figures_per_event(tmp_pat
         ds,
         selected,
         output_dir=tmp_path,
-        window_days=1,
+        window_days=0,
+        smoothing_window=1,
     )
 
     assert len(written) == 4
