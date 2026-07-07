@@ -1,8 +1,8 @@
 """Compare advection with adiabatic heating and net dynamical contribution.
 
-The diagnostic loads a Stage-2 event-feature table and writes a four-panel
-scatter figure. The first two panels use integrated adiabatic tendency on the
-x-axis, while the final two use net dynamical contribution on the x-axis.
+The diagnostic loads a Stage-2 event-feature table and writes a 2x2 scatter
+figure. The left-column panels use integrated adiabatic tendency on the x-axis,
+while the right-column panels use net dynamical contribution on the x-axis.
 Points are colored by peak temperature anomaly by default.
 """
 
@@ -25,6 +25,7 @@ import xarray as xr
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.colors import Normalize, TwoSlopeNorm
 
 plt.rcParams.update({
     "axes.titlesize": 18,
@@ -35,7 +36,7 @@ plt.rcParams.update({
     "figure.titlesize": 20,
 })
 
-REGION = "pnw_bartusek"
+REGION = "pnw_hotz"
 THRESHOLD_VARIABLE = "tas"
 QUANTILE_THRESHOLD = "q90"
 
@@ -60,15 +61,19 @@ ADVECTION_VARIABLE = "I_advection_pre"
 TEMPERATURE_CHANGE_VARIABLE = "I_dTdt_pre"
 DIABATIC_VARIABLE = "I_diabatic_pre"
 COLOR_VARIABLE = "tas_anom_peak"
-COLOR_MAP = "gist_heat_r"
+COLOR_MAP = "gist_heat_r" #"RdBu_r" #
+# Set to False to use Matplotlib's default color normalization.
+USE_CENTERED_COLOR_NORMALIZATION = False
+COLOR_NORMALIZATION_CENTER = 3.0
 NET_DYNAMICAL_LABEL = r"$I_{dyn,net}$ (K)"
 VARIABLE_LABELS = {
     "tas_anom_peak": "Peak TAS Anomaly (K)",
     "tas_peak": "Peak TAS (K)",
-    "I_advection_pre": "I_advective (K)",
-    "I_adiabatic_pre": "I_adiabatic (K)",
-    "I_dTdt_pre": "I_dT/dt (K)",
-    "I_diabatic_pre": "I_diabatic (K)",
+    "lwa_a_peak": "Peak LWA A [hPa m]",
+    "I_advection_pre": r"$I_{advective}$(K)",
+    "I_adiabatic_pre": r"$I_{adiabatic}$ (K)",
+    "I_dTdt_pre": r"$I_{dT/dt}$ (K)",
+    "I_diabatic_pre": r"$I_{diabatic}$ (K)",
 }
 
 
@@ -177,7 +182,7 @@ def plot_tendency_scatter(
     point_size: float = 24.0,
     alpha: float = 0.75,
 ) -> plt.Figure:  # type: ignore[type-arg]
-    """Return the four-panel adiabatic/advection net dynamical comparison."""
+    """Return the 2x2 adiabatic/advection net dynamical comparison."""
     validate_feature_variables(features, color_variable=color_variable)
 
     x_values = feature_values(features, X_VARIABLE)
@@ -189,6 +194,7 @@ def plot_tendency_scatter(
     temperature_change_values = feature_values(features, TEMPERATURE_CHANGE_VARIABLE)
     diabatic_values = feature_values(features, DIABATIC_VARIABLE)
     color_values = feature_values(features, color_variable) if color_variable else None
+    color_norm = color_norm_for_values(color_values)
 
     finite_adiabatic = np.isfinite(x_values) & np.isfinite(advection_values)
     if color_values is not None:
@@ -198,14 +204,16 @@ def plot_tendency_scatter(
     )
     finite_diabatic = finite_adiabatic & np.isfinite(diabatic_values)
 
-    fig, axes = plt.subplots(
-        nrows=4,
-        ncols=1,
-        figsize=(7.5, 12.8),
-        sharex=False,
-        constrained_layout=True,
+    fig = plt.figure(figsize=(15.0, 7.2), constrained_layout=True)
+    grid = fig.add_gridspec(nrows=2, ncols=2)
+    axes = np.array(
+        [
+            fig.add_subplot(grid[0, 0]),
+            fig.add_subplot(grid[1, 0]),
+            fig.add_subplot(grid[0, 1]),
+            fig.add_subplot(grid[1, 1]),
+        ]
     )
-    axes = np.atleast_1d(axes)
     axes[1].sharex(axes[0])
     axes[3].sharex(axes[2])
 
@@ -215,6 +223,7 @@ def plot_tendency_scatter(
         advection_values,
         finite_adiabatic,
         color_values=color_values,
+        color_norm=color_norm,
         point_size=point_size,
         alpha=alpha,
     )
@@ -232,6 +241,7 @@ def plot_tendency_scatter(
         net_dynamical_values,
         finite_adiabatic,
         color_values=color_values,
+        color_norm=color_norm,
         point_size=point_size,
         alpha=alpha,
     )
@@ -245,12 +255,12 @@ def plot_tendency_scatter(
         temperature_change_values,
         finite_temperature_change,
         color_values=color_values,
+        color_norm=color_norm,
         point_size=point_size,
         alpha=alpha,
     )
     axes[2].set_title(r"Integrated dT/dt vs $I_{dyn,net}$")
     axes[2].set_ylabel(variable_label(TEMPERATURE_CHANGE_VARIABLE))
-    axes[2].set_xlabel(NET_DYNAMICAL_LABEL)
 
     plot_scatter_panel(
         axes[3],
@@ -258,6 +268,7 @@ def plot_tendency_scatter(
         diabatic_values,
         finite_diabatic,
         color_values=color_values,
+        color_norm=color_norm,
         point_size=point_size,
         alpha=alpha,
     )
@@ -283,6 +294,7 @@ def plot_scatter_panel(
     finite: np.ndarray,
     *,
     color_values: np.ndarray | None,
+    color_norm: Normalize | None,
     point_size: float,
     alpha: float,
 ):
@@ -301,6 +313,7 @@ def plot_scatter_panel(
             y_values[finite],
             c=color_values[finite],
             cmap=COLOR_MAP,
+            norm=color_norm,
             **kwargs,
         )
 
@@ -317,6 +330,33 @@ def plot_scatter_panel(
         bbox={"facecolor": "white", "edgecolor": "0.8", "alpha": 0.85},
     )
     return mappable
+
+
+def color_norm_for_values(color_values: np.ndarray | None) -> Normalize | None:
+    """Return a shared color norm centered on the configured value when enabled."""
+    if color_values is None or not USE_CENTERED_COLOR_NORMALIZATION:
+        return None
+
+    finite = np.asarray(color_values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return None
+
+    if np.all(finite == COLOR_NORMALIZATION_CENTER):
+        padding = (
+            0.5
+            if COLOR_NORMALIZATION_CENTER == 0.0
+            else abs(COLOR_NORMALIZATION_CENTER) * 0.05
+        )
+        return TwoSlopeNorm(
+            vmin=COLOR_NORMALIZATION_CENTER - padding,
+            vcenter=COLOR_NORMALIZATION_CENTER,
+            vmax=COLOR_NORMALIZATION_CENTER + padding,
+        )
+
+    norm = TwoSlopeNorm(vcenter=COLOR_NORMALIZATION_CENTER)
+    norm.autoscale_None(finite)
+    return norm
 
 
 def validate_feature_variables(

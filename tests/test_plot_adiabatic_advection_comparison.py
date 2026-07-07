@@ -68,6 +68,27 @@ def test_panels_use_expected_x_and_y_values():
         plot_diag.plt.close(fig)
 
 
+def test_panels_share_color_normalization_centered_on_configured_value(monkeypatch):
+    monkeypatch.setattr(plot_diag, "USE_CENTERED_COLOR_NORMALIZATION", True)
+    monkeypatch.setattr(plot_diag, "COLOR_NORMALIZATION_CENTER", 4.0)
+
+    fig = plot_diag.plot_tendency_scatter(_make_feature_table())
+    try:
+        norms = [ax.collections[0].norm for ax in fig.axes[:4]]
+        assert all(norm is norms[0] for norm in norms)
+        assert norms[0](4.0) == pytest.approx(0.5)
+    finally:
+        plot_diag.plt.close(fig)
+
+
+def test_centered_color_normalization_can_be_disabled(monkeypatch):
+    monkeypatch.setattr(plot_diag, "USE_CENTERED_COLOR_NORMALIZATION", False)
+
+    norm = plot_diag.color_norm_for_values(np.array([2.0, 4.0, 6.0]))
+
+    assert norm is None
+
+
 def test_validate_feature_variables_requires_only_plotted_and_color_variables():
     features = _make_feature_table()
 
