@@ -227,7 +227,7 @@ def test_write_top_event_plots_uses_extended_variables_when_requested(monkeypatc
     captured = {"plot_extended_variables": []}
 
     def fake_composite(source, **kwargs):
-        captured["composite_kwargs"] = kwargs
+        captured["composite_kwargs"] = kwargs #type: ignore
         return reference_composite
 
     def fake_smooth(source, **kwargs):
@@ -273,7 +273,7 @@ def test_write_top_event_plots_uses_extended_variables_when_requested(monkeypatc
     )
 
     assert len(written) == 2
-    assert captured["composite_kwargs"]["variables"] == (
+    assert captured["composite_kwargs"]["variables"] == ( #type: ignore
         plot_top_events.EXTENDED_TOP_EVENT_VARIABLES
     )
     assert captured["smooth_kwargs"][0]["variables"] == (

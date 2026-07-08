@@ -32,7 +32,7 @@ echo "[info] $(date -Is) starting eulerian heat budget calculation on host $(hos
     --top-boundary 700 \
     --start-year-ehb 1940 \
     --end-year-ehb 2025 \
-    --threshold-variable "lwa_a" \
+    --threshold-variable "tas" \
     --add-full-diagnostics \
 
 echo "[info] $(date -Is) done"
