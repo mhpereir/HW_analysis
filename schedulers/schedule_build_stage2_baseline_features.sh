@@ -19,7 +19,7 @@ mamba activate dev_env
 set -euo pipefail
 
 REGION="pnw_bartusek"
-THRESHOLD_VARIABLE="tas"
+THRESHOLD_VARIABLE="lwa_a"
 QUANTILE_THRESHOLD="q90"
 
 INPUT_PATH="/home/mhpereir/HW_analysis/results/stage1/harmonized_regional_timeseries_${REGION}_surface_700hPa_${THRESHOLD_VARIABLE}_${QUANTILE_THRESHOLD}_1940_2024.nc"
