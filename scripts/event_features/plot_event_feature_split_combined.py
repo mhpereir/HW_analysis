@@ -23,14 +23,7 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.patches import Patch
 
-plt.rcParams.update({
-    "axes.titlesize": 14,
-    "axes.labelsize": 13,
-    "xtick.labelsize": 11,
-    "ytick.labelsize": 12,
-    "legend.fontsize": 11,
-    "figure.titlesize": 18,
-})
+from src import plot_style
 
 REGION = "pnw_bartusek"
 
@@ -101,9 +94,9 @@ DERIVED_VARIABLE_SOURCES = {
 
 SPLIT_SPECS = tuple((variable, 0.9) for variable in Y_VARIABLES)
 
-TOTAL_COLOR = "black"
-LOW_COLOR = "tab:blue"
-HIGH_COLOR = "tab:red"
+TOTAL_COLOR = plot_style.COLORS["calculated"]
+LOW_COLOR = plot_style.COLORS["volume"]
+HIGH_COLOR = plot_style.COLORS["diabatic"]
 VIOLIN_ALPHA = 0.72
 TOTAL_POSITION = 0.0
 SPLIT_POSITION_OFFSET = 0.18
@@ -208,7 +201,7 @@ def write_split_violin_plot(
     output_path = Path(output_path).expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig = plot_split_violin_combined(features, split_specs=split_specs)
-    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plot_style.save_figure(fig, output_path)
     plt.close(fig)
     return output_path
 
@@ -224,7 +217,7 @@ def plot_split_violin_combined(
 
     nrows = len(Y_VARIABLES)
     ncols = max(len(splits) + 1, 1)
-    fig_width = max(10.0, 1.25 * ncols + 2.0)
+    fig_width = plot_style.FULL_TWO_COLUMN_WIDTH_IN
     fig_height = max(12.0, 1.75 * nrows + 1.4)
     fig, axes_grid = plt.subplots(
         nrows=nrows,
@@ -247,7 +240,12 @@ def plot_split_violin_combined(
 
     handles = legend_handles(splits)
     if handles:
-        fig.legend(handles=handles, loc="upper center", ncol=len(handles), frameon=True)
+        fig.legend(
+            handles=handles,
+            loc="upper center",
+            ncol=len(handles),
+            **plot_style.legend_kwargs(),
+        )
     fig.suptitle("Event Fixed-Window Feature Distributions by Split Population")
     return fig
 
@@ -296,7 +294,6 @@ def plot_one_split_violin_row(
     add_horizontal_zero_line(ax)
     ax.set_title(PANEL_TITLES[y_variable], loc="left")
     ax.set_ylabel(variable_label(y_variable))
-    ax.grid(True, axis="y", color="0.88", linewidth=0.8)
     ax.set_axisbelow(True)
     ax.text(
         0.01,
@@ -311,6 +308,7 @@ def plot_one_split_violin_row(
     configure_x_axis(ax, splits=splits, show_xlabel=show_xlabel)
     if y_variable == "tas_peak":
         set_data_driven_y_limits(ax, y_values[finite_y])
+    plot_style.style_axis(ax)
 
 
 def validate_feature_variables(
@@ -506,7 +504,7 @@ def add_violin(
             position - width / 2.0,
             position + width / 2.0,
             color=color,
-            linewidth=2.0,
+            linewidth=plot_style.LINE_WIDTH_PT,
             zorder=3,
         )
         line.set_gid(gid)
@@ -522,7 +520,7 @@ def add_violin(
     )
     body = parts["bodies"][0] #type: ignore
     body.set_facecolor(color)
-    body.set_edgecolor("black")
+    body.set_edgecolor(plot_style.COLORS["calculated"])
     body.set_alpha(VIOLIN_ALPHA)
     body.set_linewidth(0.7)
     body.set_gid(gid)
@@ -530,7 +528,13 @@ def add_violin(
 
 def add_horizontal_zero_line(ax: Axes) -> None:
     """Add a horizontal zero reference line."""
-    ax.axhline(0.0, color="0.55", linewidth=0.8, linestyle="--", zorder=0)
+    ax.axhline(
+        0.0,
+        color=plot_style.COLORS["zero"],
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+        linestyle="--",
+        zorder=0,
+    )
 
 
 def configure_x_axis(
@@ -559,7 +563,13 @@ def split_tick_label(split: QuantileSplit) -> str:
 
 def legend_handles(splits: tuple[QuantileSplit, ...]) -> list[Patch]:
     """Return figure legend handles for total, lower, and upper populations."""
-    handles = [Patch(facecolor=TOTAL_COLOR, edgecolor="black", label="Total population")]
+    handles = [
+        Patch(
+            facecolor=TOTAL_COLOR,
+            edgecolor=plot_style.COLORS["calculated"],
+            label="Total population",
+        )
+    ]
     if not splits:
         return handles
 
@@ -572,8 +582,16 @@ def legend_handles(splits: tuple[QuantileSplit, ...]) -> list[Patch]:
         high_label = "Upper percentile group"
     handles.extend(
         [
-            Patch(facecolor=LOW_COLOR, edgecolor="black", label=low_label),
-            Patch(facecolor=HIGH_COLOR, edgecolor="black", label=high_label),
+            Patch(
+                facecolor=LOW_COLOR,
+                edgecolor=plot_style.COLORS["calculated"],
+                label=low_label,
+            ),
+            Patch(
+                facecolor=HIGH_COLOR,
+                edgecolor=plot_style.COLORS["calculated"],
+                label=high_label,
+            ),
         ]
     )
     return handles

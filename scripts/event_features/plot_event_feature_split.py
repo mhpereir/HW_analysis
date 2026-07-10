@@ -21,14 +21,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-plt.rcParams.update({
-    "axes.titlesize": 18,
-    "axes.labelsize": 16,
-    "xtick.labelsize": 14,
-    "ytick.labelsize": 14,
-    "legend.fontsize": 12,
-    "figure.titlesize": 20,
-})
+from src import plot_style
 
 REGION = "pnw_bartusek"
 
@@ -98,8 +91,8 @@ DERIVED_VARIABLE_SOURCES = {
     "cos_days_from_solstice": "days_from_solstice",
 }
 SPLIT_GROUPS = (
-    ("low", "tab:blue", "Low"),
-    ("high", "tab:red", "High"),
+    ("low", plot_style.COLORS["volume"], "Low"),
+    ("high", plot_style.COLORS["diabatic"], "High"),
 )
 SUMMARY_ALPHA = 0.20
 
@@ -247,7 +240,7 @@ def write_tendency_scatter_plot(
         alpha=alpha,
         standardized=standardized,
     )
-    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plot_style.save_figure(fig, output_path)
     plt.close(fig)
     return output_path
 
@@ -272,7 +265,7 @@ def plot_tendency_scatter(
     fig, axes = plt.subplots(
         nrows=3,
         ncols=3,
-        figsize=(14, 12),
+        figsize=plot_style.publication_figsize("full", aspect=1.0),
         sharex=True,
         constrained_layout=True,
     )
@@ -289,7 +282,12 @@ def plot_tendency_scatter(
 
     handles, labels = axes.flat[0].get_legend_handles_labels()
     if handles:
-        axes.flat[2].legend(handles, labels, loc="upper right", frameon=True)
+        axes.flat[2].legend(
+            handles,
+            labels,
+            loc="upper right",
+            **plot_style.legend_kwargs(),
+        )
 
     title = (
         "Event Fixed-Window Heat-Budget Feature Relationships "
@@ -297,7 +295,7 @@ def plot_tendency_scatter(
     )
     if standardized:
         title = f"{title} (Standardized)"
-    fig.suptitle(title, fontsize=13)
+    fig.suptitle(title)
     return fig
 
 
@@ -351,8 +349,8 @@ def plot_one_tendency_panel(
     if threshold_value is not None and np.isfinite(threshold_value):
         line = ax.axhline(
             threshold_value,
-            color="black",
-            linewidth=1.4,
+            color=plot_style.COLORS["calculated"],
+            linewidth=plot_style.LINE_WIDTH_PT,
             linestyle="-",
             zorder=4,
         )
@@ -361,7 +359,6 @@ def plot_one_tendency_panel(
     ax.set_title(PANEL_TITLES[y_variable])
     ax.set_xlabel(variable_label(X_VARIABLE, standardized=standardized))
     ax.set_ylabel(variable_label(y_variable, standardized=standardized))
-    ax.grid(True, color="0.88", linewidth=0.8)
     if y_variable == "tas_peak" and not standardized:
         set_data_driven_y_limits(ax, y_values[finite])
     ax.text(
@@ -374,6 +371,7 @@ def plot_one_tendency_panel(
         fontsize=9,
         bbox={"facecolor": "white", "edgecolor": "0.8", "alpha": 0.85},
     )
+    plot_style.style_axis(ax)
 
 
 def validate_feature_variables(
@@ -493,7 +491,7 @@ def add_group_summary_overlay(
     line = ax.axhline(
         mean,
         color=color,
-        linewidth=1.4,
+        linewidth=plot_style.LINE_WIDTH_PT,
         linestyle="-",
         zorder=3,
         label=f"{label} mean",
@@ -589,8 +587,20 @@ def variable_label(variable: str, *, standardized: bool = False) -> str:
 
 def add_zero_reference_lines(ax: Axes) -> None:
     """Add horizontal and vertical zero lines."""
-    ax.axhline(0.0, color="0.55", linewidth=0.9, linestyle="--", zorder=0)
-    ax.axvline(0.0, color="0.55", linewidth=0.9, linestyle="--", zorder=0)
+    ax.axhline(
+        0.0,
+        color=plot_style.COLORS["zero"],
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+        linestyle="--",
+        zorder=0,
+    )
+    ax.axvline(
+        0.0,
+        color=plot_style.COLORS["zero"],
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+        linestyle="--",
+        zorder=0,
+    )
 
 
 def add_one_to_one_line(ax: Axes, x_values: np.ndarray, y_values: np.ndarray) -> None:
@@ -602,8 +612,8 @@ def add_one_to_one_line(ax: Axes, x_values: np.ndarray, y_values: np.ndarray) ->
     ax.plot(
         [lower, upper],
         [lower, upper],
-        color="0.25",
-        linewidth=1.0,
+        color=plot_style.COLORS["benchmark"],
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
         linestyle=":",
         zorder=0,
         label="1:1",

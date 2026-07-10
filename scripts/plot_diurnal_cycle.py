@@ -24,7 +24,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from src import analysis_io, plot_paths
+from src import analysis_io, plot_paths, plot_style
 
 
 PLOT_NAME = "diurnal_cycle"
@@ -48,29 +48,19 @@ HW_CLASS_LABELS: tuple[str, ...] = ("Heatwave days", "Non-heatwave days")
 LOCAL_HOURS = np.arange(24, dtype=np.int64)
 SAMPLE_PERCENTILE_PREFIX = "sample_percentile_"
 VARIABLE_COLORS = {
-    "T_mean": "tab:red",
-    "volume": "tab:blue",
-    "dTdt": "tab:purple",
-    "advection": "tab:orange",
-    "adiabatic": "tab:green",
-    "diabatic": "tab:brown",
-    "lwa_a_region": "tab:olive",
-    "lwa_c_region": "tab:cyan",
+    "T_mean": plot_style.COLORS["temperature"],
+    "volume": plot_style.COLORS["volume"],
+    "dTdt": plot_style.COLORS["storage"],
+    "advection": plot_style.COLORS["advection"],
+    "adiabatic": plot_style.COLORS["adiabatic"],
+    "diabatic": plot_style.COLORS["diabatic"],
+    "lwa_a_region": plot_style.FACE_COLORS["east"],
+    "lwa_c_region": plot_style.FACE_COLORS["west"],
 }
 CLASS_LINESTYLES = {
     "Heatwave days": "-",
     "Non-heatwave days": "--",
 }
-
-plt.rcParams.update({
-    "axes.titlesize": 18,
-    "axes.labelsize": 16,
-    "xtick.labelsize": 14,
-    "ytick.labelsize": 14,
-    "legend.fontsize": 12,
-    "figure.titlesize": 20,
-})
-
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line options for the diurnal-cycle diagnostic."""
@@ -218,7 +208,7 @@ def plot_diurnal_cycle(composite: xr.Dataset) -> Figure:
     fig, axes = plt.subplots(
         nrows=4,
         ncols=1,
-        figsize=(12, 10),
+        figsize=plot_style.publication_figsize("full", aspect=0.85),
         sharex=True,
         constrained_layout=True,
     )
@@ -232,10 +222,10 @@ def plot_diurnal_cycle(composite: xr.Dataset) -> Figure:
     for ax in axes:
         ax.set_xlim(0, 23)
         ax.set_xticks(np.arange(0, 24, 3))
-        ax.grid(True, linewidth=0.5, alpha=0.35)
     ax3.set_xlabel("Local hour")
 
-    fig.suptitle(_figure_title(composite), fontsize=18)
+    fig.suptitle(_figure_title(composite))
+    plot_style.style_axes(axes)
     return fig
 
 
@@ -244,7 +234,7 @@ def write_diurnal_cycle_plot(composite: xr.Dataset, output_path: Path) -> Path:
     output_path = output_path.expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig = plot_diurnal_cycle(composite)
-    fig.savefig(output_path, dpi=150)
+    plot_style.save_figure(fig, output_path)
     plt.close(fig)
     return output_path
 
@@ -327,7 +317,7 @@ def _plot_single_variable_panel(
 ) -> None:
     """Plot one variable by HW class."""
     _plot_class_lines(ax, composite, name, color=VARIABLE_COLORS[name])
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel(ylabel)
     ax.legend(handles=[_variable_legend_handle(name)], loc="upper left")
 
@@ -336,7 +326,7 @@ def _plot_tendency_panel(ax: Axes, composite: xr.Dataset) -> None:
     """Plot heat-budget tendency terms by HW class."""
     for name in ("advection", "adiabatic", "diabatic"):
         _plot_class_lines(ax, composite, name, color=VARIABLE_COLORS[name])
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel("[K hr-1]")
     _expand_yaxis(ax, factor=1.5)
     ax.legend(
@@ -380,7 +370,7 @@ def _plot_class_lines(
             subset[name].values,
             color=color,
             linestyle=linestyle,
-            linewidth=1.8,
+            linewidth=plot_style.LINE_WIDTH_PT,
         )
         _plot_iqr_bound_lines(
             ax,
@@ -413,7 +403,7 @@ def _plot_iqr_bound_lines(
             color=color,
             linestyle=linestyle,
             alpha=0.28,
-            linewidth=1.0,
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
         )
 
 
@@ -448,14 +438,21 @@ def _add_class_legend(ax: Axes) -> None:
         Line2D(
             [0],
             [0],
-            color="0.2",
+            color=plot_style.COLORS["zero"],
             linestyle=_class_linestyle(label),
             label=label,
         )
         for label in HW_CLASS_LABELS
     ]
     handles.append(
-        Line2D([0], [0], color="0.2", linestyle="-", alpha=0.28, label="IQR bounds")
+        Line2D(
+            [0],
+            [0],
+            color=plot_style.COLORS["zero"],
+            linestyle="-",
+            alpha=0.28,
+            label="IQR bounds",
+        )
     )
     ax.legend(handles=handles, loc="upper right")
 

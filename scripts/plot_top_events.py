@@ -25,7 +25,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from src import analysis_io, composites, plot_paths, plotting, selectors
+from src import analysis_io, composites, plot_paths, plot_style, plotting, selectors
 
 
 PLOT_NAME = "top_events"
@@ -198,7 +198,7 @@ def write_top_event_plots(
             plot_extended_variables=plot_extended_variables,
         )
         path = output_dir / _event_figure_filename(event)
-        fig.savefig(path, dpi=150)
+        plot_style.save_figure(fig, path)
         plt.close(fig)
         written.append(path)
 
@@ -211,7 +211,7 @@ def write_top_event_plots(
             plot_extended_variables=plot_extended_variables,
         )
         path = output_dir / _smoothed_event_figure_filename(event)
-        fig.savefig(path, dpi=150)
+        plot_style.save_figure(fig, path)
         plt.close(fig)
         written.append(path)
     return written

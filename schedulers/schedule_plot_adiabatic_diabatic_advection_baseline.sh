@@ -18,8 +18,8 @@ mamba activate dev_env
 
 set -euo pipefail
 
-REGION="pnw_hotz"
-THRESHOLD_VARIABLE="lwa_a"
+REGION="pnw_bartusek"
+THRESHOLD_VARIABLE="tas"
 QUANTILE_THRESHOLD="q90"
 TIME_START=1940
 TIME_END=2024

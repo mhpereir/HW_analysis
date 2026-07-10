@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -29,6 +29,8 @@ import xarray as xr
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
+
+from src import plot_style
 
 REGION = "pnw_hotz"
 
@@ -203,7 +205,7 @@ def write_pca_diagnostic_plots(
     ]
     for plotter, path, kwargs in figure_specs:
         fig = plotter(pca, **kwargs)
-        fig.savefig(path, dpi=180, bbox_inches="tight")
+        plot_style.save_figure(fig, path)
         plt.close(fig)
         written.append(path)
     return written
@@ -250,16 +252,32 @@ def plot_explained_variance(pca: xr.Dataset) -> plt.Figure:  # type: ignore[type
         dtype=float,
     )
 
-    fig, ax = plt.subplots(figsize=(8, 4.8), constrained_layout=True)
-    ax.bar(x, ratio, color="tab:blue", alpha=0.78, label="Individual")
-    ax.plot(x, cumulative, color="tab:red", marker="o", linewidth=1.8, label="Cumulative")
+    fig, ax = plt.subplots(
+        figsize=plot_style.publication_figsize("single", aspect=0.6),
+        constrained_layout=True,
+    )
+    ax.bar(
+        x,
+        ratio,
+        color=plot_style.COLORS["volume"],
+        alpha=0.78,
+        label="Individual",
+    )
+    ax.plot(
+        x,
+        cumulative,
+        color=plot_style.COLORS["diabatic"],
+        marker="o",
+        linewidth=plot_style.LINE_WIDTH_PT,
+        label="Cumulative",
+    )
     ax.set_xticks(x)
     ax.set_xticklabels(pc_labels, rotation=45, ha="right")
     ax.set_ylim(0.0, min(1.05, max(1.0, float(np.nanmax(cumulative)) + 0.05)))
     ax.set_ylabel("Explained variance ratio")
     ax.set_title("PCA Explained Variance")
-    ax.grid(True, axis="y", color="0.88", linewidth=0.8)
-    ax.legend(frameon=False)
+    plot_style.style_axis(ax)
+    ax.legend(**plot_style.legend_kwargs(frameon=False))
     return fig
 
 
@@ -275,7 +293,10 @@ def plot_loading_heatmap(
     feature_labels = [str(value) for value in pca["feature"].values]
     vmax = max(0.1, float(np.nanmax(np.abs(loadings))))
 
-    fig_width = max(8.0, 0.75 * len(feature_labels))
+    fig_width = min(
+        max(plot_style.SINGLE_COLUMN_WIDTH_IN, 0.75 * len(feature_labels)),
+        plot_style.FULL_TWO_COLUMN_WIDTH_IN,
+    )
     fig, ax = plt.subplots(figsize=(fig_width, 5.0), constrained_layout=True)
     image = ax.imshow(loadings, aspect="auto", cmap="coolwarm", vmin=-vmax, vmax=vmax)
     ax.set_xticks(np.arange(len(feature_labels)))
@@ -297,8 +318,13 @@ def plot_loading_heatmap(
                 ha="center",
                 va="center",
                 fontsize=8,
-                color="black" if abs(loadings[row, col]) < 0.55 * vmax else "white",
+                color=(
+                    plot_style.COLORS["calculated"]
+                    if abs(loadings[row, col]) < 0.55 * vmax
+                    else "white"
+                ),
             )
+    plot_style.style_axis(ax, grid=False)
     return fig
 
 
@@ -318,7 +344,10 @@ def plot_pc_score_diagnostics(
     fig, axes = plt.subplots(
         nrows=nrows,
         ncols=ncols,
-        figsize=(6.4 * ncols, 5.3 * nrows),
+        figsize=(
+            plot_style.FULL_TWO_COLUMN_WIDTH_IN if ncols > 1 else plot_style.SINGLE_COLUMN_WIDTH_IN,
+            4.8 * nrows,
+        ),
         squeeze=False,
         constrained_layout=True,
     )
@@ -342,7 +371,7 @@ def plot_pc_score_diagnostics(
     for ax in axes.ravel()[n_panels:]:
         ax.axis("off")
 
-    fig.suptitle(f"PCA Scores: {pc_x} vs {pc_y}", fontsize=13)
+    fig.suptitle(f"PCA Scores: {pc_x} vs {pc_y}")
     return fig
 
 
@@ -371,12 +400,23 @@ def plot_one_score_panel(
         alpha=alpha,
         edgecolors="none",
     )
-    ax.axhline(0.0, color="0.62", linewidth=0.9, linestyle="--", zorder=0)
-    ax.axvline(0.0, color="0.62", linewidth=0.9, linestyle="--", zorder=0)
+    ax.axhline(
+        0.0,
+        color=plot_style.COLORS["zero"],
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+        linestyle="--",
+        zorder=0,
+    )
+    ax.axvline(
+        0.0,
+        color=plot_style.COLORS["zero"],
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+        linestyle="--",
+        zorder=0,
+    )
     ax.set_xlabel(pc_axis_label(pca, pc_x))
     ax.set_ylabel(pc_axis_label(pca, pc_y))
     ax.set_title(variable_label(color_variable))
-    ax.grid(True, color="0.88", linewidth=0.8)
     ax.text(
         0.03,
         0.97,
@@ -387,6 +427,7 @@ def plot_one_score_panel(
         fontsize=9,
         bbox={"facecolor": "white", "edgecolor": "0.8", "alpha": 0.85},
     )
+    plot_style.style_axis(ax)
     cbar = fig.colorbar(scatter, ax=ax, shrink=0.86)
     cbar.set_label(variable_label(color_variable))
 

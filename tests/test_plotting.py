@@ -58,8 +58,8 @@ def test_plot_composite_timeseries_adds_iqr_legend_to_first_panel():
 def test_temperature_volume_axis_labels_match_tick_colors():
     fig = plotting.plot_composite_timeseries(_make_composite())
     try:
-        assert fig.axes[0].yaxis.label.get_color() == "tab:red"
-        assert fig.axes[4].yaxis.label.get_color() == "tab:blue"
+        assert fig.axes[0].yaxis.label.get_color() == plotting.VARIABLE_COLORS["T_mean"]
+        assert fig.axes[4].yaxis.label.get_color() == plotting.VARIABLE_COLORS["volume"]
     finally:
         plt.close(fig)
 

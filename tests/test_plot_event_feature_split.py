@@ -79,7 +79,7 @@ def test_selection_panel_draws_black_quantile_divider():
             line for line in duration_axis.lines if line.get_gid() == "selection_threshold"
         ]
         assert len(threshold_lines) == 1
-        assert threshold_lines[0].get_color() == "black"
+        assert threshold_lines[0].get_color() == plot_split.plot_style.COLORS["calculated"]
         np.testing.assert_allclose(threshold_lines[0].get_ydata(), [3.0, 3.0])
     finally:
         plot_split.plt.close(fig)

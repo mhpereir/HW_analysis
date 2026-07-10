@@ -19,7 +19,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from src import analysis_io, plot_paths, preprocess
+from src import analysis_io, plot_paths, plot_style, preprocess
 
 PLOT_NAME = "threshold_timeseries"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / f"plots_{PLOT_NAME}"
@@ -149,7 +149,7 @@ def write_threshold_timeseries_plots(
         fig, axes = plt.subplots(
             nrows=2,
             ncols=1,
-            figsize=(13, 8),
+            figsize=plot_style.publication_figsize("full", aspect=0.68),
             sharex=False,
             constrained_layout=True,
         )
@@ -169,7 +169,7 @@ def write_threshold_timeseries_plots(
         )
         fig.suptitle(f"{region} q{quantile} event diagnostics, {year}")
         path = output_dir / f"{region}_q{quantile}_{year}_event_diagnostics.png"
-        fig.savefig(path, dpi=150)
+        plot_style.save_figure(fig, path)
         plt.close(fig)
         written.append(path)
 
@@ -233,7 +233,7 @@ def _plot_event_panel(
         ax.axvspan(
             start, #type: ignore
             stop,  #type: ignore
-            color="tab:blue",
+            color=plot_style.COLORS["volume"],
             alpha=0.12,
             linewidth=0,
             label=label,
@@ -245,7 +245,7 @@ def _plot_event_panel(
         threshold_y.values,
         series_y.values,
         where=mask_values,
-        color="tab:orange",
+        color=plot_style.COLORS["temperature"],
         alpha=0.30,
         interpolate=False,
         label="series > threshold",
@@ -254,25 +254,33 @@ def _plot_event_panel(
     ax.plot(
         times,
         climatology_y.values,
-        color="0.45",
-        linewidth=1.2,
+        color=plot_style.COLORS["benchmark"],
+        linewidth=plot_style.LINE_WIDTH_PT,
         label="climatology",
         zorder=2,
     )
     ax.plot(
         times,
         threshold_y.values,
-        color="tab:red",
-        linewidth=1.4,
+        color=plot_style.COLORS["diabatic"],
+        linewidth=plot_style.LINE_WIDTH_PT,
         label="threshold",
         zorder=3,
     )
-    ax.plot(times, series_y.values, color="black", linewidth=1.1, label="series", zorder=4)
+    ax.plot(
+        times,
+        series_y.values,
+        color=plot_style.COLORS["calculated"],
+        linewidth=plot_style.LINE_WIDTH_PT,
+        label="series",
+        zorder=4,
+    )
 
     ax.set_title(title)
     ax.set_ylabel(ylabel)
-    ax.grid(True, alpha=0.25)
-    ax.legend(loc="upper left", ncols=5, fontsize=8)
+    plot_style.format_time_axis(ax)
+    plot_style.style_axis(ax)
+    ax.legend(loc="upper left", ncols=5, **plot_style.legend_kwargs())
 
 
 def _true_runs(times: np.ndarray, values: np.ndarray) -> list[tuple[np.datetime64, np.datetime64]]:

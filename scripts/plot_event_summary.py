@@ -22,7 +22,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-from src import analysis_io, plot_paths, selectors
+from src import analysis_io, plot_paths, plot_style, selectors
 
 
 PLOT_NAME = "event_summary"
@@ -143,7 +143,7 @@ def write_event_summary_histograms(
     output_path = output_path.expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig = plot_event_summary_histograms(event_table, variables=variables, bins=bins)
-    fig.savefig(output_path, dpi=150)
+    plot_style.save_figure(fig, output_path)
     plt.close(fig)
     return output_path
 
@@ -158,10 +158,15 @@ def plot_event_summary_histograms(
     n_variables = len(variables)
     ncols = 3 if n_variables > 2 else n_variables
     nrows = math.ceil(n_variables / ncols)
+    fig_width = (
+        plot_style.FULL_TWO_COLUMN_WIDTH_IN
+        if ncols > 1
+        else plot_style.SINGLE_COLUMN_WIDTH_IN
+    )
     fig, axes_array = plt.subplots(
         nrows=nrows,
         ncols=ncols,
-        figsize=(5.0 * ncols, 3.6 * nrows),
+        figsize=(fig_width, 3.2 * nrows),
         constrained_layout=True,
     )
     axes = np.atleast_1d(axes_array).ravel()
@@ -176,7 +181,7 @@ def plot_event_summary_histograms(
     title_parts = [f"Event summary histograms (n={n_events})"]
     if "selection_type" in event_table.attrs:
         title_parts.append(str(event_table.attrs["selection_type"]))
-    fig.suptitle(" - ".join(title_parts), fontsize=16)
+    fig.suptitle(" - ".join(title_parts))
     return fig
 
 
@@ -185,7 +190,6 @@ def _plot_variable_histogram(ax: Axes, da: xr.DataArray, *, bins: int) -> None:
     values = _finite_values(da)
     ax.set_title(_display_name(da.name)) # type: ignore
     ax.set_ylabel("Events")
-    ax.grid(True, linewidth=0.5, alpha=0.35)
 
     if values.size == 0:
         ax.text(
@@ -196,22 +200,36 @@ def _plot_variable_histogram(ax: Axes, da: xr.DataArray, *, bins: int) -> None:
             va="center",
             transform=ax.transAxes,
         )
+        plot_style.style_axis(ax)
         return
 
     if np.issubdtype(da.dtype, np.datetime64):
         dates = mdates.date2num(values.astype("datetime64[ms]").astype(object))
-        ax.hist(dates, bins=bins, color="tab:blue", edgecolor="white", linewidth=0.6)
+        ax.hist(
+            dates,
+            bins=bins,
+            color=plot_style.COLORS["volume"],
+            edgecolor="white",
+            linewidth=0.6,
+        )
         ax.xaxis_date()
         ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
     else:
         hist_bins = _histogram_bins(values, da, bins=bins)
-        ax.hist(values, bins=hist_bins, color="tab:blue", edgecolor="white", linewidth=0.6)
+        ax.hist(
+            values,
+            bins=hist_bins,
+            color=plot_style.COLORS["volume"],
+            edgecolor="white",
+            linewidth=0.6,
+        )
         if _uses_integer_day_bins(da, values):
             ax.set_xticks(np.arange(int(values.min()), int(values.max()) + 1))
 
     xlabel = _axis_label(da)
     if xlabel:
         ax.set_xlabel(xlabel)
+    plot_style.style_axis(ax)
 
 
 def _event_summary_table(ds: xr.Dataset) -> xr.Dataset:

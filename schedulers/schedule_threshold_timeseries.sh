@@ -20,7 +20,7 @@ set -euo pipefail
 
 TIME_START=1940
 TIME_END=2024
-REGION="pnw_hotz"
+REGION="pnw_bartusek"
 BOTTOM_BOUNDARY="surface"
 TOP_BOUNDARY=700
 THRESHOLD_VARIABLE="tas"

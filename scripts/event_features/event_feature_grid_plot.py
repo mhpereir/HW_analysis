@@ -25,6 +25,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
+from src import plot_style
+
 
 DEFAULT_INPUT_PATH = (
     REPO_ROOT
@@ -178,7 +180,7 @@ def write_tendency_scatter_plot(
         point_size=point_size,
         alpha=alpha,
     )
-    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plot_style.save_figure(fig, output_path)
     plt.close(fig)
     return output_path
 
@@ -196,7 +198,7 @@ def plot_tendency_scatter(
     fig, axes = plt.subplots(
         nrows=3,
         ncols=3,
-        figsize=(14, 12),
+        figsize=plot_style.publication_figsize("full", aspect=1.0),
         sharex=True,
         constrained_layout=True,
     )
@@ -218,7 +220,7 @@ def plot_tendency_scatter(
         cbar = fig.colorbar(mappable, ax=np.ravel(axes), shrink=0.86)
         cbar.set_label(variable_label(color_variable))
 
-    fig.suptitle("Event Fixed-Window Heat-Budget Feature Relationships", fontsize=13)
+    fig.suptitle("Event Fixed-Window Heat-Budget Feature Relationships")
     return fig
 
 
@@ -245,7 +247,7 @@ def plot_one_tendency_panel(
         "edgecolors": "none",
     }
     if color_values is None:
-        kwargs["color"] = "tab:blue"
+        kwargs["color"] = plot_style.COLORS["volume"]
         mappable = ax.scatter(x_values[finite], y_values[finite], **kwargs)
     else:
         mappable = ax.scatter(
@@ -262,7 +264,6 @@ def plot_one_tendency_panel(
     ax.set_title(PANEL_TITLES[y_variable])
     ax.set_xlabel(variable_label(X_VARIABLE))
     ax.set_ylabel(variable_label(y_variable))
-    ax.grid(True, color="0.88", linewidth=0.8)
     ax.text(
         0.03,
         0.97,
@@ -273,6 +274,7 @@ def plot_one_tendency_panel(
         fontsize=9,
         bbox={"facecolor": "white", "edgecolor": "0.8", "alpha": 0.85},
     )
+    plot_style.style_axis(ax)
     if color_variable is None:
         return None
     return mappable
@@ -329,8 +331,20 @@ def variable_label(variable: str) -> str:
 
 def add_zero_reference_lines(ax: Axes) -> None:
     """Add horizontal and vertical zero lines."""
-    ax.axhline(0.0, color="0.55", linewidth=0.9, linestyle="--", zorder=0)
-    ax.axvline(0.0, color="0.55", linewidth=0.9, linestyle="--", zorder=0)
+    ax.axhline(
+        0.0,
+        color=plot_style.COLORS["zero"],
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+        linestyle="--",
+        zorder=0,
+    )
+    ax.axvline(
+        0.0,
+        color=plot_style.COLORS["zero"],
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+        linestyle="--",
+        zorder=0,
+    )
 
 
 def add_one_to_one_line(ax: Axes, x_values: np.ndarray, y_values: np.ndarray) -> None:
@@ -342,8 +356,8 @@ def add_one_to_one_line(ax: Axes, x_values: np.ndarray, y_values: np.ndarray) ->
     ax.plot(
         [lower, upper],
         [lower, upper],
-        color="0.25",
-        linewidth=1.0,
+        color=plot_style.COLORS["benchmark"],
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
         linestyle=":",
         zorder=0,
         label="1:1",

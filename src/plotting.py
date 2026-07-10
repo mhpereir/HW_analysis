@@ -31,17 +31,8 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-import matplotlib.dates as mdates
 
-
-plt.rcParams.update({
-    "axes.titlesize": 18,
-    "axes.labelsize": 16,
-    "xtick.labelsize": 14,
-    "ytick.labelsize": 14,
-    "legend.fontsize": 12,
-    "figure.titlesize": 20,
-})
+from . import plot_style
 
 DEFAULT_COMPOSITE_WINDOW_DAYS = 7
 EVENT_PERCENTILE_PREFIX = "event_percentile_"
@@ -50,23 +41,23 @@ UPPER_EVENT_PERCENTILE = 0.75
 SPLIT_BIN_DIM = "split_bin"
 SPLIT_LINE_STYLES = ("-", "--", ":", "-.")
 VARIABLE_COLORS = {
-    "T_mean": "tab:red",
-    "volume": "tab:blue",
-    "dTdt": "tab:purple",
-    "advection": "tab:orange",
-    "adiabatic": "tab:green",
-    "diabatic": "tab:brown",
-    "lwa_a_region": "tab:olive",
-    "lwa_c_region": "tab:cyan",
-    "pbl_p_mean": "tab:blue",
-    "pbl_p_p05": "tab:blue",
-    "pbl_p_p95": "tab:blue",
-    "nslr_heating_rate_approx": "tab:gray",
-    "nssr_heating_rate_approx": "tab:orange",
-    "sshf_heating_rate_approx": "tab:red",
-    "slhf_heating_rate_approx": "tab:purple",
-    "soil_moisture": "tab:green",
-    "cloud_cover": "tab:cyan",
+    "T_mean": plot_style.COLORS["temperature"],
+    "volume": plot_style.COLORS["volume"],
+    "dTdt": plot_style.COLORS["storage"],
+    "advection": plot_style.COLORS["advection"],
+    "adiabatic": plot_style.COLORS["adiabatic"],
+    "diabatic": plot_style.COLORS["diabatic"],
+    "lwa_a_region": plot_style.FACE_COLORS["east"],
+    "lwa_c_region": plot_style.FACE_COLORS["west"],
+    "pbl_p_mean": plot_style.COLORS["mass"],
+    "pbl_p_p05": plot_style.COLORS["mass"],
+    "pbl_p_p95": plot_style.COLORS["mass"],
+    "nslr_heating_rate_approx": plot_style.COLORS["benchmark"],
+    "nssr_heating_rate_approx": plot_style.FACE_COLORS["top"],
+    "sshf_heating_rate_approx": plot_style.COLORS["heat_flux"],
+    "slhf_heating_rate_approx": plot_style.FACE_COLORS["south"],
+    "soil_moisture": plot_style.COLORS["adiabatic"],
+    "cloud_cover": plot_style.FACE_COLORS["south"],
 }
 EXTENDED_PLOT_VARIABLES: tuple[str, ...] = (
     "T_mean",
@@ -119,7 +110,7 @@ def plot_composite_timeseries(
     fig, axes = plt.subplots(
         nrows=4,
         ncols=1,
-        figsize=(12, 10),
+        figsize=plot_style.publication_figsize("full", aspect=0.85),
         sharex=True,
         constrained_layout=True,
     )
@@ -131,8 +122,13 @@ def plot_composite_timeseries(
     _plot_lwa_panel(ax3, composite)
 
     for ax in axes:
-        ax.axvline(0, color="0.2", linewidth=1.0, linestyle="--", alpha=0.8)
-        ax.grid(True, linewidth=0.5, alpha=0.35)
+        ax.axvline(
+            0,
+            color=plot_style.COLORS["zero"],
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+            linestyle="--",
+            alpha=0.8,
+        )
 
     n_events = int(composite.attrs.get("n_events", 0))
     pre_days = int(composite.attrs.get("pre_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
@@ -145,10 +141,10 @@ def plot_composite_timeseries(
     )
     fig.suptitle(
         f"HW event-mean composite centered on peak tas "
-        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})",
-        fontsize=18,
+        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
     ax3.set_xlabel("Lag from event peak (hours)")
+    _style_axes(axes)
     return fig
 
 
@@ -166,7 +162,7 @@ def plot_split_composite_timeseries(
     fig, axes = plt.subplots(
         nrows=4,
         ncols=1,
-        figsize=(12, 10),
+        figsize=plot_style.publication_figsize("full", aspect=0.85),
         sharex=True,
         constrained_layout=True,
     )
@@ -178,8 +174,13 @@ def plot_split_composite_timeseries(
     _plot_split_lwa_panel(ax3, composite)
 
     for ax in axes:
-        ax.axvline(0, color="0.2", linewidth=1.0, linestyle="--", alpha=0.8)
-        ax.grid(True, linewidth=0.5, alpha=0.35)
+        ax.axvline(
+            0,
+            color=plot_style.COLORS["zero"],
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+            linestyle="--",
+            alpha=0.8,
+        )
 
     n_events = _split_total_events(composite)
     pre_days = int(composite.attrs.get("pre_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
@@ -193,10 +194,10 @@ def plot_split_composite_timeseries(
     split_variable = composite.attrs.get("split_variable", "event metric")
     fig.suptitle(
         f"HW event-mean composites split by {split_variable} "
-        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})",
-        fontsize=18,
+        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
     ax3.set_xlabel("Lag from event peak (hours)")
+    _style_axes(axes)
     return fig
 
 
@@ -222,7 +223,7 @@ def plot_top_event_timeseries(
     fig, axes = plt.subplots(
         nrows=4,
         ncols=1,
-        figsize=(12, 10),
+        figsize=plot_style.publication_figsize("full", aspect=0.85),
         sharex=True,
         constrained_layout=True,
     )
@@ -256,10 +257,27 @@ def plot_top_event_timeseries(
     )
 
     for ax in axes:
-        ax.axvline(start_time, color="tab:orange", linewidth=1.2, linestyle=":", alpha=0.9)
-        ax.axvline(end_time, color="tab:orange", linewidth=1.2, linestyle=":", alpha=0.9)
-        ax.axvline(peak_time, color="0.2", linewidth=1.0, linestyle="--", alpha=0.8)
-        ax.grid(True, linewidth=0.5, alpha=0.35)
+        ax.axvline(
+            start_time,
+            color=plot_style.FACE_COLORS["top"],
+            linewidth=plot_style.LINE_WIDTH_PT,
+            linestyle=":",
+            alpha=0.9,
+        )
+        ax.axvline(
+            end_time,
+            color=plot_style.FACE_COLORS["top"],
+            linewidth=plot_style.LINE_WIDTH_PT,
+            linestyle=":",
+            alpha=0.9,
+        )
+        ax.axvline(
+            peak_time,
+            color=plot_style.COLORS["zero"],
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+            linestyle="--",
+            alpha=0.8,
+        )
 
     event_id = int(event["event_id"].item())
     rank = int(event["selection_rank"].item()) if "selection_rank" in event else event_id
@@ -271,12 +289,12 @@ def plot_top_event_timeseries(
         else ""
     )
     fig.suptitle(
-        f"Rank {rank} HW event {event_id}: peak tas={peak_value:.2f}{smoothing_label}",
-        fontsize=13,
+        f"Rank {rank} HW event {event_id}: peak tas={peak_value:.2f}{smoothing_label}"
     )
     ax3.set_xlabel("Time")
 
     _format_datetime_xaxis(axes)
+    _style_axes(axes)
 
     return fig
 
@@ -292,7 +310,7 @@ def _plot_extended_composite_timeseries(composite: xr.Dataset) -> Figure:
     fig, axes = plt.subplots(
         nrows=5,
         ncols=2,
-        figsize=(18, 14),
+        figsize=plot_style.publication_figsize("full", aspect=1.08),
         sharex=True,
         constrained_layout=True,
     )
@@ -322,8 +340,13 @@ def _plot_extended_composite_timeseries(composite: xr.Dataset) -> Figure:
     _plot_soil_moisture_cloud_panel(right[4], composite)
 
     for ax in axes.ravel():
-        ax.axvline(0, color="0.2", linewidth=1.0, linestyle="--", alpha=0.8)
-        ax.grid(True, linewidth=0.5, alpha=0.35)
+        ax.axvline(
+            0,
+            color=plot_style.COLORS["zero"],
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+            linestyle="--",
+            alpha=0.8,
+        )
 
     n_events = int(composite.attrs.get("n_events", 0))
     pre_days = int(composite.attrs.get("pre_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
@@ -336,11 +359,11 @@ def _plot_extended_composite_timeseries(composite: xr.Dataset) -> Figure:
     )
     fig.suptitle(
         f"HW event-mean composite centered on peak tas "
-        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})",
-        fontsize=18,
+        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
     left[-1].set_xlabel("Lag from event peak (hours)")
     right[-1].set_xlabel("Lag from event peak (hours)")
+    _style_axes(axes.ravel())
     return fig
 
 
@@ -355,7 +378,7 @@ def _plot_extended_split_composite_timeseries(composite: xr.Dataset) -> Figure:
     fig, axes = plt.subplots(
         nrows=5,
         ncols=2,
-        figsize=(18, 14),
+        figsize=plot_style.publication_figsize("full", aspect=1.08),
         sharex=True,
         constrained_layout=True,
     )
@@ -385,8 +408,13 @@ def _plot_extended_split_composite_timeseries(composite: xr.Dataset) -> Figure:
     _plot_split_soil_moisture_cloud_panel(right[4], composite)
 
     for ax in axes.ravel():
-        ax.axvline(0, color="0.2", linewidth=1.0, linestyle="--", alpha=0.8)
-        ax.grid(True, linewidth=0.5, alpha=0.35)
+        ax.axvline(
+            0,
+            color=plot_style.COLORS["zero"],
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+            linestyle="--",
+            alpha=0.8,
+        )
 
     n_events = _split_total_events(composite)
     pre_days = int(composite.attrs.get("pre_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
@@ -400,11 +428,11 @@ def _plot_extended_split_composite_timeseries(composite: xr.Dataset) -> Figure:
     split_variable = composite.attrs.get("split_variable", "event metric")
     fig.suptitle(
         f"HW event-mean composites split by {split_variable} "
-        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})",
-        fontsize=18,
+        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
     left[-1].set_xlabel("Lag from event peak (hours)")
     right[-1].set_xlabel("Lag from event peak (hours)")
+    _style_axes(axes.ravel())
     return fig
 
 
@@ -434,7 +462,7 @@ def _plot_extended_top_event_timeseries(
     fig, axes = plt.subplots(
         nrows=5,
         ncols=2,
-        figsize=(18, 14),
+        figsize=plot_style.publication_figsize("full", aspect=1.08),
         sharex=True,
         constrained_layout=True,
     )
@@ -501,10 +529,27 @@ def _plot_extended_top_event_timeseries(
     )
 
     for ax in axes.ravel():
-        ax.axvline(start_time, color="tab:orange", linewidth=1.2, linestyle=":", alpha=0.9)
-        ax.axvline(end_time, color="tab:orange", linewidth=1.2, linestyle=":", alpha=0.9)
-        ax.axvline(peak_time, color="0.2", linewidth=1.0, linestyle="--", alpha=0.8)
-        ax.grid(True, linewidth=0.5, alpha=0.35)
+        ax.axvline(
+            start_time,
+            color=plot_style.FACE_COLORS["top"],
+            linewidth=plot_style.LINE_WIDTH_PT,
+            linestyle=":",
+            alpha=0.9,
+        )
+        ax.axvline(
+            end_time,
+            color=plot_style.FACE_COLORS["top"],
+            linewidth=plot_style.LINE_WIDTH_PT,
+            linestyle=":",
+            alpha=0.9,
+        )
+        ax.axvline(
+            peak_time,
+            color=plot_style.COLORS["zero"],
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+            linestyle="--",
+            alpha=0.8,
+        )
 
     event_id = int(event["event_id"].item())
     rank = int(event["selection_rank"].item()) if "selection_rank" in event else event_id
@@ -516,12 +561,12 @@ def _plot_extended_top_event_timeseries(
         else ""
     )
     fig.suptitle(
-        f"Rank {rank} HW event {event_id}: peak tas={peak_value:.2f}{smoothing_label}",
-        fontsize=13,
+        f"Rank {rank} HW event {event_id}: peak tas={peak_value:.2f}{smoothing_label}"
     )
     left[-1].set_xlabel("Time")
     right[-1].set_xlabel("Time")
     _format_datetime_xaxis(axes.ravel())
+    _style_axes(axes.ravel())
     return fig
 
 
@@ -574,11 +619,13 @@ def smooth_composite_for_display(
 
 
 def _format_datetime_xaxis(axes: Sequence[Axes]) -> None:
-    locator = mdates.AutoDateLocator(minticks=4, maxticks=8)
-    formatter = mdates.ConciseDateFormatter(locator)
     for ax in axes:
-        ax.xaxis.set_major_locator(locator)
-        ax.xaxis.set_major_formatter(formatter)
+        plot_style.format_time_axis(ax)
+
+
+def _style_axes(axes: Sequence[Axes]) -> None:
+    plot_style.style_axes(np.ravel(axes))
+
 
 def write_composite_timeseries_plot(
     composite: xr.Dataset,
@@ -593,7 +640,7 @@ def write_composite_timeseries_plot(
         composite,
         plot_extended_variables=plot_extended_variables,
     )
-    fig.savefig(output_path, dpi=150)
+    plot_style.save_figure(fig, output_path)
     plt.close(fig)
     return output_path
 
@@ -611,7 +658,7 @@ def write_split_composite_timeseries_plot(
         composite,
         plot_extended_variables=plot_extended_variables,
     )
-    fig.savefig(output_path, dpi=150)
+    plot_style.save_figure(fig, output_path)
     plt.close(fig)
     return output_path
 
@@ -683,16 +730,18 @@ def write_split_composite_timeseries_outputs(
 def _plot_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
     """Plot T_mean and volume with separate y axes."""
     lag = ds["lag_hour"].values
-    ax.plot(lag, ds["T_mean"].values, color="tab:red", label="T_mean")
-    _plot_event_percentile_band(ax, lag, ds, "T_mean", color="tab:red")
-    ax.set_ylabel("T_mean [K]", color="tab:red")
-    ax.tick_params(axis="y", labelcolor="tab:red")
+    temperature_color = VARIABLE_COLORS["T_mean"]
+    volume_color = VARIABLE_COLORS["volume"]
+    ax.plot(lag, ds["T_mean"].values, color=temperature_color, label="T_mean")
+    _plot_event_percentile_band(ax, lag, ds, "T_mean", color=temperature_color)
+    ax.set_ylabel("T_mean [K]", color=temperature_color)
+    ax.tick_params(axis="y", labelcolor=temperature_color)
 
     ax_volume = ax.twinx()
-    ax_volume.plot(lag, ds["volume"].values, color="tab:blue", label="volume")
-    _plot_event_percentile_band(ax_volume, lag, ds, "volume", color="tab:blue")
-    ax_volume.set_ylabel("volume [m2 Pa]", color="tab:blue")
-    ax_volume.tick_params(axis="y", labelcolor="tab:blue")
+    ax_volume.plot(lag, ds["volume"].values, color=volume_color, label="volume")
+    _plot_event_percentile_band(ax_volume, lag, ds, "volume", color=volume_color)
+    ax_volume.set_ylabel("volume [m2 Pa]", color=volume_color)
+    ax_volume.tick_params(axis="y", labelcolor=volume_color)
 
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax_volume.get_legend_handles_labels()
@@ -799,15 +848,16 @@ def _plot_single_variable_panel(
     ylabel: str,
 ) -> None:
     """Plot one composite variable."""
-    ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color="tab:purple")
+    color = VARIABLE_COLORS[name]
+    ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color=color)
     _plot_event_percentile_band(
         ax,
         ds["lag_hour"].values,
         ds,
         name,
-        color="tab:purple",
+        color=color,
     )
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel(ylabel)
     ax.legend(loc="upper left")
 
@@ -829,7 +879,7 @@ def _plot_composite_variable_panel(
         name,
         color=color,
     )
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel(ylabel)
     ax.legend(handles=[_variable_legend_handle(name)], loc="upper left")
     ax.legend(loc="upper left")
@@ -853,7 +903,7 @@ def _plot_composite_multi_variable_panel(
             name,
             color=color,
         )
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel(ylabel)
     ax.legend(loc="upper left")
 
@@ -885,7 +935,7 @@ def _plot_top_event_single_variable_panel(
             name,
             color=color,
         )
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel(ylabel)
     ax.legend(loc="upper left")
 
@@ -918,7 +968,7 @@ def _plot_top_event_multi_variable_panel(
                 name,
                 color=color,
             )
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel(ylabel)
     ax.legend(loc="upper left")
 
@@ -938,7 +988,7 @@ def _plot_split_single_variable_panel(
         name,
         color=VARIABLE_COLORS[name],
     )
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel(ylabel)
     ax.legend(handles=[_variable_legend_handle(name)], loc="upper left")
 
@@ -959,7 +1009,7 @@ def _plot_split_multi_variable_panel(
             name,
             color=VARIABLE_COLORS[name],
         )
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel(ylabel)
     variable_legend = ax.legend(
         handles=[_variable_legend_handle(name) for name in names],
@@ -980,7 +1030,7 @@ def _plot_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
             name,
             color=color,
         )
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel("[K hr-1]")
     _expand_yaxis(ax, factor=1.5)
     ax.legend(loc="upper left", ncol=3)
@@ -1012,7 +1062,7 @@ def _plot_top_event_tendency_panel(
                 name,
                 color=color,
             )
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel("[K hr-1]")
     _expand_yaxis(ax, factor=1.5)
     ax.legend(loc="upper left", ncol=3)
@@ -1028,7 +1078,7 @@ def _plot_split_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
             name,
             color=VARIABLE_COLORS[name],
         )
-    ax.axhline(0, color="0.2", linewidth=1.0)
+    plot_style.zero_line(ax)
     ax.set_ylabel("[K hr-1]")
     _expand_yaxis(ax, factor=1.5)
     variable_legend = ax.legend(
@@ -1137,7 +1187,7 @@ def _plot_top_event_pbl_pressure_panel(
             color=color,
             label=f"_{name}",
             linestyle=":",
-            linewidth=1.0,
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
             scale=PBL_PRESSURE_TO_HPA,
         )
     if reference_composite is not None:
@@ -1149,7 +1199,7 @@ def _plot_top_event_pbl_pressure_panel(
             "pbl_p_mean",
             color=color,
             label="_all_event_average",
-            linewidth=1.8,
+            linewidth=plot_style.LINE_WIDTH_PT,
             scale=PBL_PRESSURE_TO_HPA,
         )
         _plot_event_percentile_band(
@@ -1356,7 +1406,7 @@ def _plot_split_lines(
             subset[name].values * scale,
             color=color,
             linestyle=style,
-            linewidth=1.8,
+            linewidth=plot_style.LINE_WIDTH_PT,
         )
         _plot_event_percentile_bound_lines(
             ax,
@@ -1417,7 +1467,7 @@ def _plot_event_percentile_bound_lines(
             color=color,
             linestyle=linestyle,
             alpha=0.28,
-            linewidth=1.0,
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
         )
 
 
@@ -1448,7 +1498,7 @@ def _plot_top_event_reference(
         reference_composite,
         name,
         color=color,
-        linewidth=1.8,
+        linewidth=plot_style.LINE_WIDTH_PT,
         label="_all_event_average",
     )
     _plot_event_percentile_band(ax, time, reference_composite, name, color=color)
@@ -1463,7 +1513,13 @@ def _add_iqr_legend(ax: Axes) -> None:
 def _add_top_event_reference_legend(ax: Axes) -> None:
     """Add a single legend for top-event reference line and IQR shading."""
     handles = [
-        Line2D([0], [0], color="0.2", linestyle="-", label="all-event average"),
+        Line2D(
+            [0],
+            [0],
+            color=plot_style.COLORS["zero"],
+            linestyle="-",
+            label="all-event average",
+        ),
         Patch(facecolor="0.5", edgecolor="none", alpha=0.18, label="IQR"),
     ]
     ax.legend(handles=handles, loc="upper right")
@@ -1472,11 +1528,24 @@ def _add_top_event_reference_legend(ax: Axes) -> None:
 def _add_split_style_legend(ax: Axes, labels: Sequence[str]) -> None:
     """Add a split-bin linestyle legend plus IQR-bound hint."""
     handles = [
-        Line2D([0], [0], color="0.2", linestyle=_split_line_style(index), label=label)
+        Line2D(
+            [0],
+            [0],
+            color=plot_style.COLORS["zero"],
+            linestyle=_split_line_style(index),
+            label=label,
+        )
         for index, label in enumerate(labels)
     ]
     handles.append(
-        Line2D([0], [0], color="0.2", linestyle="-", alpha=0.28, label="IQR bounds")
+        Line2D(
+            [0],
+            [0],
+            color=plot_style.COLORS["zero"],
+            linestyle="-",
+            alpha=0.28,
+            label="IQR bounds",
+        )
     )
     ax.legend(handles=handles, loc="upper right")
 
