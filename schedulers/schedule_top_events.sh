@@ -18,7 +18,7 @@ mamba activate dev_env
 
 set -euo pipefail
 
-REGION="pnw_hotz"
+REGION="pnw_bartusek"
 BOTTOM_BOUNDARY="surface"
 TOP_BOUNDARY=700
 THRESHOLD_VARIABLE="tas"
@@ -38,6 +38,7 @@ echo "[info] $(date -Is) starting plot generation on host $(hostname)"
     --start-year "${TIME_START}" \
     --end-year "${TIME_END}" \
     --top-n 10 \
-    --window-days 7
-    # --plot-extended-variables \
+    --window-days 7 \
+    --plot-extended-variables
+    
 echo "[info] $(date -Is) done"
