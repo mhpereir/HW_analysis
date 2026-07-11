@@ -64,17 +64,56 @@ def test_temperature_volume_axis_labels_match_tick_colors():
         plt.close(fig)
 
 
+def test_plot_composite_timeseries_keeps_default_lag_xaxis_formatter_on_save():
+    fig = plotting.plot_composite_timeseries(_make_composite())
+    try:
+        plotting.plot_style.format_numeric_axes(fig)
+
+        assert all(
+            not isinstance(
+                ax.xaxis.get_major_formatter(),
+                plotting.plot_style.FixedDecimalScaleFormatter,
+            )
+            for ax in fig.axes
+        )
+    finally:
+        plt.close(fig)
+
+
+def test_plot_composite_timeseries_uses_boxed_axes():
+    fig = plotting.plot_composite_timeseries(_make_composite())
+    try:
+        _assert_all_spines_visible(fig)
+    finally:
+        plt.close(fig)
+
+
 def test_plot_composite_timeseries_uses_variable_colors_for_multi_variable_panels():
     fig = plotting.plot_composite_timeseries(_make_composite())
     try:
         tendency_colors = _line_colors_by_label(fig.axes[2])
-        assert tendency_colors["advection"] == plotting.VARIABLE_COLORS["advection"]
-        assert tendency_colors["adiabatic"] == plotting.VARIABLE_COLORS["adiabatic"]
-        assert tendency_colors["diabatic"] == plotting.VARIABLE_COLORS["diabatic"]
+        assert (
+            tendency_colors[_display_label("advection")]
+            == plotting.VARIABLE_COLORS["advection"]
+        )
+        assert (
+            tendency_colors[_display_label("adiabatic")]
+            == plotting.VARIABLE_COLORS["adiabatic"]
+        )
+        assert (
+            tendency_colors[_display_label("diabatic")]
+            == plotting.VARIABLE_COLORS["diabatic"]
+        )
 
         lwa_colors = _line_colors_by_label(fig.axes[3])
-        assert lwa_colors["lwa_a_region"] == plotting.VARIABLE_COLORS["lwa_a_region"]
-        assert lwa_colors["lwa_c_region"] == plotting.VARIABLE_COLORS["lwa_c_region"]
+        assert (
+            lwa_colors[_display_label("lwa_a_region")]
+            == plotting.VARIABLE_COLORS["lwa_a_region"]
+        )
+        assert (
+            lwa_colors[_display_label("lwa_c_region")]
+            == plotting.VARIABLE_COLORS["lwa_c_region"]
+        )
     finally:
         plt.close(fig)
 
@@ -116,9 +155,15 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
     try:
         assert len(fig.axes) == 12
 
-        assert set(_line_colors_by_label(fig.axes[4])) == {"advection"}
-        assert set(_line_colors_by_label(fig.axes[6])) == {"adiabatic"}
-        assert set(_line_colors_by_label(fig.axes[8])) == {"diabatic"}
+        assert set(_line_colors_by_label(fig.axes[4])) == {
+            _display_label("advection")
+        }
+        assert set(_line_colors_by_label(fig.axes[6])) == {
+            _display_label("adiabatic")
+        }
+        assert set(_line_colors_by_label(fig.axes[8])) == {
+            _display_label("diabatic")
+        }
 
         pbl_axis = fig.axes[3]
         assert pbl_axis.yaxis_inverted()
@@ -129,12 +174,12 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
         )
 
         assert set(_line_colors_by_label(fig.axes[5])) == {
-            "nslr_heating_rate_approx",
-            "nssr_heating_rate_approx",
+            _display_label("nslr_heating_rate_approx"),
+            _display_label("nssr_heating_rate_approx"),
         }
         assert set(_line_colors_by_label(fig.axes[7])) == {
-            "sshf_heating_rate_approx",
-            "slhf_heating_rate_approx",
+            _display_label("sshf_heating_rate_approx"),
+            _display_label("slhf_heating_rate_approx"),
         }
         assert fig.axes[9].get_ylabel() == "soil moisture [m3 m-3]"
         assert fig.axes[11].get_ylabel() == "cloud cover fraction"
@@ -151,6 +196,17 @@ def test_plot_composite_timeseries_extended_layout_requires_optional_variables()
         assert "Extended plot requires missing variables in composite: cloud_cover" in str(exc)
     else:
         raise AssertionError("Expected missing extended variable to raise ValueError.")
+
+
+def test_plot_composite_timeseries_extended_uses_boxed_axes():
+    fig = plotting.plot_composite_timeseries(
+        _make_composite(),
+        plot_extended_variables=True,
+    )
+    try:
+        _assert_all_spines_visible(fig)
+    finally:
+        plt.close(fig)
 
 
 def test_write_composite_timeseries_plot_writes_png(tmp_path):
@@ -203,7 +259,31 @@ def test_plot_split_composite_timeseries_labels_dtdt_panel_variable():
     try:
         legend_labels = [text.get_text() for text in fig.axes[1].get_legend().get_texts()]
 
-        assert "dTdt" in legend_labels
+        assert _display_label("dTdt") in legend_labels
+    finally:
+        plt.close(fig)
+
+
+def test_plot_split_composite_timeseries_keeps_default_lag_xaxis_formatter_on_save():
+    fig = plotting.plot_split_composite_timeseries(_make_split_composite())
+    try:
+        plotting.plot_style.format_numeric_axes(fig)
+
+        assert all(
+            not isinstance(
+                ax.xaxis.get_major_formatter(),
+                plotting.plot_style.FixedDecimalScaleFormatter,
+            )
+            for ax in fig.axes
+        )
+    finally:
+        plt.close(fig)
+
+
+def test_plot_split_composite_timeseries_uses_boxed_axes():
+    fig = plotting.plot_split_composite_timeseries(_make_split_composite())
+    try:
+        _assert_all_spines_visible(fig)
     finally:
         plt.close(fig)
 
@@ -289,7 +369,7 @@ def test_plot_split_composite_timeseries_extended_labels_single_variable_panels(
                 text.get_text()
                 for text in fig.axes[axis_index].get_legend().get_texts()
             ]
-            assert label in legend_labels
+            assert _display_label(label) in legend_labels
     finally:
         plt.close(fig)
 
@@ -322,7 +402,7 @@ def test_plot_top_event_timeseries_draws_event_and_reference_lines():
             for line in fig.axes[1].lines
         }
 
-        assert dtdt_styles["dTdt"] == "--"
+        assert dtdt_styles[_display_label("dTdt")] == "--"
         assert dtdt_styles["_all_event_average"] == "-"
     finally:
         plt.close(fig)
@@ -407,6 +487,14 @@ def test_plot_top_event_timeseries_uses_concise_datetime_formatter():
         plt.close(fig)
 
 
+def test_plot_top_event_timeseries_uses_boxed_axes():
+    fig = plotting.plot_top_event_timeseries(_make_top_event_window(), _make_top_event())
+    try:
+        _assert_all_spines_visible(fig)
+    finally:
+        plt.close(fig)
+
+
 def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
     event_window = _make_top_event_window()
     composite = _make_composite()
@@ -419,9 +507,15 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
     )
     try:
         assert len(fig.axes) == 12
-        assert set(_line_colors_by_label(fig.axes[4])) == {"advection"}
-        assert set(_line_colors_by_label(fig.axes[6])) == {"adiabatic"}
-        assert set(_line_colors_by_label(fig.axes[8])) == {"diabatic"}
+        assert set(_line_colors_by_label(fig.axes[4])) == {
+            _display_label("advection")
+        }
+        assert set(_line_colors_by_label(fig.axes[6])) == {
+            _display_label("adiabatic")
+        }
+        assert set(_line_colors_by_label(fig.axes[8])) == {
+            _display_label("diabatic")
+        }
 
         pbl_axis = fig.axes[3]
         assert pbl_axis.yaxis_inverted()
@@ -430,12 +524,12 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
             event_window["pbl_p_mean"].values * 0.01,
         )
         assert set(_line_colors_by_label(fig.axes[5])) == {
-            "nslr_heating_rate_approx",
-            "nssr_heating_rate_approx",
+            _display_label("nslr_heating_rate_approx"),
+            _display_label("nssr_heating_rate_approx"),
         }
         assert set(_line_colors_by_label(fig.axes[7])) == {
-            "sshf_heating_rate_approx",
-            "slhf_heating_rate_approx",
+            _display_label("sshf_heating_rate_approx"),
+            _display_label("slhf_heating_rate_approx"),
         }
         assert fig.axes[9].get_ylabel() == "soil moisture [m3 m-3]"
         assert fig.axes[11].get_ylabel() == "cloud cover fraction"
@@ -569,6 +663,18 @@ def _line_colors_by_label(ax) -> dict[str, str]:
 
 def _non_marker_line_colors(ax) -> set[str]:
     return {line.get_color() for line in ax.lines if line.get_color() != "0.2"}
+
+
+def _display_label(name: str) -> str:
+    return plotting.plot_style.VARIABLE_NAME_MAPPING[name]
+
+
+def _assert_all_spines_visible(fig) -> None:
+    assert all(
+        spine.get_visible()
+        for ax in fig.axes
+        for spine in ax.spines.values()
+    )
 
 
 def _make_split_composite() -> xr.Dataset:

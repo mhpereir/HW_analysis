@@ -40,25 +40,7 @@ LOWER_EVENT_PERCENTILE = 0.25
 UPPER_EVENT_PERCENTILE = 0.75
 SPLIT_BIN_DIM = "split_bin"
 SPLIT_LINE_STYLES = ("-", "--", ":", "-.")
-VARIABLE_COLORS = {
-    "T_mean": plot_style.COLORS["temperature"],
-    "volume": plot_style.COLORS["volume"],
-    "dTdt": plot_style.COLORS["storage"],
-    "advection": plot_style.COLORS["advection"],
-    "adiabatic": plot_style.COLORS["adiabatic"],
-    "diabatic": plot_style.COLORS["diabatic"],
-    "lwa_a_region": plot_style.FACE_COLORS["east"],
-    "lwa_c_region": plot_style.FACE_COLORS["west"],
-    "pbl_p_mean": plot_style.COLORS["mass"],
-    "pbl_p_p05": plot_style.COLORS["mass"],
-    "pbl_p_p95": plot_style.COLORS["mass"],
-    "nslr_heating_rate_approx": plot_style.COLORS["benchmark"],
-    "nssr_heating_rate_approx": plot_style.FACE_COLORS["top"],
-    "sshf_heating_rate_approx": plot_style.COLORS["heat_flux"],
-    "slhf_heating_rate_approx": plot_style.FACE_COLORS["south"],
-    "soil_moisture": plot_style.COLORS["adiabatic"],
-    "cloud_cover": plot_style.FACE_COLORS["south"],
-}
+VARIABLE_COLORS = plot_style.VARIABLE_COLORS
 EXTENDED_PLOT_VARIABLES: tuple[str, ...] = (
     "T_mean",
     "volume",
@@ -145,6 +127,7 @@ def plot_composite_timeseries(
     )
     ax3.set_xlabel("Lag from event peak (hours)")
     _style_axes(axes)
+    _use_default_lag_xaxis_formatter(fig)
     return fig
 
 
@@ -198,6 +181,7 @@ def plot_split_composite_timeseries(
     )
     ax3.set_xlabel("Lag from event peak (hours)")
     _style_axes(axes)
+    _use_default_lag_xaxis_formatter(fig)
     return fig
 
 
@@ -364,6 +348,7 @@ def _plot_extended_composite_timeseries(composite: xr.Dataset) -> Figure:
     left[-1].set_xlabel("Lag from event peak (hours)")
     right[-1].set_xlabel("Lag from event peak (hours)")
     _style_axes(axes.ravel())
+    _use_default_lag_xaxis_formatter(fig)
     return fig
 
 
@@ -433,6 +418,7 @@ def _plot_extended_split_composite_timeseries(composite: xr.Dataset) -> Figure:
     left[-1].set_xlabel("Lag from event peak (hours)")
     right[-1].set_xlabel("Lag from event peak (hours)")
     _style_axes(axes.ravel())
+    _use_default_lag_xaxis_formatter(fig)
     return fig
 
 
@@ -587,7 +573,7 @@ def _plot_line(
         x,
         ds[name].values * scale,
         color=color,
-        label=label or name,
+        label=label or _variable_label(name),
         linestyle=linestyle,
         linewidth=linewidth,
     )
@@ -624,7 +610,23 @@ def _format_datetime_xaxis(axes: Sequence[Axes]) -> None:
 
 
 def _style_axes(axes: Sequence[Axes]) -> None:
-    plot_style.style_axes(np.ravel(axes))
+    flat_axes = tuple(np.ravel(axes)) # type: ignore
+    plot_style.style_axes(flat_axes)
+    if flat_axes:
+        _show_all_spines(flat_axes[0].figure)
+
+
+def _show_all_spines(fig: Figure) -> None:
+    """Use boxed axes for composite/top-event figures, including twinx panels."""
+    for ax in fig.axes:
+        for spine in ax.spines.values():
+            spine.set_visible(True)
+
+
+def _use_default_lag_xaxis_formatter(fig: Figure) -> None:
+    """Keep lag-hour axes on Matplotlib's default integer-friendly formatter."""
+    for ax in fig.axes:
+        plot_style.use_default_numeric_formatter(ax.xaxis)
 
 
 def write_composite_timeseries_plot(
@@ -732,13 +734,23 @@ def _plot_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
     lag = ds["lag_hour"].values
     temperature_color = VARIABLE_COLORS["T_mean"]
     volume_color = VARIABLE_COLORS["volume"]
-    ax.plot(lag, ds["T_mean"].values, color=temperature_color, label="T_mean")
+    ax.plot(
+        lag,
+        ds["T_mean"].values,
+        color=temperature_color,
+        label=_variable_label("T_mean"),
+    )
     _plot_event_percentile_band(ax, lag, ds, "T_mean", color=temperature_color)
     ax.set_ylabel("T_mean [K]", color=temperature_color)
     ax.tick_params(axis="y", labelcolor=temperature_color)
 
     ax_volume = ax.twinx()
-    ax_volume.plot(lag, ds["volume"].values, color=volume_color, label="volume")
+    ax_volume.plot(
+        lag,
+        ds["volume"].values,
+        color=volume_color,
+        label=_variable_label("volume"),
+    )
     _plot_event_percentile_band(ax_volume, lag, ds, "volume", color=volume_color)
     ax_volume.set_ylabel("volume [m2 Pa]", color=volume_color)
     ax_volume.tick_params(axis="y", labelcolor=volume_color)
@@ -764,7 +776,7 @@ def _plot_top_event_temperature_volume_panel(
         event_window,
         "T_mean",
         color=VARIABLE_COLORS["T_mean"],
-        label="T_mean",
+        label=_variable_label("T_mean"),
         linestyle="--",
     )
     if reference_composite is not None:
@@ -785,7 +797,7 @@ def _plot_top_event_temperature_volume_panel(
         event_window,
         "volume",
         color=VARIABLE_COLORS["volume"],
-        label="volume",
+        label=_variable_label("volume"),
         linestyle="--",
     )
     if reference_composite is not None:
@@ -849,7 +861,12 @@ def _plot_single_variable_panel(
 ) -> None:
     """Plot one composite variable."""
     color = VARIABLE_COLORS[name]
-    ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color=color)
+    ax.plot(
+        ds["lag_hour"].values,
+        ds[name].values,
+        label=_variable_label(name),
+        color=color,
+    )
     _plot_event_percentile_band(
         ax,
         ds["lag_hour"].values,
@@ -871,7 +888,12 @@ def _plot_composite_variable_panel(
 ) -> None:
     """Plot one composite variable using its configured color."""
     color = VARIABLE_COLORS[name]
-    ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color=color)
+    ax.plot(
+        ds["lag_hour"].values,
+        ds[name].values,
+        label=_variable_label(name),
+        color=color,
+    )
     _plot_event_percentile_band(
         ax,
         ds["lag_hour"].values,
@@ -895,7 +917,12 @@ def _plot_composite_multi_variable_panel(
     """Plot multiple composite variables on one axis."""
     for name in names:
         color = VARIABLE_COLORS[name]
-        ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color=color)
+        ax.plot(
+            ds["lag_hour"].values,
+            ds[name].values,
+            label=_variable_label(name),
+            color=color,
+        )
         _plot_event_percentile_band(
             ax,
             ds["lag_hour"].values,
@@ -1022,7 +1049,12 @@ def _plot_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
     """Plot heat-budget tendency terms on one axis."""
     for name in ("advection", "adiabatic", "diabatic"):
         color = VARIABLE_COLORS[name]
-        ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color=color)
+        ax.plot(
+            ds["lag_hour"].values,
+            ds[name].values,
+            label=_variable_label(name),
+            color=color,
+        )
         _plot_event_percentile_band(
             ax,
             ds["lag_hour"].values,
@@ -1096,7 +1128,12 @@ def _plot_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
     """Plot LWA_a and LWA_c regional composite time series."""
     for name in ("lwa_a_region", "lwa_c_region"):
         color = VARIABLE_COLORS[name]
-        ax.plot(ds["lag_hour"].values, ds[name].values, label=name, color=color)
+        ax.plot(
+            ds["lag_hour"].values,
+            ds[name].values,
+            label=_variable_label(name),
+            color=color,
+        )
         _plot_event_percentile_band(
             ax,
             ds["lag_hour"].values,
@@ -1115,7 +1152,7 @@ def _plot_pbl_pressure_panel(ax: Axes, ds: xr.Dataset) -> None:
     ax.plot(
         lag,
         ds["pbl_p_mean"].values * PBL_PRESSURE_TO_HPA,
-        label="pbl_p_mean",
+        label=_variable_label("pbl_p_mean"),
         color=color,
     )
     _plot_event_percentile_band(
@@ -1133,9 +1170,12 @@ def _plot_pbl_pressure_panel(ax: Axes, ds: xr.Dataset) -> None:
         color=color,
         alpha=0.14,
         linewidth=0,
-        label="pbl_p_p05-p95",
+        label=(
+            f"{_variable_label('pbl_p_p05')}-"
+            f"{_variable_label('pbl_p_p95')}"
+        ),
     )
-    ax.set_ylabel("PBL top pressure [hPa]")
+    ax.set_ylabel("PBL [hPa]")
     ax.invert_yaxis()
     ax.legend(loc="upper left")
 
@@ -1279,13 +1319,23 @@ def _plot_soil_moisture_cloud_panel(ax: Axes, ds: xr.Dataset) -> None:
     lag = ds["lag_hour"].values
     soil_color = VARIABLE_COLORS["soil_moisture"]
     cloud_color = VARIABLE_COLORS["cloud_cover"]
-    ax.plot(lag, ds["soil_moisture"].values, color=soil_color, label="soil_moisture")
+    ax.plot(
+        lag,
+        ds["soil_moisture"].values,
+        color=soil_color,
+        label=_variable_label("soil_moisture"),
+    )
     _plot_event_percentile_band(ax, lag, ds, "soil_moisture", color=soil_color)
     ax.set_ylabel("soil moisture [m3 m-3]", color=soil_color)
     ax.tick_params(axis="y", labelcolor=soil_color)
 
     ax_cloud = ax.twinx()
-    ax_cloud.plot(lag, ds["cloud_cover"].values, color=cloud_color, label="cloud_cover")
+    ax_cloud.plot(
+        lag,
+        ds["cloud_cover"].values,
+        color=cloud_color,
+        label=_variable_label("cloud_cover"),
+    )
     _plot_event_percentile_band(ax_cloud, lag, ds, "cloud_cover", color=cloud_color)
     ax_cloud.set_ylabel("cloud cover fraction", color=cloud_color)
     ax_cloud.tick_params(axis="y", labelcolor=cloud_color)
@@ -1609,9 +1659,20 @@ def _split_line_style(index: int) -> str:
     return SPLIT_LINE_STYLES[index % len(SPLIT_LINE_STYLES)]
 
 
+def _variable_label(name: str) -> str:
+    """Return the display label for a plotted data variable."""
+    return plot_style.VARIABLE_NAME_MAPPING.get(name, name)
+
+
 def _variable_legend_handle(name: str) -> Line2D:
     """Return a solid-line variable legend handle."""
-    return Line2D([0], [0], color=VARIABLE_COLORS[name], linestyle="-", label=name)
+    return Line2D(
+        [0],
+        [0],
+        color=VARIABLE_COLORS[name],
+        linestyle="-",
+        label=_variable_label(name),
+    )
 
 
 def _split_total_events(ds: xr.Dataset) -> int:

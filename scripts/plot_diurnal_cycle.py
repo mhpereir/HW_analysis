@@ -47,16 +47,7 @@ HW_CLASS_DIM = "hw_class"
 HW_CLASS_LABELS: tuple[str, ...] = ("Heatwave days", "Non-heatwave days")
 LOCAL_HOURS = np.arange(24, dtype=np.int64)
 SAMPLE_PERCENTILE_PREFIX = "sample_percentile_"
-VARIABLE_COLORS = {
-    "T_mean": plot_style.COLORS["temperature"],
-    "volume": plot_style.COLORS["volume"],
-    "dTdt": plot_style.COLORS["storage"],
-    "advection": plot_style.COLORS["advection"],
-    "adiabatic": plot_style.COLORS["adiabatic"],
-    "diabatic": plot_style.COLORS["diabatic"],
-    "lwa_a_region": plot_style.FACE_COLORS["east"],
-    "lwa_c_region": plot_style.FACE_COLORS["west"],
-}
+VARIABLE_COLORS = plot_style.VARIABLE_COLORS
 CLASS_LINESTYLES = {
     "Heatwave days": "-",
     "Non-heatwave days": "--",
@@ -459,7 +450,13 @@ def _add_class_legend(ax: Axes) -> None:
 
 def _variable_legend_handle(name: str) -> Line2D:
     """Return a solid-line variable legend handle."""
-    return Line2D([0], [0], color=VARIABLE_COLORS[name], linestyle="-", label=name)
+    return Line2D(
+        [0],
+        [0],
+        color=VARIABLE_COLORS[name],
+        linestyle="-",
+        label=plot_style.VARIABLE_NAME_MAPPING.get(name, name),
+    )
 
 
 def _expand_yaxis(ax: Axes, *, factor: float) -> None:

@@ -30,6 +30,46 @@ TWO_PANEL_STACK_ASPECT = 0.55
 THREE_PANEL_STACK_ASPECT = 0.62
 SQUARE_PANEL_ASPECT = 0.95
 
+VARIABLE_NAME_MAPPING = {
+    "T_mean": r"$\langle T \rangle$",
+    "volume": "V",
+    "dTdt": r"d$\langle T \rangle$/dt",
+    "advection": "Advection",
+    "adiabatic": "Adiabatic",
+    "diabatic": "Diabatic",
+    "lwa_a_region": "Anticyclonic",
+    "lwa_c_region": "Cyclonic",
+    "pbl_p_mean": "PBL mean",
+    "pbl_p_p05": "5pctl",
+    "pbl_p_p95": "95pctl",
+    "nslr_heating_rate_approx": "Longwave Radiation",
+    "nssr_heating_rate_approx": "Shortwave Radiation",
+    "sshf_heating_rate_approx": "Sensible Heating",
+    "slhf_heating_rate_approx": "Latent heat flux",
+    "soil_moisture": "Soil Moisture",
+    "cloud_cover": "Cloud Cover",
+}
+
+VARIABLE_COLORS = {
+    "T_mean": "#E60000",
+    "volume": "#0072B2",
+    "dTdt": "#D55E00",
+    "advection": "#2636CA",
+    "adiabatic": "#0DAF43",
+    "diabatic": "#D55E00",
+    "lwa_a_region": "#EC6205",
+    "lwa_c_region": "#00869E",
+    "pbl_p_mean": "#0072B2",
+    "pbl_p_p05": "#0072B2",
+    "pbl_p_p95": "#0072B2",
+    "nslr_heating_rate_approx": "#4D4D4D",
+    "nssr_heating_rate_approx": "#E69F00",
+    "sshf_heating_rate_approx": "#D55E00",
+    "slhf_heating_rate_approx": "#56B4E9",
+    "soil_moisture": "#6B3400",
+    "cloud_cover": "#56B4E9",
+}
+
 COLORS = {
     "volume": "#0072B2",
     "temperature": "#E69F00",
