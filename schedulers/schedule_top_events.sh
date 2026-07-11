@@ -40,5 +40,5 @@ echo "[info] $(date -Is) starting plot generation on host $(hostname)"
     --top-n 10 \
     --window-days 7 \
     --plot-extended-variables
-    
+
 echo "[info] $(date -Is) done"

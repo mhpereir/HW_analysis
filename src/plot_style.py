@@ -71,14 +71,14 @@ VARIABLE_COLORS = {
 }
 
 COLORS = {
-    "volume": "#0072B2",
-    "temperature": "#E69F00",
+    "volume": VARIABLE_COLORS['volume'],
+    "temperature": VARIABLE_COLORS['T_mean'],
     "storage": "#D55E00",
     "volume_tendency": "#0072B2",
     "temperature_tendency": "#009E73",
-    "advection": "#111111",
-    "adiabatic": "#009E73",
-    "diabatic": "#D55E00",
+    "advection": VARIABLE_COLORS['advection'],
+    "adiabatic": VARIABLE_COLORS['adiabatic'],
+    "diabatic": VARIABLE_COLORS['diabatic'],
     "residual": "#111111",
     "mass": "#0072B2",
     "benchmark": "#4D4D4D",
