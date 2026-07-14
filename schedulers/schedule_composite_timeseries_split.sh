@@ -28,22 +28,32 @@ TIME_END=2024
 
 cd /home/mhpereir/HW_analysis/scripts
 
-# echo "[info] $(date -Is) starting plot generation on host $(hostname)"
-# /usr/bin/time -v python plot_composite_timeseries_split.py \
-#     --region "${REGION}" \
-#     --bottom-boundary "${BOTTOM_BOUNDARY}" \
-#     --top-boundary "${TOP_BOUNDARY}" \
-#     --threshold-variable "${THRESHOLD_VARIABLE}" \
-#     --quantile "${QUANTILE}" \
-#     --start-year "${TIME_START}" \
-#     --end-year "${TIME_END}" \
-#     --window-days 7 \
-#     --split-variable "tas_excess_integral" \
-#     --split-quantiles 0.90 \
-#     --season-months 6 7 8 \
-#     --require-full-event \
-#     --plot-extended-variables
-# echo "[info] $(date -Is) done"
+split_variable_list=(
+    "duration"
+    "tas_anom_peak"
+    "tas_excess_integral"
+    "tas_excess_peak"
+    "tas_peak"
+)
+
+for split_variable in "${split_variable_list[@]}"; do
+    echo "[info] $(date -Is) starting plot generation for ${split_variable} on host $(hostname)"
+    /usr/bin/time -v python plot_composite_timeseries_split.py \
+        --region "${REGION}" \
+        --bottom-boundary "${BOTTOM_BOUNDARY}" \
+        --top-boundary "${TOP_BOUNDARY}" \
+        --threshold-variable "${THRESHOLD_VARIABLE}" \
+        --quantile "${QUANTILE}" \
+        --start-year "${TIME_START}" \
+        --end-year "${TIME_END}" \
+        --window-days 7 \
+        --split-variable "${split_variable}" \
+        --split-quantiles 0.90 \
+        --season-months 6 7 8 \
+        --require-full-event \
+        --plot-extended-variables
+    echo "[info] $(date -Is) done with ${split_variable}"
+done
 
 
 echo "[info] $(date -Is) starting plot generation on host $(hostname)"
