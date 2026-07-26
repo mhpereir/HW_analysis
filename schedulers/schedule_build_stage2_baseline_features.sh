@@ -19,7 +19,7 @@ mamba activate dev_env
 set -euo pipefail
 
 REGION="pnw_bartusek"
-THRESHOLD_VARIABLE="lwa_a"
+THRESHOLD_VARIABLE="tas"
 QUANTILE_THRESHOLD="q90"
 
 INPUT_PATH="/home/mhpereir/HW_analysis/results/stage1/harmonized_regional_timeseries_${REGION}_surface_700hPa_${THRESHOLD_VARIABLE}_${QUANTILE_THRESHOLD}_1940_2024.nc"
@@ -32,7 +32,8 @@ echo "[info] $(date -Is) starting baseline-day feature extraction on host $(host
 /usr/bin/time -v python event_features/build_stage2_baseline_features.py \
     --input-path "${INPUT_PATH}" \
     --output-path "${OUTPUT_PATH}" \
-    --season-months "${SEASON_MONTHS[@]}"
+    --season-months "${SEASON_MONTHS[@]}" \
+    --overwrite
 echo "[info] $(date -Is) done"
 
 # CLI defaults intentionally omitted:
