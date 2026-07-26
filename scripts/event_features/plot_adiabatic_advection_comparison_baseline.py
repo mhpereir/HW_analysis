@@ -233,7 +233,7 @@ def plot_tendency_scatter(
     events = tendency_values(event_features)
 
     fig = plt.figure(
-        figsize=plot_style.publication_figsize("full", aspect=0.62),
+        figsize=plot_style.publication_figsize("full", aspect=plot_style.TWO_PANEL_STACK_ASPECT),
         constrained_layout=True,
     )
     grid = fig.add_gridspec(nrows=2, ncols=2)

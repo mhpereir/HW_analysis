@@ -243,7 +243,7 @@ def plot_tendency_scatter(
         ncols=1,
         figsize=plot_style.publication_figsize("single", aspect=1.6),
         sharex=True,
-        constrained_layout=True,
+        constrained_layout=True
     )
     axes = np.atleast_1d(axes)
 
