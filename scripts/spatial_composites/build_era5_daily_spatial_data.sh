@@ -77,6 +77,7 @@ done
 (( OVERWRITE == 0 || SKIP_EXISTING == 0 )) || \
     die "--overwrite and --skip-existing are mutually exclusive."
 command -v cdo >/dev/null 2>&1 || die "CDO is required but was not found on PATH."
+command -v nccopy >/dev/null 2>&1 || die "nccopy is required but was not found on PATH."
 
 run() {
     if (( DRY_RUN )); then
@@ -136,7 +137,7 @@ validate_daily_file() {
 if (( ! DRY_RUN )); then
     mkdir -p "$OUTPUT_DIR"
     WORK_DIR="$(mktemp -d "${OUTPUT_DIR}/.daily_era5.XXXXXX")"
-    trap 'rm -rf "${WORK_DIR}"' EXIT
+    trap 'rm -rf -- "${WORK_DIR}"' EXIT
 else
     WORK_DIR="${OUTPUT_DIR}/.daily_era5.DRY_RUN"
 fi
@@ -157,17 +158,31 @@ for (( year=START_YEAR; year<=END_YEAR; year++ )); do
         fi
     fi
 
+    t2m_rechunked="${WORK_DIR}/t2m_hourly_rechunked_${year}.nc"
+    z500_rechunked="${WORK_DIR}/z500_hourly_rechunked_${year}.nc"
     t2m_daily="${WORK_DIR}/t2m_daily_${year}.nc"
     z500_daily="${WORK_DIR}/z500_daily_${year}.nc"
     merged_daily="${WORK_DIR}/ERA5_daily_t2m_z500_${year}.nc"
 
     echo "[info] Building daily ERA5 spatial data for $year"
+    echo "[info] Rechunking hourly T2m input for daily aggregation"
+    run /usr/bin/time -v nccopy -d 1 -s \
+        -c valid_time/24,latitude/180,longitude/180 \
+        "$t2m_input" "$t2m_rechunked"
     run cdo -O -L -P "$THREADS" -f nc4c -b F32 -z zip_4 \
         settime,00:00:00 -daymean -selname,t2m \
-        "$t2m_input" "$t2m_daily"
+        "$t2m_rechunked" "$t2m_daily"
+    run rm -f -- "$t2m_rechunked"
+
+    echo "[info] Rechunking hourly Z500 input for daily aggregation"
+    run /usr/bin/time -v nccopy -d 1 -s \
+        -c valid_time/24,pressure_level/1,latitude/180,longitude/180 \
+        "$z500_input" "$z500_rechunked"
     run cdo -O -L -P "$THREADS" -f nc4c -b F32 -z zip_4 \
         settime,00:00:00 -daymean -sellevel,500 -selname,z \
-        "$z500_input" "$z500_daily"
+        "$z500_rechunked" "$z500_daily"
+    run rm -f -- "$z500_rechunked"
+
     run cdo -O -L -P "$THREADS" -f nc4c -b F32 -z zip_4 \
         -setattribute,pipeline_stage=era5_daily_spatial_data,daily_aggregation=UTC_calendar_day_arithmetic_mean,daily_source_samples=24 \
         -merge "$t2m_daily" "$z500_daily" "$merged_daily"

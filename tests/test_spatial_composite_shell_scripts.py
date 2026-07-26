@@ -6,6 +6,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DAILY_SCRIPT = REPO_ROOT / "scripts/spatial_composites/build_era5_daily_spatial_data.sh"
 CLIMATE_SCRIPT = REPO_ROOT / "scripts/spatial_composites/build_era5_daily_doy_climatology.sh"
 ARRAY_SUBMIT_SCRIPT = REPO_ROOT / "schedulers/submit_era5_daily_spatial_array.sh"
+DAILY_SCHEDULER = REPO_ROOT / "schedulers/schedule_build_era5_daily_spatial_data.sh"
 
 
 def test_daily_script_dry_run_builds_expected_cdo_commands(tmp_path):
@@ -40,6 +41,15 @@ def test_daily_script_dry_run_builds_expected_cdo_commands(tmp_path):
     assert "daymean" in result.stdout
     assert "sellevel\\,500" in result.stdout
     assert "merge" in result.stdout
+    assert result.stdout.count("nccopy") == 2
+    assert "valid_time/24\\,latitude/180\\,longitude/180" in result.stdout
+    assert (
+        "valid_time/24\\,pressure_level/1\\,latitude/180\\,longitude/180"
+        in result.stdout
+    )
+    assert "t2m_hourly_rechunked_2000.nc" in result.stdout
+    assert "z500_hourly_rechunked_2000.nc" in result.stdout
+    assert result.stdout.count("rm -f") == 2
     assert not output_dir.exists()
 
 
@@ -162,3 +172,11 @@ def test_array_submitter_builds_throttled_year_range():
 
     assert "qsub -J 2000-2004%3" in result.stdout
     assert "schedule_build_era5_daily_spatial_data.sh" in result.stdout
+
+
+def test_daily_scheduler_is_pinned_to_venus05():
+    scheduler = DAILY_SCHEDULER.read_text()
+
+    assert "#PBS -l select=1:ncpus=1:mem=2gb:host=venus05" in scheduler
+    assert "EXPECTED_HOST=venus05" in scheduler
+    assert 'hostname -s' in scheduler
