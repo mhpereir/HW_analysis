@@ -1190,7 +1190,7 @@ def _plot_split_pbl_pressure_panel(ax: Axes, ds: xr.Dataset) -> None:
         color=VARIABLE_COLORS["pbl_p_mean"],
         scale=PBL_PRESSURE_TO_HPA,
     )
-    ax.set_ylabel("PBL top pressure [hPa]")
+    ax.set_ylabel("PBL [hPa]")
     ax.invert_yaxis()
     variable_legend = ax.legend(
         handles=[_variable_legend_handle("pbl_p_mean")],
@@ -1258,7 +1258,7 @@ def _plot_top_event_pbl_pressure_panel(
             alpha=0.14,
             linewidth=0,
         )
-    ax.set_ylabel("PBL top pressure [hPa]")
+    ax.set_ylabel("PBL [hPa]")
     ax.invert_yaxis()
     ax.legend(loc="upper left")
 
