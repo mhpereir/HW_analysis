@@ -36,8 +36,14 @@ def test_timestamp_weights_preserve_equal_event_weight_with_overlaps():
 
     weights = builder.timestamp_weights(dates, signs, np.array([2, 1]))
 
-    np.testing.assert_allclose(sum(weights.values()), [1.0, 1.0])
-    np.testing.assert_allclose(weights[pd.Timestamp("2000-06-02")], [0.25, 0.25])
+    np.testing.assert_allclose(
+        np.sum(np.stack(list(weights.values())), axis=0),
+        np.ones((2, 4)),
+    )
+    np.testing.assert_allclose(
+        weights[pd.Timestamp("2000-06-02")],
+        [[0.5, 0.5, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]],
+    )
 
 
 def test_build_spatial_composites_uses_daily_data_and_calendar_climatology(tmp_path):
@@ -64,9 +70,16 @@ def test_build_spatial_composites_uses_daily_data_and_calendar_climatology(tmp_p
     np.testing.assert_array_equal(out["event_count"], [1, 1])
     np.testing.assert_allclose(out["t2m_anomaly"], 2.0, atol=1e-10)
     np.testing.assert_allclose(out["z500_anomaly"], 50.0, atol=1e-10)
+    assert out["t2m_anomaly"].dims == (
+        "dyn_sign",
+        "lag",
+        "latitude",
+        "longitude",
+    )
+    np.testing.assert_array_equal(out["lag"], np.arange(-3, 4))
     np.testing.assert_array_equal(out["latitude"], [10.0, 20.0, 80.0])
     np.testing.assert_array_equal(out["longitude"], [-170.0, -160.0, -40.0])
-    assert out.attrs["daily_lags"] == "-4,-3,-2,-1"
+    assert out.attrs["daily_lags"] == "-3,-2,-1,0,1,2,3"
 
     output_path = tmp_path / "full_composite.nc"
     builder.write_composite_product(out, output_path)
@@ -86,7 +99,7 @@ def test_build_spatial_composites_rejects_missing_required_daily_date(tmp_path):
     _write_spatial_file(daily_path, year=2000)
     _write_spatial_file(climate_path, year=2004)
     with xr.open_dataset(daily_path, engine="h5netcdf") as source:
-        reduced = source.sel(valid_time=slice("2000-06-07", None)).load()
+        reduced = source.sel(valid_time=slice("2000-06-08", None)).load()
     reduced.to_netcdf(daily_path, engine="h5netcdf", mode="w")
 
     with pytest.raises(ValueError, match="missing required daily timestamps"):

@@ -15,6 +15,6 @@ set -euo pipefail
 
 cd /home/mhpereir/HW_analysis
 echo "[info] $(date -Is) starting daily dynamical-sign composites on $(hostname)"
-/usr/bin/time -v python scripts/spatial_composites/build_dyn_net_spatial_composites.py
+/usr/bin/time -v python scripts/spatial_composites/build_dyn_net_spatial_composites.py --overwrite
 /usr/bin/time -v python scripts/spatial_composites/plot_dyn_net_spatial_composites.py
 echo "[info] $(date -Is) done"

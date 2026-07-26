@@ -1,4 +1,4 @@
-"""Build daily T2m/Z500 composites split by event net dynamical sign."""
+"""Build lagged daily T2m/Z500 composites split by event net dynamical sign."""
 
 from __future__ import annotations
 
@@ -39,8 +39,9 @@ DEFAULT_OUTPUT_PATH = (
 
 GROUPS = ("positive", "negative")
 GROUP_DIM = "dyn_sign"
+LAG_DIM = "lag"
 EVENT_DIM = "event"
-DAILY_LAGS = (-4, -3, -2, -1)
+DAILY_LAGS = tuple(range(-3, 4))
 LATITUDE_BOUNDS = (10.0, 80.0)
 LONGITUDE_BOUNDS = (-170.0, -40.0)
 GEOPOTENTIAL_TO_HEIGHT_M_S2 = config.G_M_S2
@@ -55,7 +56,7 @@ REQUIRED_EVENT_VARIABLES = (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Build four-pre-peak-day T2m/Z500 composites for positive and "
+            "Build event-relative daily T2m/Z500 composites for positive and "
             "negative event I_dyn_net populations."
         )
     )
@@ -76,6 +77,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lon-min", type=float, default=LONGITUDE_BOUNDS[0])
     parser.add_argument("--lon-max", type=float, default=LONGITUDE_BOUNDS[1])
     parser.add_argument(
+        "--lag-start",
+        type=int,
+        default=DAILY_LAGS[0],
+        help="First daily lag relative to the event peak date (default: -3).",
+    )
+    parser.add_argument(
+        "--lag-end",
+        type=int,
+        default=DAILY_LAGS[-1],
+        help="Last daily lag relative to the event peak date (default: +3).",
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Replace an existing composite product.",
@@ -90,6 +103,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--lon-min must be less than --lon-max.")
     if args.lon_min < -180 or args.lon_max > 180:
         raise ValueError("Longitude bounds must lie within [-180, 180].")
+    if args.lag_start > args.lag_end:
+        raise ValueError("--lag-start must be less than or equal to --lag-end.")
     output_path = args.output_path.expanduser().resolve()
     if output_path.exists() and not args.overwrite:
         raise FileExistsError(
@@ -115,6 +130,7 @@ def main() -> int:
         climatology_path=args.climatology_path,
         lat_bounds=(args.lat_min, args.lat_max),
         lon_bounds=(args.lon_min, args.lon_max),
+        daily_lags=tuple(range(args.lag_start, args.lag_end + 1)),
         event_features_path=event_path,
     )
     written = write_composite_product(composite, args.output_path)
@@ -166,10 +182,18 @@ def build_spatial_composites(
     climatology_path: str | Path,
     lat_bounds: tuple[float, float] = LATITUDE_BOUNDS,
     lon_bounds: tuple[float, float] = LONGITUDE_BOUNDS,
+    daily_lags: tuple[int, ...] = DAILY_LAGS,
     event_features_path: str | Path | None = None,
 ) -> xr.Dataset:
-    """Return equal-event-weight daily spatial composites for both sign groups."""
-    event_dates, event_signs = event_window_dates(events)
+    """Return equal-event-weight composites for each sign group and daily lag."""
+    if not daily_lags:
+        raise ValueError("At least one daily lag is required.")
+    if len(set(daily_lags)) != len(daily_lags):
+        raise ValueError("Daily lags must be unique.")
+    if tuple(sorted(daily_lags)) != daily_lags:
+        raise ValueError("Daily lags must be strictly increasing.")
+
+    event_dates, event_signs = event_window_dates(events, daily_lags=daily_lags)
     group_counts = np.array(
         [np.count_nonzero(event_signs == group) for group in GROUPS],
         dtype=np.int64,
@@ -197,10 +221,17 @@ def build_spatial_composites(
 
     coords = {
         GROUP_DIM: np.asarray(GROUPS, dtype=str),
+        LAG_DIM: np.asarray(daily_lags, dtype=np.int64),
         "latitude": raw_lat,
         "longitude": raw_lon,
     }
     out = xr.Dataset(coords=coords)
+    out[LAG_DIM].attrs.update(
+        {
+            "long_name": "day relative to heatwave peak date",
+            "description": "integer day offset; 0 is the event peak date",
+        }
+    )
     for variable, units, long_name in (
         ("t2m", "K", "2 metre temperature"),
         ("z500", "m", "500 hPa geopotential height"),
@@ -209,21 +240,23 @@ def build_spatial_composites(
         climatology_name = f"{variable}_climatology_mean"
         anomaly_name = f"{variable}_anomaly"
         out[event_name] = (
-            (GROUP_DIM, "latitude", "longitude"),
+            (GROUP_DIM, LAG_DIM, "latitude", "longitude"),
             raw_fields[variable],
         )
         out[climatology_name] = (
-            (GROUP_DIM, "latitude", "longitude"),
+            (GROUP_DIM, LAG_DIM, "latitude", "longitude"),
             climate_fields[variable],
         )
         out[anomaly_name] = out[event_name] - out[climatology_name]
         for name in (event_name, climatology_name, anomaly_name):
             out[name].attrs["units"] = units
-        out[event_name].attrs["long_name"] = f"event-window mean {long_name}"
+        out[event_name].attrs["long_name"] = f"event composite {long_name}"
         out[climatology_name].attrs["long_name"] = (
-            f"event-date-matched climatological {long_name}"
+            f"event-date- and lag-matched climatological {long_name}"
         )
-        out[anomaly_name].attrs["long_name"] = f"event composite {long_name} anomaly"
+        out[anomaly_name].attrs["long_name"] = (
+            f"lagged event composite {long_name} anomaly"
+        )
 
     out["event_count"] = (GROUP_DIM, group_counts)
     out["I_dyn_net_mean"] = (
@@ -249,9 +282,13 @@ def build_spatial_composites(
             ),
             "daily_data_dir": str(Path(daily_dir).expanduser().resolve()),
             "climatology_path": str(Path(climatology_path).expanduser().resolve()),
-            "daily_lags": ",".join(str(lag) for lag in DAILY_LAGS),
-            "daily_window_description": "four complete UTC days before peak date",
-            "event_weighting": "equal event weight; equal weight across four daily lags",
+            "daily_lags": ",".join(str(lag) for lag in daily_lags),
+            "daily_window_description": (
+                "individual complete UTC days relative to peak date"
+            ),
+            "event_weighting": (
+                "equal event weight within each dynamical-sign and daily-lag composite"
+            ),
             "climatology_matching": "calendar month and day",
             "latitude_bounds": f"{lat_bounds[0]},{lat_bounds[1]}",
             "longitude_bounds": f"{lon_bounds[0]},{lon_bounds[1]}",
@@ -264,11 +301,15 @@ def build_spatial_composites(
     return out
 
 
-def event_window_dates(events: xr.Dataset) -> tuple[np.ndarray, np.ndarray]:
+def event_window_dates(
+    events: xr.Dataset,
+    *,
+    daily_lags: tuple[int, ...] = DAILY_LAGS,
+) -> tuple[np.ndarray, np.ndarray]:
     peaks = pd.DatetimeIndex(events["peak_time"].values).normalize()
     signs = np.asarray(events["event_dyn_sign"].values, dtype=str)
-    dates = np.empty((len(peaks), len(DAILY_LAGS)), dtype="datetime64[ns]")
-    for index, lag in enumerate(DAILY_LAGS):
+    dates = np.empty((len(peaks), len(daily_lags)), dtype="datetime64[ns]")
+    for index, lag in enumerate(daily_lags):
         dates[:, index] = (peaks + pd.to_timedelta(lag, unit="D")).values
     return dates, signs
 
@@ -278,15 +319,18 @@ def timestamp_weights(
     event_signs: np.ndarray,
     group_counts: np.ndarray,
 ) -> dict[pd.Timestamp, np.ndarray]:
-    """Return normalized group weights keyed by actual calendar timestamp."""
+    """Return normalized group/lag weights keyed by actual calendar timestamp."""
+    lag_count = event_dates.shape[1]
     weights: defaultdict[pd.Timestamp, np.ndarray] = defaultdict(
-        lambda: np.zeros(len(GROUPS), dtype=float)
+        lambda: np.zeros((len(GROUPS), lag_count), dtype=float)
     )
     for row, sign in zip(event_dates, event_signs, strict=True):
         group_index = GROUPS.index(str(sign))
-        sample_weight = 1.0 / (group_counts[group_index] * len(DAILY_LAGS))
-        for value in row:
-            weights[pd.Timestamp(value).normalize()][group_index] += sample_weight
+        sample_weight = 1.0 / group_counts[group_index]
+        for lag_index, value in enumerate(row):
+            weights[pd.Timestamp(value).normalize()][
+                group_index, lag_index
+            ] += sample_weight
     assert_normalized_weights(weights)
     return dict(weights)
 
@@ -296,23 +340,26 @@ def calendar_key_weights(
     event_signs: np.ndarray,
     group_counts: np.ndarray,
 ) -> dict[tuple[int, int], np.ndarray]:
-    """Return normalized group weights keyed by climatological month/day."""
+    """Return normalized group/lag weights keyed by climatological month/day."""
+    lag_count = event_dates.shape[1]
     weights: defaultdict[tuple[int, int], np.ndarray] = defaultdict(
-        lambda: np.zeros(len(GROUPS), dtype=float)
+        lambda: np.zeros((len(GROUPS), lag_count), dtype=float)
     )
     for row, sign in zip(event_dates, event_signs, strict=True):
         group_index = GROUPS.index(str(sign))
-        sample_weight = 1.0 / (group_counts[group_index] * len(DAILY_LAGS))
-        for value in row:
+        sample_weight = 1.0 / group_counts[group_index]
+        for lag_index, value in enumerate(row):
             timestamp = pd.Timestamp(value)
-            weights[(timestamp.month, timestamp.day)][group_index] += sample_weight
+            weights[(timestamp.month, timestamp.day)][
+                group_index, lag_index
+            ] += sample_weight
     assert_normalized_weights(weights)
     return dict(weights)
 
 
 def assert_normalized_weights(weights: Mapping[object, np.ndarray]) -> None:
     total = np.sum(np.stack(list(weights.values())), axis=0)
-    np.testing.assert_allclose(total, np.ones(len(GROUPS)), atol=1e-12)
+    np.testing.assert_allclose(total, np.ones_like(total), atol=1e-12)
 
 
 def reduce_annual_daily_fields(
@@ -347,8 +394,8 @@ def reduce_annual_daily_fields(
             if reference_lat is None:
                 reference_lat, reference_lon = lat, lon
                 accumulators = {
-                    name: np.zeros((len(GROUPS), lat.size, lon.size), dtype=np.float64)
-                    for name in fields
+                    name: np.zeros_like(values, dtype=np.float64)
+                    for name, values in fields.items()
                 }
             else:
                 require_same_grid(reference_lat, reference_lon, lat, lon)
@@ -458,7 +505,7 @@ def load_weighted_fields(
     *,
     context: str,
 ) -> dict[str, np.ndarray]:
-    """Load selected daily fields and reduce them with two group weights."""
+    """Load selected fields and reduce them with group-by-lag weights."""
     time = pd.DatetimeIndex(ds["time"].values).normalize()
     if time.has_duplicates:
         raise ValueError(f"{context} has duplicate daily timestamps.")
@@ -468,7 +515,7 @@ def load_weighted_fields(
     if missing:
         raise ValueError(f"{context} is missing required daily timestamps: {missing}")
     indices = [time_to_index[value] for value in requested]
-    weight_matrix = np.stack([weights[value] for value in requested], axis=1)
+    weight_matrix = np.stack([weights[value] for value in requested], axis=-1)
 
     t2m = np.asarray(ds["t2m"].isel(time=indices).load().values, dtype=np.float64)
     z = np.asarray(ds["z"].isel(time=indices).load().values, dtype=np.float64)
@@ -477,8 +524,8 @@ def load_weighted_fields(
     if not np.isfinite(t2m).all() or not np.isfinite(z).all():
         raise ValueError(f"{context} contains non-finite selected spatial fields.")
     return {
-        "t2m": np.tensordot(weight_matrix, t2m, axes=(1, 0)),
-        "z500": np.tensordot(weight_matrix, z, axes=(1, 0))
+        "t2m": np.tensordot(weight_matrix, t2m, axes=(-1, 0)),
+        "z500": np.tensordot(weight_matrix, z, axes=(-1, 0))
         / GEOPOTENTIAL_TO_HEIGHT_M_S2,
     }
 

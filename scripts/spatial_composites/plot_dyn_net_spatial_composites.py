@@ -1,4 +1,4 @@
-"""Plot stacked positive/negative daily T2m and Z500 anomaly composites."""
+"""Plot positive/negative daily T2m and Z500 anomaly evolution."""
 
 from __future__ import annotations
 
@@ -36,13 +36,17 @@ DEFAULT_OUTPUT_PATH = (
     / "dyn_net_daily_t2m_z500_composites_pnw_bartusek_tas_q90_1940_2024.png"
 )
 GROUPS = ("positive", "negative")
+GROUP_DIM = "dyn_sign"
+LAG_DIM = "lag"
 MAP_EXTENT = (-170.0, -40.0, 10.0, 80.0)
 PNW_BARTUSEK_BOUNDS = (-130.0, -110.0, 40.0, 60.0)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Plot stacked daily T2m/Z500 composites by I_dyn_net sign."
+        description=(
+            "Plot event-relative daily T2m/Z500 composites by I_dyn_net sign."
+        )
     )
     parser.add_argument("--input-path", type=Path, default=DEFAULT_INPUT_PATH)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH)
@@ -94,13 +98,26 @@ def validate_composite(ds: xr.Dataset) -> None:
     missing = sorted(required.difference(ds.data_vars))
     if missing:
         raise ValueError("Composite dataset is missing variables: " + ", ".join(missing))
-    for coord in ("dyn_sign", "latitude", "longitude"):
+    for coord in (GROUP_DIM, LAG_DIM, "latitude", "longitude"):
         if coord not in ds.coords:
             raise ValueError(f"Composite dataset is missing coordinate {coord!r}.")
-    groups = tuple(str(value) for value in ds["dyn_sign"].values)
+    groups = tuple(str(value) for value in ds[GROUP_DIM].values)
     if set(groups) != set(GROUPS):
-        raise ValueError(f"Expected dyn_sign groups {GROUPS}; found {groups}.")
+        raise ValueError(f"Expected {GROUP_DIM} groups {GROUPS}; found {groups}.")
+    lags = np.asarray(ds[LAG_DIM].values)
+    if lags.ndim != 1 or lags.size == 0:
+        raise ValueError(f"Coordinate {LAG_DIM!r} must be one-dimensional and nonempty.")
+    if not np.issubdtype(lags.dtype, np.integer):
+        raise ValueError(f"Coordinate {LAG_DIM!r} must contain integer days.")
+    if np.any(np.diff(lags) <= 0):
+        raise ValueError(f"Coordinate {LAG_DIM!r} must be strictly increasing.")
     for name in ("t2m_anomaly", "z500_anomaly"):
+        expected_dims = (GROUP_DIM, LAG_DIM, "latitude", "longitude")
+        if ds[name].dims != expected_dims:
+            raise ValueError(
+                f"Composite variable {name!r} must have dimensions {expected_dims}; "
+                f"found {ds[name].dims}."
+            )
         values = np.asarray(ds[name].values, dtype=float)
         if not np.isfinite(values).all():
             raise ValueError(f"Composite variable {name!r} contains non-finite values.")
@@ -112,9 +129,10 @@ def plot_spatial_composites(
     temperature_limit: float | None = None,
     height_contour_interval: float | None = None,
 ) -> plt.Figure:  # type: ignore[type-arg]
-    """Return the two-panel publication figure."""
+    """Return a sign-by-lag publication figure."""
     validate_composite(ds)
     plot_style.apply_theme()
+    lags = np.asarray(ds[LAG_DIM].values, dtype=int)
 
     temperature_limit = temperature_limit or rounded_symmetric_limit(
         ds["t2m_anomaly"].values,
@@ -133,62 +151,88 @@ def plot_spatial_composites(
     )
     data_crs = ccrs.PlateCarree()
     fig, axes = plt.subplots(
-        nrows=2,
-        ncols=1,
-        figsize=plot_style.publication_figsize("full", aspect=0.83),
+        nrows=len(GROUPS),
+        ncols=lags.size,
+        figsize=plot_style.publication_figsize("full", aspect=0.48),
         subplot_kw={"projection": projection},
         constrained_layout=True,
+        squeeze=False,
     )
-    axes = np.atleast_1d(axes)
     mesh = None
-    for ax, group in zip(axes, GROUPS, strict=True):
-        panel = ds.sel(dyn_sign=group)
-        mesh = ax.pcolormesh(
-            ds["longitude"],
-            ds["latitude"],
-            panel["t2m_anomaly"],
-            transform=data_crs,
-            cmap="RdBu_r",
-            norm=norm,
-            shading="auto",
-            rasterized=True,
-        )
-        line_styles = ["dashed" if level < 0 else "solid" for level in contour_levels]
-        line_widths = [1.4 if np.isclose(level, 0.0) else 0.8 for level in contour_levels]
-        contours = ax.contour(
-            ds["longitude"],
-            ds["latitude"],
-            panel["z500_anomaly"],
-            levels=contour_levels,
-            colors="#222222",
-            linewidths=line_widths,
-            linestyles=line_styles,
-            transform=data_crs,
-        )
-        ax.clabel(contours, fmt="%g", fontsize=8, inline_spacing=2)
-        decorate_map(ax, data_crs)
-        count = int(panel["event_count"].item())
-        dyn_mean = float(panel["I_dyn_net_mean"].item())
-        ax.set_title(
-            f"{group.capitalize()} $I_{{dyn,net}}$: n = {count}, "
-            f"mean = {dyn_mean:.2f} K"
-        )
+    line_styles = ["dashed" if level < 0 else "solid" for level in contour_levels]
+    line_widths = [1.2 if np.isclose(level, 0.0) else 0.7 for level in contour_levels]
+    for row, group in enumerate(GROUPS):
+        group_panel = ds.sel({GROUP_DIM: group})
+        count = int(group_panel["event_count"].item())
+        dyn_mean = float(group_panel["I_dyn_net_mean"].item())
+        for column, lag in enumerate(lags):
+            ax = axes[row, column]
+            panel = group_panel.sel({LAG_DIM: lag})
+            mesh = ax.pcolormesh(
+                ds["longitude"],
+                ds["latitude"],
+                panel["t2m_anomaly"],
+                transform=data_crs,
+                cmap="RdBu_r",
+                norm=norm,
+                shading="auto",
+                rasterized=True,
+            )
+            contours = ax.contour(
+                ds["longitude"],
+                ds["latitude"],
+                panel["z500_anomaly"],
+                levels=contour_levels,
+                colors="#222222",
+                linewidths=line_widths,
+                linestyles=line_styles,
+                transform=data_crs,
+            )
+            ax.clabel(contours, fmt="%g", fontsize=6, inline_spacing=1)
+            decorate_map(
+                ax,
+                data_crs,
+                left_labels=column == 0,
+                bottom_labels=row == len(GROUPS) - 1,
+            )
+            if row == 0:
+                ax.set_title(format_lag_title(lag))
+            if column == 0:
+                ax.text(
+                    -0.24,
+                    0.5,
+                    (
+                        f"{group.capitalize()} $I_{{dyn,net}}$\n"
+                        f"n = {count}\nmean = {dyn_mean:.2f} K"
+                    ),
+                    transform=ax.transAxes,
+                    ha="center",
+                    va="center",
+                    rotation=90,
+                    fontsize=9,
+                )
 
     assert mesh is not None
     colorbar = fig.colorbar(
         mesh,
-        ax=axes.tolist(),
+        ax=axes.ravel().tolist(),
         orientation="horizontal",
-        fraction=0.045,
-        pad=0.045,
-        aspect=38,
+        fraction=0.055,
+        pad=0.055,
+        aspect=55,
     )
     colorbar.set_label("2 m temperature anomaly (K)")
-    fig.suptitle("Four-day Pre-peak Heatwave Spatial Composites")
+    fig.suptitle("Heatwave Spatial Composite Evolution Relative to Peak Day")
     return fig
 
 
-def decorate_map(ax, data_crs: ccrs.PlateCarree) -> None:
+def decorate_map(
+    ax,
+    data_crs: ccrs.PlateCarree,
+    *,
+    left_labels: bool = True,
+    bottom_labels: bool = True,
+) -> None:
     ax.set_extent(MAP_EXTENT, crs=data_crs)
     ax.coastlines(resolution="50m", linewidth=0.7)
     ax.add_feature(cfeature.BORDERS.with_scale("50m"), linewidth=0.55)
@@ -204,8 +248,10 @@ def decorate_map(ax, data_crs: ccrs.PlateCarree) -> None:
     )
     gridlines.top_labels = False
     gridlines.right_labels = False
-    gridlines.xlabel_style = {"size": 9}
-    gridlines.ylabel_style = {"size": 9}
+    gridlines.left_labels = left_labels
+    gridlines.bottom_labels = bottom_labels
+    gridlines.xlabel_style = {"size": 7}
+    gridlines.ylabel_style = {"size": 7}
     west, east, south, north = PNW_BARTUSEK_BOUNDS
     ax.add_patch(
         Rectangle(
@@ -219,6 +265,12 @@ def decorate_map(ax, data_crs: ccrs.PlateCarree) -> None:
             zorder=5,
         )
     )
+
+
+def format_lag_title(lag: int) -> str:
+    if lag == 0:
+        return r"$t$ (peak)"
+    return rf"$t{lag:+d}$"
 
 
 def rounded_symmetric_limit(values: np.ndarray, *, step: float) -> float:
