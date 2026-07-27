@@ -378,8 +378,5 @@ def _make_full_diagnostics(hourly_time: np.ndarray) -> dict[str, xr.Dataset]:
         "sshf": gridded("sshf", [-5.0, -6.0]),
         "soil_moisture": gridded("swvl1", [0.1, 0.2]),
         "pbl_p": gridded("pbl_p", [70000.0, 65000.0]),
-        "cloud_cover": xr.Dataset(
-            {"total_cloud_cover": ("time", [0.25, 0.5])},
-            coords={"time": hourly_time},
-        ),
+        "cloud_cover": gridded("total_cloud_cover", [0.25, 0.5]),
     }

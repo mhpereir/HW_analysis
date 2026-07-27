@@ -133,8 +133,8 @@ abs_mass_advection_residual_fraction (time) - diagnostic quantity, not necessary
 
 # locally stored hourly ARCO/ERA5 full diagnostics
 ERA5_PBL_P_ROOT: str = "/home/mhpereir/data-mhpereir/arco_era5/PBL_download/outputs"
-ERA5_CLOUD_COVER_ROOT: str = "/home/mhpereir/data-mhpereir/arco_era5/CloudCover_download/outputs"
 ERA5_HOURLY_SURFACE_ROOT: str = "/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly"
+ERA5_CLOUD_COVER_ROOT: str = f"{ERA5_HOURLY_SURFACE_ROOT}/cloud_cover"
 ERA5_NSLR_ROOT: str = f"{ERA5_HOURLY_SURFACE_ROOT}/nslr"
 ERA5_NSSR_ROOT: str = f"{ERA5_HOURLY_SURFACE_ROOT}/nssr"
 ERA5_SLHF_ROOT: str = f"{ERA5_HOURLY_SURFACE_ROOT}/slhf"

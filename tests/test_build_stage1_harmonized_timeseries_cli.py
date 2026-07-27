@@ -215,6 +215,45 @@ def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch
     assert "pbl_p" in datasets
 
 
+def test_load_full_diagnostic_inputs_routes_region_only_to_pbl(monkeypatch):
+    pbl_calls = []
+    cloud_calls = []
+
+    def fake_pbl(**kwargs):
+        pbl_calls.append(kwargs)
+        return xr.Dataset()
+
+    def fake_cloud(**kwargs):
+        cloud_calls.append(kwargs)
+        return xr.Dataset()
+
+    monkeypatch.setattr(stage1_builder.data_io, "open_era5_pbl_p", fake_pbl)
+    monkeypatch.setattr(
+        stage1_builder.data_io,
+        "open_era5_surface_diagnostic",
+        lambda *args, **kwargs: xr.Dataset(),
+    )
+    monkeypatch.setattr(
+        stage1_builder.data_io,
+        "open_era5_total_cloud_cover",
+        fake_cloud,
+    )
+
+    args = Namespace(
+        analysis_years=[1940, 1941],
+        region="pnw_bartusek",
+    )
+    stage1_builder.load_full_diagnostic_inputs(args)
+
+    assert pbl_calls == [
+        {
+            "region": "pnw_bartusek",
+            "years": [1940, 1941],
+        }
+    ]
+    assert cloud_calls == [{"years": [1940, 1941]}]
+
+
 def test_append_event_summary_table_defaults_to_tas_events():
     ds = _make_harmonized_timeseries_for_events()
 

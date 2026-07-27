@@ -35,7 +35,6 @@ DEFAULT_THRESHOLD_CHUNKS: dict[str, int] = {"dayofyear": 365}
 DEFAULT_HEAT_BUDGET_CHUNKS: dict[str, int] = {"time": 512}
 ChunkSpec: TypeAlias = Mapping[str, int] | str
 DEFAULT_GLOBAL_HOURLY_CHUNKS: str = "auto"
-DEFAULT_REGIONAL_HOURLY_CHUNKS: str = "auto"
 DEFAULT_PBL_CHUNKS: str = "auto"
 
 
@@ -256,11 +255,12 @@ def open_era5_surface_diagnostic(
 
 def open_era5_pbl_p(
     *,
+    region: str,
     years: Sequence[int] | None = None,
     chunks: ChunkSpec | None = None,
 ) -> xr.Dataset:
-    """Open local hourly ARCO PBL top pressure fields."""
-    pattern = f"{config.ERA5_PBL_P_ROOT}/ERA5_ARCO_pbl_p_*.nc"
+    """Open local hourly ARCO PBL top pressure fields for one region."""
+    pattern = f"{config.ERA5_PBL_P_ROOT}/{region}/ERA5_ARCO_pbl_p_*.nc"
     paths = _glob_required(pattern)
     paths = _filter_yearly_files(paths, years)
     ds = _open_multiple_datasets(
@@ -273,23 +273,24 @@ def open_era5_pbl_p(
 
 def open_era5_total_cloud_cover(
     *,
-    region: str,
     years: Sequence[int] | None = None,
     chunks: ChunkSpec | None = None,
 ) -> xr.Dataset:
-    """Open local hourly ARCO total cloud cover regional time series."""
-    pattern = (
-        f"{config.ERA5_CLOUD_COVER_ROOT}/"
-        f"ERA5_ARCO_total_cloud_cover_{region}_*.nc"
-    )
+    """Open global hourly ERA5 total cloud-cover fields."""
+    pattern = f"{config.ERA5_CLOUD_COVER_ROOT}/cloud_cover_hour_ERA5_*.nc"
     paths = _glob_required(pattern)
     paths = _filter_yearly_files(paths, years)
     ds = _open_multiple_datasets(
         paths,
         combine="by_coords",
-        chunks=chunks or DEFAULT_REGIONAL_HOURLY_CHUNKS,
+        chunks=chunks or DEFAULT_GLOBAL_HOURLY_CHUNKS,
     )
-    return _standardize_common_structure(ds)
+    ds = _standardize_common_structure(ds)
+    if "tcc" not in ds:
+        raise ValueError("ERA5 cloud-cover dataset is missing required variable 'tcc'.")
+    ds = ds.rename({"tcc": "total_cloud_cover"})
+    ds["total_cloud_cover"].attrs["source_variable"] = "tcc"
+    return ds
 
 
 def _normalize_quantile_token(quantile: str | int | float) -> str:
