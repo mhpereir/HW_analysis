@@ -5,10 +5,10 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from HW_analysis.scripts.event_features import (
+from HW_analysis.scripts.event_features.old import (
     build_stage4_event_feature_clusters as build_stage4_clusters,
 )
-from HW_analysis.scripts.event_features import plot_event_feature_clusters
+from HW_analysis.scripts.event_features.old import plot_event_feature_clusters
 
 
 def test_ward_clustering_adds_labels_tracked_values_and_summaries():

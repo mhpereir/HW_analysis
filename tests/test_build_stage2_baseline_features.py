@@ -84,12 +84,12 @@ def test_build_baseline_writes_reference_features_without_event_peak_analogues()
         season_months=[6],
     )
 
-    assert out["n_samples_heat_budget_pre"].min().item() == 97
-    assert out["n_samples_lwa_pre_reference"].min().item() == 97
+    assert out["n_samples_heat_budget_pre"].min().item() == 73
+    assert out["n_samples_lwa_pre_reference"].min().item() == 73
     assert out["n_samples_antecedent_state"].min().item() == 145
-    assert out["I_dTdt_pre"].min().item() == 97.0
-    assert out["I_lwa_a_pre_reference"].min().item() == 485.0
-    assert out["I_lwa_c_pre_reference"].min().item() == 582.0
+    assert out["I_dTdt_pre"].min().item() == 73.0
+    assert out["I_lwa_a_pre_reference"].min().item() == 365.0
+    assert out["I_lwa_c_pre_reference"].min().item() == 438.0
     assert out["I_lwa_a_pre_reference"].attrs["window_name"] == "lwa_pre_reference"
     assert out["n_samples_lwa_pre_reference"].attrs["window_name"] == "lwa_pre_reference"
     assert out["T_anom_mean_ant"].min().item() == 10.0
@@ -136,7 +136,7 @@ def test_build_baseline_adds_extended_features():
         use_extended_variables=True,
     )
 
-    assert out["I_nslr_pre"].min().item() == 679.0
+    assert out["I_nslr_pre"].min().item() == 511.0
     assert out["cloud_cover_mean_ant"].min().item() == 0.5
     assert out["pbl_p_mean_ant"].min().item() == 90000.0
     assert "soil_moisture_change" in out

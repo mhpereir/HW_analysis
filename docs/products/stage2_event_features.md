@@ -48,8 +48,8 @@ Timestamp slices are inclusive. Current defaults are:
 
 | Window | Lags relative to `peak_time` |
 | --- | --- |
-| `heat_budget_pre` | `(-96, 0)` hours |
-| `lwa_pre_peak` | `(-96, 0)` hours |
+| `heat_budget_pre` | `(-72, 0)` hours |
+| `lwa_pre_peak` | `(-72, 0)` hours |
 | `antecedent_state` | `(-168, -24)` hours |
 | `antecedent_change` | `(-168, 0)` hours |
 | `near_peak` | `(-24, 24)` hours |

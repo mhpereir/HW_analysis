@@ -24,8 +24,8 @@ changeable analysis choices live in `docs/decisions/`.
    where needed.
 4. **Reusable selector and event logic**: thresholds, masks, event IDs, duration
    filters, peaks, and event summaries should be built once and reused.
-5. **Separation of concerns**: raw loading, harmonization, event features, PCA,
-   clustering, composites, diagnostics, and plotting have distinct roles.
+5. **Separation of concerns**: raw loading, harmonization, event features,
+   composites, diagnostics, and plotting have distinct roles.
 6. **Plotting consumes products**: plotting scripts should not reload raw data,
    rebuild event IDs, or hide analysis logic.
 
@@ -37,23 +37,18 @@ raw inputs
 Product Stage 1: harmonized regional time series
   |-> Product Stage 2: baseline-day feature table
   `-> Product Stage 2: event-feature table
-        ->
-      Product Stage 3: event-feature PCA product
-        ->
-      Product Stage 4: event-feature cluster product
-        ->
-      cluster composites / PCA diagnostics / interpretation figures
 ```
 
 | Product stage | Durable artifact | Producer | Main consumers |
 | --- | --- | --- | --- |
 | Stage 1 | `results/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_stage1_harmonized_timeseries.py` | event features, baseline features, composites, top-event plots |
-| Stage 2 | event-feature table | `scripts/event_features/build_stage2_event_features.py` | PCA, feature plots, exploratory diagnostics |
+| Stage 2 | event-feature table | `scripts/event_features/build_stage2_event_features.py` | feature plots, event comparisons, exploratory diagnostics |
 | Stage 2 | baseline-day feature table | `scripts/event_features/build_stage2_baseline_features.py` | event/baseline comparisons, exploratory diagnostics |
-| Stage 3 | event-feature PCA product | `scripts/event_features/build_stage3_event_feature_pca.py` | PCA diagnostics, clustering |
-| Stage 4 | event-feature cluster product | `scripts/event_features/build_stage4_event_feature_clusters.py` | cluster interpretation, cluster composites |
 
-Stage-4 cluster labels are method- and feature-dependent derived products; they should be interpreted through PCA loadings, event metadata, and cluster-conditioned composites rather than treated as physical mechanisms by default.
+Stages 3 and 4 are inactive legacy workflows. Their PCA and clustering
+implementations are retained under `scripts/event_features/old/` for historical
+reference and possible future reactivation, but they are not active pipeline
+products or plotting dependencies.
 
 ## Module Responsibility Map
 
@@ -85,19 +80,15 @@ scripts/
 `-- event_features/
     |-- build_stage2_event_features.py
     |-- build_stage2_baseline_features.py
-    |-- build_stage3_event_feature_pca.py
-    |-- build_stage4_event_feature_clusters.py
     |-- plot_event_feature.py
-    |-- plot_pca_vector_loadings.py
-    `-- event_feature_grid_plot.py
+    |-- event_feature_grid_plot.py
+    `-- old/
 |-- src/
 |-- tests/
 results/
 |-- stage1/
 |-- stage2_event_features/
-|-- stage2_baseline_features/
-|-- stage3_event_feature_pca/
-`-- stage4_event_feature_clusters/
+`-- stage2_baseline_features/
 ```
 
 Product filenames should encode enough run context to distinguish region,
@@ -110,14 +101,16 @@ dataset contents rather than one exact run filename.
 - [Stage 1: harmonized regional time series](products/stage1_harmonized_timeseries.md)
 - [Stage 2: event features](products/stage2_event_features.md)
 - [Stage 2: baseline-day features](products/stage2_baseline_features.md)
-- [Stage 3: event-feature PCA](products/stage3_event_feature_pca.md)
-- [Stage 4: event-feature clusters](products/stage4_event_feature_clusters.md)
+
+The Stage 3 and Stage 4 product documents are retained as legacy design
+records, not active product specifications.
 
 ## Workflow Docs
 
 - [Composites](workflows/composites.md)
-- [PCA diagnostics](workflows/pca_diagnostics.md)
-- [Cluster interpretation](workflows/cluster_interpretation.md)
+
+The PCA diagnostics and cluster interpretation workflow documents describe
+inactive legacy workflows.
 
 Diagnostic and plotting scripts are workflow consumers, so their names describe
 the diagnostic they make rather than a product stage they produce.
