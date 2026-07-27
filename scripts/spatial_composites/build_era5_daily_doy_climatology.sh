@@ -66,7 +66,9 @@ done
 [[ "$END_YEAR" =~ ^[0-9]{4}$ ]] || die "--end-year must be a four-digit year."
 [[ "$THREADS" =~ ^[1-9][0-9]*$ ]] || die "--threads must be a positive integer."
 (( START_YEAR <= END_YEAR )) || die "--start-year must be <= --end-year."
-command -v cdo >/dev/null 2>&1 || die "CDO is required but was not found on PATH."
+if (( ! DRY_RUN )); then
+    command -v cdo >/dev/null 2>&1 || die "CDO is required but was not found on PATH."
+fi
 
 if [[ -e "$OUTPUT_PATH" && "$OVERWRITE" -ne 1 ]]; then
     die "Output exists: $OUTPUT_PATH (pass --overwrite to replace it)."

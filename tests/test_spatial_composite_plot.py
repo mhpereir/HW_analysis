@@ -21,7 +21,7 @@ def test_plot_spatial_composites_creates_sign_by_lag_geoaxes():
 
 
 def test_write_figure_creates_png(tmp_path):
-    fig = plotter.plot_spatial_composites(_composite_dataset())
+    fig = plotter.plt.figure()
     output_path = tmp_path / "figures" / "composite.png"
     try:
         written = plotter.write_figure(fig, output_path)

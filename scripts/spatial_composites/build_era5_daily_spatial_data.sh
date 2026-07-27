@@ -76,8 +76,10 @@ done
 (( START_YEAR <= END_YEAR )) || die "--start-year must be <= --end-year."
 (( OVERWRITE == 0 || SKIP_EXISTING == 0 )) || \
     die "--overwrite and --skip-existing are mutually exclusive."
-command -v cdo >/dev/null 2>&1 || die "CDO is required but was not found on PATH."
-command -v nccopy >/dev/null 2>&1 || die "nccopy is required but was not found on PATH."
+if (( ! DRY_RUN )); then
+    command -v cdo >/dev/null 2>&1 || die "CDO is required but was not found on PATH."
+    command -v nccopy >/dev/null 2>&1 || die "nccopy is required but was not found on PATH."
+fi
 
 run() {
     if (( DRY_RUN )); then

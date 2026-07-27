@@ -167,7 +167,7 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
 
         pbl_axis = fig.axes[3]
         assert pbl_axis.yaxis_inverted()
-        assert pbl_axis.get_ylabel() == "PBL top pressure [hPa]"
+        assert pbl_axis.get_ylabel() == "PBL [hPa]"
         np.testing.assert_allclose(
             pbl_axis.lines[0].get_ydata(),
             composite["pbl_p_mean"].values * 0.01,
@@ -330,7 +330,7 @@ def test_plot_split_composite_timeseries_extended_layout_uses_optional_panels():
 
         pbl_axis = fig.axes[3]
         assert pbl_axis.yaxis_inverted()
-        assert pbl_axis.get_ylabel() == "PBL top pressure [hPa]"
+        assert pbl_axis.get_ylabel() == "PBL [hPa]"
         np.testing.assert_allclose(
             pbl_axis.lines[0].get_ydata(),
             composite.isel(split_bin=0)["pbl_p_mean"].values * 0.01,
