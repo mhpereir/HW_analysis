@@ -6,8 +6,9 @@ Planned on branch `advection-direction-prototype`.
 
 This document defines the goal, scientific interpretation, implementation
 sequence, compatibility requirements, and intended outputs for a standalone
-advection-direction time-series prototype. It does not yet change the Stage-1
-contract or any production figure.
+advection-direction time-series prototype. The prototype uses an enhanced
+Stage-1 copy in an exploration subfolder. It does not yet change the canonical
+Stage-1 contract or any production figure.
 
 ## Goal
 
@@ -89,6 +90,15 @@ metadata that do not reliably describe the variables or units. The prototype
 must therefore validate the upstream formulas and write fresh, explicit
 metadata. It must not propagate raw attributes without review.
 
+A read-only 2024 comparison on Venus found zero maximum absolute error for all
+three initial reconstruction checks:
+
+```text
+sum(face heat contributions) - raw advection_term
+existing Stage-1 volume - raw domain_volume
+normalized face sum - existing Stage-1 advection
+```
+
 ## Scientific Interpretation
 
 ### Advective tendency components
@@ -139,6 +149,11 @@ zero. The prototype will compare:
 
 No ratio will replace the underlying components.
 
+The initial denominator mask is `0.005 K hr-1`. In the inspected 2024 data,
+this is near the lower tail of the absolute meridional and horizontal
+contributions. The value remains explicit in the CLI, plot title, and output
+metadata so it can be assessed against the full composite.
+
 ### Face-contribution visualization
 
 The prototype will preserve all signed heat contributions rather than reduce
@@ -170,8 +185,8 @@ is selected and validated.
 
 ```text
 raw EHB face contributions + existing Stage-1 event definitions
-  -> experimental directional-advection time-series dataset
-  -> peak-aligned experimental composite dataset
+  -> enhanced Stage-1 copy in an exploration subfolder
+  -> peak-aligned in-memory experimental composite
   -> standalone comparison figures
 ```
 
@@ -196,16 +211,19 @@ result paths.
 - Add synthetic tests for each face, simultaneous opposing-face contributions,
   complete cancellation, top exchange, and near-zero-denominator cases.
 
-### Phase 2: Experimental dataset builders
+### Phase 2: Experimental Stage-1 builder
 
 - Add a thin builder such as
-  `scripts/build_advection_direction_prototype.py`.
+  `scripts/build_stage1_advection_exploration.py`.
 - Load raw EHB inputs through `src/data_io.py`.
 - Open Stage 1 through `src.analysis_io.open_harmonized_timeseries()`.
 - Require exact hourly alignment between raw EHB data and Stage 1.
-- Produce a small experimental hourly dataset containing face components,
-  grouped components, and ratios or shares.
-- Produce a peak-aligned composite dataset using the existing Stage-1
+- Save a complete enhanced Stage-1 copy containing the original variables plus
+  normalized face contributions under
+  `results/stage1/advection_direction_exploration/`.
+- Derive grouped components and ratios from the face contributions rather than
+  persisting redundant variables.
+- Build the peak-aligned composite in memory using the existing Stage-1
   `peak_time` and event-selection semantics.
 - Refuse to overwrite an existing prototype product unless the CLI explicitly
   authorizes it.
@@ -213,7 +231,7 @@ result paths.
 ### Phase 3: Standalone plotting prototype
 
 - Add a thin plotter such as
-  `scripts/plot_advection_direction_prototype.py`.
+  `scripts/plot_advection_direction_exploration.py`.
 - Use `src/plot_style.py` and the non-interactive Matplotlib backend.
 - Render unnormalized component tendencies as the scientific reference.
 - Compare the most promising ratio, bounded-share, and angle representations.
@@ -266,28 +284,24 @@ Only after prototype approval:
 
 ## Intended Prototype Outputs
 
-Provisional generated paths:
+Generated paths:
 
 ```text
-results/prototypes/advection_direction/
-  pnw_bartusek_surface_700hPa_tas_q90_1940_2024/
-    advection_direction_hourly.nc
-    advection_direction_composite.nc
-    advection_component_timeseries.png
-    advection_face_contributions.png
+results/stage1/advection_direction_exploration/
+  harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc
+
+results/plots_advection_direction_exploration/
+  region_pnw_bartusek/
+    boundary_surface_700hPa/
+      time_range_1940_2024/
+        advection_face_contributions.png
 ```
 
-`advection_component_timeseries.png` will show:
+`advection_face_contributions.png` will show:
 
-- total advection;
-- zonal, meridional, horizontal, and vertical contributions;
-- zero reference lines; and
-- event percentile bounds where useful.
-
-`advection_face_contributions.png` will compare:
-
+- individual signed face contributions;
+- total, zonal, meridional, horizontal, and vertical contributions;
 - signed ratios with invalid regions masked;
-- bounded component shares or component-space angles; and
 - the daily 24-hour face-contribution glyph sequence.
 
 Each product and figure will record the region, pressure boundaries, event
