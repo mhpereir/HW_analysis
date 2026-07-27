@@ -7,6 +7,8 @@
 
 set -euo pipefail
 
+cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
+
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 
