@@ -140,7 +140,15 @@ events remain after selection, selected events have missing `peak_time`, or the
 output path exists without overwrite permission.
 
 The sample-count variables are part of the product contract because they expose
-boundary events and missing hourly samples to PCA and clustering consumers.
+boundary events and missing hourly samples to downstream consumers.
+
+## Downstream Consumers
+
+- event-feature plots and split diagnostics under `scripts/event_features/`;
+- event-versus-baseline comparison plots; and
+- `scripts/spatial_composites/build_dyn_net_spatial_composites.py`, which uses
+  `peak_time`, `I_adiabatic_pre`, and `I_advection_pre` to define
+  dynamical-sign groups and lagged dates.
 
 ## Non-goals
 

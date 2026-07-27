@@ -5,6 +5,9 @@ pipeline. It should stay short and stable. Detailed variable contracts live in
 `docs/products/`, script-oriented procedures live in `docs/workflows/`, and
 changeable analysis choices live in `docs/decisions/`.
 
+Start at [docs/README.md](README.md) for the documentation reading order and
+authority rules.
+
 ## Terminology
 
 | Term | Meaning |
@@ -15,28 +18,41 @@ changeable analysis choices live in `docs/decisions/`.
 
 ## Design Principles
 
-1. **Dataset-first rather than plot-first**: build reusable analysis products
+1. **Documentation-first compatibility**: record intended behavior,
+   compatibility requirements, and validation before implementation. Code and
+   tests must conform to the documented contract.
+2. **Dataset-first rather than plot-first**: build reusable analysis products
    before making figures.
-2. **Regional time series as the primary handoff**: the Stage-1 product is the
-   central harmonized dataset consumed by downstream workflows.
-3. **Explicit timestep handling**: native timestep and analysis timestep must be
+3. **Explicit reusable handoffs**: Stage 1 is the central regional handoff;
+   spatial workflows use separately documented daily ERA5 and composite
+   products.
+4. **Explicit timestep handling**: native timestep and analysis timestep must be
    documented separately, with daily event IDs projected onto hourly diagnostics
    where needed.
-4. **Reusable selector and event logic**: thresholds, masks, event IDs, duration
+5. **Reusable selector and event logic**: thresholds, masks, event IDs, duration
    filters, peaks, and event summaries should be built once and reused.
-5. **Separation of concerns**: raw loading, harmonization, event features,
+6. **Separation of concerns**: raw loading, harmonization, event features,
    composites, diagnostics, and plotting have distinct roles.
-6. **Plotting consumes products**: plotting scripts should not reload raw data,
-   rebuild event IDs, or hide analysis logic.
+7. **Plotting consumes products**: plotting scripts should not reload raw data,
+   rebuild event IDs, or hide reusable analysis logic.
+8. **One shared figure contract**: active figures use `src/plot_style.py`
+   directly or through `src/plotting.py`.
 
-## Product-stage Map
+## Active Data-flow Map
+
+### Regional products
 
 ```text
-raw inputs
+pre-calculated EHB + regional ERA5-family inputs + thresholds + LWA
   ->
 Product Stage 1: harmonized regional time series
   |-> Product Stage 2: baseline-day feature table
   `-> Product Stage 2: event-feature table
+        |-> feature and event/baseline diagnostics
+        `-> dynamical-sign spatial composites
+
+Product Stage 1
+  `-> temporal composites, top events, threshold, diurnal, and event summaries
 ```
 
 | Product stage | Durable artifact | Producer | Main consumers |
@@ -44,6 +60,24 @@ Product Stage 1: harmonized regional time series
 | Stage 1 | `results/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_stage1_harmonized_timeseries.py` | event features, baseline features, composites, top-event plots |
 | Stage 2 | event-feature table | `scripts/event_features/build_stage2_event_features.py` | feature plots, event comparisons, exploratory diagnostics |
 | Stage 2 | baseline-day feature table | `scripts/event_features/build_stage2_baseline_features.py` | event/baseline comparisons, exploratory diagnostics |
+
+### Spatial products
+
+```text
+raw hourly ERA5 T2m + Z500
+  -> annual daily T2m/Z500
+  -> 366-day T2m/Z500 climatology
+
+annual daily fields + climatology + Stage 2 event features
+  -> lagged positive/negative I_dyn_net spatial composites
+  -> sign-by-lag publication map
+```
+
+| Durable artifact | Producer | Main consumer |
+| --- | --- | --- |
+| `results/spatial_composites/daily/ERA5_daily_t2m_z500_<year>.nc` | `scripts/spatial_composites/build_era5_daily_spatial_data.sh` | climatology and composite builders |
+| `results/spatial_composites/climatology/era5_daily_doy_climatology_*.nc` | `scripts/spatial_composites/build_era5_daily_doy_climatology.sh` | spatial composite builder |
+| `results/spatial_composites/dyn_net_daily_spatial_composites_*.nc` | `scripts/spatial_composites/build_dyn_net_spatial_composites.py` | spatial composite plotter |
 
 Stages 3 and 4 are inactive legacy workflows. Their PCA and clustering
 implementations are retained under `scripts/event_features/old/` for historical
@@ -65,30 +99,41 @@ products or plotting dependencies.
 | `src/composites.py` | Build event-centered extracts, means, spreads, and top-event products. |
 | `src/diagnostics.py` | Domain-specific derived diagnostics such as residual checks and heating-rate approximations. |
 | `src/plotting.py` | Plot prepared products without raw loading or event generation. |
+| `src/plot_style.py` | Shared names, colors, dimensions, axis formatting, legends, and figure export. |
+| `src/plot_paths.py` | Structured default output paths for Stage-1-based figures. |
+| `scripts/spatial_composites/` | Prepare daily ERA5 fields, build lagged spatial products, and render maps. |
 
 ## File And Directory Conventions
 
 ```text
 HW_analysis/
 |-- docs/
+|   |-- README.md
 |   |-- pipeline_overview.md
 |   |-- products/
 |   |-- workflows/
-|   `-- decisions/
-scripts/
-|-- build_stage1_harmonized_timeseries.py
-`-- event_features/
-    |-- build_stage2_event_features.py
-    |-- build_stage2_baseline_features.py
-    |-- plot_event_feature.py
-    |-- event_feature_grid_plot.py
-    `-- old/
+|   |-- decisions/
+|   `-- legacy/
+|-- scripts/
+|   |-- build_stage1_harmonized_timeseries.py
+|   |-- event_features/
+|   |   |-- build_stage2_event_features.py
+|   |   |-- build_stage2_baseline_features.py
+|   |   |-- plot_event_feature.py
+|   |   |-- event_feature_grid_plot.py
+|   |   `-- old/
+|   `-- spatial_composites/
+|       |-- build_era5_daily_spatial_data.sh
+|       |-- build_era5_daily_doy_climatology.sh
+|       |-- build_dyn_net_spatial_composites.py
+|       `-- plot_dyn_net_spatial_composites.py
 |-- src/
 |-- tests/
-results/
-|-- stage1/
-|-- stage2_event_features/
-`-- stage2_baseline_features/
+`-- results/
+    |-- stage1/
+    |-- stage2_event_features/
+    |-- stage2_baseline_features/
+    `-- spatial_composites/
 ```
 
 Product filenames should encode enough run context to distinguish region,
@@ -102,15 +147,15 @@ dataset contents rather than one exact run filename.
 - [Stage 2: event features](products/stage2_event_features.md)
 - [Stage 2: baseline-day features](products/stage2_baseline_features.md)
 
-The Stage 3 and Stage 4 product documents are retained as legacy design
-records, not active product specifications.
+The Stage 3 and Stage 4 product documents are retained under
+[legacy](legacy/README.md) as design records, not active product
+specifications.
 
 ## Workflow Docs
 
 - [Composites](workflows/composites.md)
-
-The PCA diagnostics and cluster interpretation workflow documents describe
-inactive legacy workflows.
+- [Spatial composites](workflows/spatial_composites.md)
+- [Plotting and shared style](workflows/plotting.md)
 
 Diagnostic and plotting scripts are workflow consumers, so their names describe
 the diagnostic they make rather than a product stage they produce.
@@ -118,7 +163,8 @@ the diagnostic they make rather than a product stage they produce.
 ## Decision Records
 
 - [001: event-feature windows](decisions/001_event_feature_windows.md)
-- [002: PCA feature matrix](decisions/002_pca_feature_matrix.md)
-- [003: clustering strategy](decisions/003_clustering_strategy.md)
 - [004: baseline season and window boundaries](decisions/004_baseline_season_windows.md)
 - [005: Stage-1 event peak semantics](decisions/005_stage1_event_peak_semantics.md)
+
+PCA and clustering decisions are indexed under
+[legacy documentation](legacy/README.md).

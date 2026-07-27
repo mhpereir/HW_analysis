@@ -58,66 +58,51 @@ gates. Before testing, confirm that the resolved interpreter and required
 packages are present. Do not silently fall back to the base environment or
 install ad hoc packages without updating the relevant dependency contract.
 
-## Active data products
+## Documentation authority
 
-There are two active reusable product stages:
+Before changing the pipeline, read [docs/README.md](docs/README.md) and follow
+its reading order.
 
-1. **Stage 1 - harmonized regional time series**
-   - Produced by `scripts/build_stage1_harmonized_timeseries.py`.
-   - Ingests pre-calculated EHB output, ERA5 inputs, thresholds, LWA, and
-     optional surface, soil-moisture, cloud, and PBL diagnostics.
-   - Is the canonical handoff from heterogeneous source data to downstream
-     analysis.
-   - Must be opened through `src.analysis_io` when Stage-1 contract validation
-     is required.
+- [docs/pipeline_overview.md](docs/pipeline_overview.md) is the canonical
+  current architecture and ownership map.
+- `docs/products/` contains active Stage 1 and Stage 2 data contracts.
+- `docs/workflows/` contains temporal composites, spatial composites, and
+  shared plotting procedures.
+- `docs/decisions/` contains active scientific defaults.
+- `docs/legacy/` contains inactive Stage 3, Stage 4, and historical material.
 
-2. **Stage 2 - analysis feature datasets**
-   - Produced by the builders in `scripts/event_features/`.
-   - Includes event-feature and baseline-day feature datasets derived from
-     Stage 1.
-   - Must consume Stage 1 rather than reload raw data or rebuild thresholds,
-     event IDs, or harmonization logic.
+This file defines execution and contribution constraints. It is not a second
+pipeline specification. The documentation is the stable source of truth for
+intended behavior, architecture, scientific contracts, and compatibility.
+Tests are executable conformance checks, and the code is the implementation.
 
-All plotting scripts should consume Stage-1 or Stage-2 products. Plotting code
-must not silently become another ingestion or dataset-construction path.
+Plan and document new development before implementing it. Follow the
+documentation-first change process in `docs/README.md`: identify affected
+contracts and consumers, record the intended change, define compatibility and
+validation requirements, and only then change code and tests. Preserve
+documented behavior by default when an inconsistency is found. Do not revise a
+contract after the fact merely to match an accidental implementation change.
 
-Stages 3 and 4 are not part of the active workflow. Their PCA and clustering
-implementations under `scripts/event_features/old/`, along with related
-schedulers, documentation, and tests, are legacy material. Do not extend, run,
-or restore these stages unless the user explicitly reactivates them.
+## Engineering boundaries
 
-## Plotting contract
-
-`src/plot_style.py` is the single shared plotting-style module. All new and
-modified plotting scripts must use it so figures remain consistent across the
-project.
-
-- Import `plot_style` from `src`.
-- Reuse its theme, sizes, colors, labels, line widths, axis formatting, legend
-  helpers, and `save_figure()` function.
-- Add a generally useful style choice to `src/plot_style.py` rather than
-  duplicating constants or local `matplotlib` configuration across scripts.
-- Keep scientific data preparation separate from visual styling.
-- Add or update plot tests when changing shared style behavior or figure
-  semantics.
-
-## Code responsibilities
-
-- `src/config.py`: Venus data paths, regions, source constants, and defaults.
-- `src/data_io.py`: source-specific file discovery and raw data loading.
-- `src/preprocess.py`: coordinate, unit, time, averaging, anomaly, and
-  resampling utilities.
-- `src/harmonize.py`: source alignment and Stage-1 construction.
-- `src/analysis_io.py`: stable validation and I/O for assembled products.
-- `src/selectors.py` and `src/events.py`: reusable selection and event logic.
-- `src/composites.py` and `src/diagnostics.py`: analysis-ready computations.
-- `src/plotting.py` and `src/plot_style.py`: plotting prepared products.
-- `scripts/`: thin command-line entrypoints.
-- `schedulers/`: Venus OpenPBS execution entrypoints.
-
-Prefer reusable, tested functions in `src/` over analysis logic embedded in a
-plotting script or scheduler. Keep paths configurable through command-line
-arguments or shared configuration instead of adding new hardcoded paths.
+- Build reusable datasets before figures. Plotting code must consume prepared
+  Stage 1, Stage 2, composite, or spatial products.
+- Keep source-specific loading in `src/data_io.py`, regional harmonization in
+  `src/harmonize.py`, product I/O in `src/analysis_io.py`, and reusable
+  selection, event, composite, and diagnostic logic in `src/`.
+- Keep `scripts/` as thin CLI entrypoints and `schedulers/` as Venus OpenPBS
+  entrypoints.
+- Keep full spatial ERA5 fields outside Stage 1 and Stage 2. Follow
+  [docs/workflows/spatial_composites.md](docs/workflows/spatial_composites.md)
+  for the separate daily-field, climatology, and spatial-composite path.
+- Use `src/plot_style.py` directly or through `src/plotting.py` for every
+  active figure. Follow
+  [docs/workflows/plotting.md](docs/workflows/plotting.md) before changing
+  shared visual behavior.
+- Keep paths configurable through command-line arguments or shared
+  configuration instead of adding new hardcoded paths.
+- Do not extend, run, or restore legacy Stage 3 or Stage 4 workflows unless the
+  user explicitly reactivates them.
 
 ## Validation
 
@@ -129,8 +114,10 @@ python -m pytest
 ```
 
 Use targeted tests while developing, then run the full suite before handing off
-a change. Tests must use small synthetic fixtures and must not require access to
-the Venus production datasets.
+a change. Treat passing tests as evidence that the implementation conforms to
+the documented contracts, not as authority to override those contracts. Tests
+must use small synthetic fixtures and must not require access to the Venus
+production datasets.
 
 For changes that affect data ingestion, product construction, or production
 plotting, local tests are necessary but not sufficient. After the exact commit
@@ -138,7 +125,7 @@ has been pushed and cleanly deployed with authorization, run a short PBS smoke
 test on Venus and validate:
 
 - expected dimensions, coordinates, variables, metadata, units, and signs;
-- Stage-1 or Stage-2 product contract markers;
+- Stage 1, Stage 2, or spatial product contract markers;
 - time coverage and event or baseline selection counts;
 - output paths and non-empty artifacts; and
 - figure creation through the shared plotting style.

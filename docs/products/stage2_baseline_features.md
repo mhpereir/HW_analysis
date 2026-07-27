@@ -112,3 +112,10 @@ n_clean_days = ...
 
 The producer fails when the selected event-ID source is missing, contains
 missing values, or is inconsistent within a calendar day.
+
+## Downstream Consumers
+
+- event-versus-baseline adiabatic and advection comparison plots; and
+- exploratory fixed-window feature diagnostics.
+
+The baseline product is not an input to the current spatial-composite builder.

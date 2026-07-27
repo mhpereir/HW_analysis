@@ -32,7 +32,7 @@ leading into and including the peak timestamp.
 
 - Inclusive hourly windows contain 73 samples for `(-72,0)` when all hourly
   timestamps are present.
-- Sample-count variables must be retained so downstream PCA and clustering can
-  identify boundary events or missing data.
+- Sample-count variables must be retained so downstream consumers can identify
+  boundary events or missing data.
 - Adaptive growth-window features based on `dTdt > 0` remain out of scope for
   this product version.

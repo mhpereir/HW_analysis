@@ -9,7 +9,6 @@ trajectories. They are workflows and diagnostics, not product stages.
 
 - Stage-1 harmonized regional time series
 - event definitions and event-summary variables already present in Stage 1
-- optional Stage-4 cluster labels when making cluster-conditioned composites
 
 ## Current Scripts
 
@@ -37,4 +36,4 @@ and documents a composite dataset contract.
 ## Boundaries
 
 Composite plotting should not perform raw loading, threshold generation,
-harmonization, PCA fitting, or cluster assignment.
+harmonization, feature extraction, or spatial-field loading.

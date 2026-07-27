@@ -101,4 +101,4 @@ The producer should fail clearly when the PCA product lacks `event`, `pc`, or
 `n_clusters < 2`, `n_clusters` exceeds the number of events, tracked variables
 cannot be resolved, or an output exists without overwrite permission.
 
-See [decision 003](../decisions/003_clustering_strategy.md).
+See [legacy decision 003](003_clustering_strategy.md).

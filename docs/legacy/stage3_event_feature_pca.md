@@ -144,4 +144,4 @@ fewer than two valid events remain, fewer than two features are selected, a
 selected feature has zero scale after filtering, `n_components` is too large, or
 the output path exists without overwrite permission.
 
-See [decision 002](../decisions/002_pca_feature_matrix.md).
+See [legacy decision 002](002_pca_feature_matrix.md).
