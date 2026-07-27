@@ -87,6 +87,12 @@ slhf_heating_rate_approx(time)
 surface_energy_heating_rate_approx(time)
 ```
 
+PBL diagnostics are loaded from region-keyed hourly source directories before
+regional mean and weighted-percentile reductions. Cloud cover is loaded from
+the global hourly ERA5 grid and reduced to the configured region with the same
+cosine-latitude weighted regional-mean procedure used by other gridded surface
+diagnostics.
+
 Surface-energy source signs are preserved. Approximate heating-rate variables
 use the pressure-coordinate control-volume approximation documented by the
 variable metadata and diagnostics code.

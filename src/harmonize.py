@@ -341,6 +341,7 @@ def _prepare_full_diagnostic_variables(
     out["cloud_cover"] = _prepare_cloud_cover(
         full_diagnostics["cloud_cover"],
         hourly_time,
+        region=region,
         time_dim=time_dim,
     )
 
@@ -414,13 +415,15 @@ def _prepare_cloud_cover(
     ds: xr.Dataset,
     hourly_time: xr.DataArray,
     *,
+    region: str,
     time_dim: str,
 ) -> xr.DataArray:
-    """Return the already regionalized cloud-cover time series."""
+    """Return the regional mean of the global hourly cloud-cover field."""
     source_name = FULL_DIAGNOSTIC_SOURCE_VARIABLES["cloud_cover"]
     source = _require_dataset_variable(ds, source_name, dataset_name="cloud_cover")
+    regional = preprocess.compute_region_mean(source, region).rename("cloud_cover")
     out = _align_hourly_series(
-        source.rename("cloud_cover"),
+        regional,
         hourly_time,
         name="cloud_cover",
         time_dim=time_dim,
@@ -428,11 +431,11 @@ def _prepare_cloud_cover(
     out.attrs.update(
         {
             "source_dataset": "cloud_cover",
-            "source_variable": source_name,
+            "source_variable": source.attrs.get("source_variable", source_name),
             "native_time_resolution": "hourly",
             "analysis_time_resolution": "hourly",
             "alignment_method": "exact_time_selection",
-            "spatial_mean": "precomputed regional cosine-latitude weighted mean",
+            "spatial_mean": "cosine-latitude weighted regional mean",
         }
     )
     return out

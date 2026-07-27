@@ -377,7 +377,7 @@ def test_open_era5_surface_diagnostic_rejects_unknown_name():
         data_io.open_era5_surface_diagnostic("bad")
 
 
-def test_open_era5_pbl_p_builds_expected_path(monkeypatch):
+def test_open_era5_pbl_p_builds_expected_regional_path(monkeypatch):
     captured = {}
     ds = xr.Dataset(
         data_vars={"pbl_p": (("time", "lat", "lon"), [[[1.0]]])},
@@ -397,26 +397,32 @@ def test_open_era5_pbl_p_builds_expected_path(monkeypatch):
 
     monkeypatch.setattr(data_io, "_open_multiple_datasets", fake_open)
 
-    out = data_io.open_era5_pbl_p(years=[1940])
+    out = data_io.open_era5_pbl_p(region="pnw_bartusek", years=[1940])
 
-    assert captured["pattern"].endswith("/ERA5_ARCO_pbl_p_*.nc")
+    assert captured["pattern"].endswith(
+        "/PBL_download/outputs/pnw_bartusek/ERA5_ARCO_pbl_p_*.nc"
+    )
     assert captured["paths"] == ["/data/ERA5_ARCO_pbl_p_1940.nc"]
     assert captured["chunks"] == data_io.DEFAULT_PBL_CHUNKS
     assert "pbl_p" in out.data_vars
 
 
-def test_open_era5_total_cloud_cover_uses_region_in_pattern(monkeypatch):
+def test_open_era5_total_cloud_cover_uses_global_hourly_files(monkeypatch):
     captured = {}
     ds = xr.Dataset(
-        data_vars={"total_cloud_cover": ("time", [0.5])},
-        coords={"time": [0]},
+        data_vars={"tcc": (("valid_time", "latitude", "longitude"), [[[0.5]]])},
+        coords={
+            "valid_time": [0],
+            "latitude": [50.0],
+            "longitude": [240.0],
+        },
     )
 
     def fake_glob_required(pattern):
         captured["pattern"] = pattern
         return [
-            "/data/ERA5_ARCO_total_cloud_cover_pnw_bartusek_1940.nc",
-            "/data/ERA5_ARCO_total_cloud_cover_pnw_bartusek_1941.nc",
+            "/data/cloud_cover_hour_ERA5_1940.nc",
+            "/data/cloud_cover_hour_ERA5_1941.nc",
         ]
 
     def fake_open(paths, *, combine, chunks):
@@ -427,12 +433,32 @@ def test_open_era5_total_cloud_cover_uses_region_in_pattern(monkeypatch):
     monkeypatch.setattr(data_io, "_glob_required", fake_glob_required)
     monkeypatch.setattr(data_io, "_open_multiple_datasets", fake_open)
 
-    out = data_io.open_era5_total_cloud_cover(
-        region="pnw_bartusek",
-        years=[1940],
+    out = data_io.open_era5_total_cloud_cover(years=[1940])
+
+    assert captured["pattern"].endswith(
+        "/cloud_cover/cloud_cover_hour_ERA5_*.nc"
+    )
+    assert captured["paths"] == ["/data/cloud_cover_hour_ERA5_1940.nc"]
+    assert captured["chunks"] == data_io.DEFAULT_GLOBAL_HOURLY_CHUNKS
+    assert {"time", "lat", "lon"} <= set(out.coords)
+    assert "total_cloud_cover" in out.data_vars
+    assert out["total_cloud_cover"].attrs["source_variable"] == "tcc"
+
+
+def test_open_era5_total_cloud_cover_rejects_missing_tcc(monkeypatch):
+    monkeypatch.setattr(
+        data_io,
+        "_glob_required",
+        lambda pattern: ["/data/cloud_cover_hour_ERA5_1940.nc"],
+    )
+    monkeypatch.setattr(
+        data_io,
+        "_open_multiple_datasets",
+        lambda paths, *, combine, chunks: xr.Dataset(
+            {"wrong": ("time", [0.5])},
+            coords={"time": [0]},
+        ),
     )
 
-    assert "ERA5_ARCO_total_cloud_cover_pnw_bartusek_*.nc" in captured["pattern"]
-    assert captured["paths"] == ["/data/ERA5_ARCO_total_cloud_cover_pnw_bartusek_1940.nc"]
-    assert captured["chunks"] == data_io.DEFAULT_REGIONAL_HOURLY_CHUNKS
-    assert "total_cloud_cover" in out.data_vars
+    with pytest.raises(ValueError, match="missing required variable 'tcc'"):
+        data_io.open_era5_total_cloud_cover(years=[1940])

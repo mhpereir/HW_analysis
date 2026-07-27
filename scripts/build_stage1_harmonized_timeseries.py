@@ -191,7 +191,10 @@ def load_era5_inputs(args: argparse.Namespace) -> dict[str, object]:
 def load_full_diagnostic_inputs(args: argparse.Namespace) -> dict[str, xr.Dataset]:
     """Open optional local ARCO/ERA5 full-diagnostic inputs."""
     return {
-        "pbl_p": data_io.open_era5_pbl_p(years=args.analysis_years),
+        "pbl_p": data_io.open_era5_pbl_p(
+            region=args.region,
+            years=args.analysis_years,
+        ),
         "nslr": data_io.open_era5_surface_diagnostic(
             "nslr",
             years=args.analysis_years,
@@ -213,7 +216,6 @@ def load_full_diagnostic_inputs(args: argparse.Namespace) -> dict[str, xr.Datase
             years=args.analysis_years,
         ),
         "cloud_cover": data_io.open_era5_total_cloud_cover(
-            region=args.region,
             years=args.analysis_years,
         ),
     }
