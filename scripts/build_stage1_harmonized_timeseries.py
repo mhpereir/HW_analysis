@@ -21,7 +21,7 @@ if str(REPO_ROOT) not in sys.path:
 
 import xarray as xr
 
-from src import analysis_io, data_io, events, harmonize
+from src import analysis_io, config, data_io, events, harmonize
 
 FULL_DIAGNOSTIC_DATASET_KEYS: tuple[str, ...] = (
     "pbl_p",
@@ -122,6 +122,24 @@ def parse_args() -> argparse.Namespace:
             "cloud cover, and approximate heating-rate variables."
         ),
     )
+    parser.add_argument(
+        "--cloud-cover-source-layout",
+        choices=data_io.CLOUD_COVER_LAYOUTS,
+        default=data_io.CLOUD_COVER_LAYOUT_GLOBAL,
+        help=(
+            "Cloud-cover storage layout. The global hourly grid is canonical; "
+            "legacy-regional is an explicit temporary compatibility mode."
+        ),
+    )
+    parser.add_argument(
+        "--cloud-cover-root",
+        type=Path,
+        default=None,
+        help=(
+            "Optional cloud-cover source root. Required with "
+            "--cloud-cover-source-layout legacy-regional."
+        ),
+    )
     args = parser.parse_args()
     if args.start_year > args.end_year:
         parser.error("--start-year must be less than or equal to --end-year.")
@@ -137,6 +155,28 @@ def parse_args() -> argparse.Namespace:
         )
     except ValueError as exc:
         parser.error(str(exc))
+
+    if (
+        args.cloud_cover_source_layout
+        == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
+        and not args.add_full_diagnostics
+    ):
+        parser.error(
+            "--cloud-cover-source-layout legacy-regional requires "
+            "--add-full-diagnostics."
+        )
+    if (
+        args.cloud_cover_source_layout
+        == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
+        and args.cloud_cover_root is None
+    ):
+        parser.error(
+            "--cloud-cover-root is required with "
+            "--cloud-cover-source-layout legacy-regional."
+        )
+    if args.cloud_cover_root is None:
+        args.cloud_cover_root = Path(config.ERA5_CLOUD_COVER_ROOT)
+    args.cloud_cover_root = args.cloud_cover_root.expanduser().resolve()
 
     args.analysis_years = list(range(args.start_year, args.end_year + 1))
     args.heat_budget_root = data_io.era5_heat_budget_annual_root(
@@ -217,6 +257,14 @@ def load_full_diagnostic_inputs(args: argparse.Namespace) -> dict[str, xr.Datase
         ),
         "cloud_cover": data_io.open_era5_total_cloud_cover(
             years=args.analysis_years,
+            source_layout=args.cloud_cover_source_layout,
+            root=args.cloud_cover_root,
+            region=(
+                args.region
+                if args.cloud_cover_source_layout
+                == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
+                else None
+            ),
         ),
     }
 
@@ -416,6 +464,21 @@ def main() -> int:
             "zg_level": args.zg_level,
             "min_duration": min_duration,
             "add_full_diagnostics": args.add_full_diagnostics,
+            "cloud_cover_source_layout": (
+                args.cloud_cover_source_layout
+                if args.add_full_diagnostics
+                else ""
+            ),
+            "cloud_cover_root": (
+                str(args.cloud_cover_root)
+                if args.add_full_diagnostics
+                else ""
+            ),
+            "temporary_legacy_cloud_cover_override": int(
+                args.add_full_diagnostics
+                and args.cloud_cover_source_layout
+                == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
+            ),
         },
     )
     describe_analysis_dataset(analysis_ds)

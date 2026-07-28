@@ -328,6 +328,71 @@ def test_build_regional_analysis_dataset_reports_missing_full_diagnostic_dataset
         )
 
 
+def test_prepare_cloud_cover_accepts_explicit_preaggregated_region():
+    hourly_time = xr.DataArray(
+        np.array(["2000-01-01T00:00", "2000-01-01T01:00"], dtype="datetime64[m]"),
+        dims=("time",),
+    )
+    cloud = xr.Dataset(
+        {
+            "total_cloud_cover": xr.DataArray(
+                [0.25, 0.5],
+                dims=("time",),
+                coords={"time": hourly_time.values},
+                attrs={
+                    "source_variable": "total_cloud_cover",
+                    "source_layout": "legacy-regional",
+                    "source_root": "/legacy/cloud",
+                    "source_region": "pnw_bartusek",
+                    "spatially_preaggregated": 1,
+                },
+            )
+        }
+    )
+
+    out = harmonize._prepare_cloud_cover(
+        cloud,
+        hourly_time,
+        region="pnw_bartusek",
+        time_dim="time",
+    )
+
+    np.testing.assert_allclose(out.values, [0.25, 0.5])
+    assert out.dims == ("time",)
+    assert out.attrs["source_layout"] == "legacy-regional"
+    assert out.attrs["source_root"] == "/legacy/cloud"
+    assert out.attrs["source_region"] == "pnw_bartusek"
+    assert out.attrs["spatially_preaggregated"] == 1
+
+
+def test_prepare_cloud_cover_rejects_wrong_preaggregated_region():
+    hourly_time = xr.DataArray(
+        np.array(["2000-01-01T00:00"], dtype="datetime64[m]"),
+        dims=("time",),
+    )
+    cloud = xr.Dataset(
+        {
+            "total_cloud_cover": xr.DataArray(
+                [0.25],
+                dims=("time",),
+                coords={"time": hourly_time.values},
+                attrs={
+                    "source_region": "pnw_hotz",
+                    "spatially_preaggregated": 1,
+                },
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="does not match"):
+        harmonize._prepare_cloud_cover(
+            cloud,
+            hourly_time,
+            region="pnw_bartusek",
+            time_dim="time",
+        )
+
+
 def _daily_array(values, *, name: str) -> xr.DataArray:
     return xr.DataArray(
         values,

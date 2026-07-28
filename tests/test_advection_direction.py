@@ -90,6 +90,33 @@ def test_grouped_advection_components_preserves_face_sums():
     np.testing.assert_allclose(grouped["advection_face_total"], [3600.0, 3600.0])
 
 
+def test_grouped_component_ratios_use_requested_numerator_order():
+    stage1, heat_budget = _make_inputs()
+    enhanced = advection_direction.add_face_advection_tendencies(stage1, heat_budget)
+
+    out = advection_direction.add_grouped_components_and_ratios(
+        enhanced,
+        ratio_epsilon=0.0,
+    )
+
+    np.testing.assert_allclose(
+        out["advection_meridional_zonal_ratio"],
+        [0.25, 0.25],
+    )
+    np.testing.assert_allclose(
+        out["advection_horizontal_vertical_ratio"],
+        [5.0 / 3.0, 5.0 / 3.0],
+    )
+    assert (
+        out["advection_meridional_zonal_ratio"].attrs["numerator"]
+        == "advection_meridional"
+    )
+    assert (
+        out["advection_horizontal_vertical_ratio"].attrs["denominator"]
+        == "advection_vertical"
+    )
+
+
 def test_masked_ratio_masks_small_denominators_and_preserves_sign():
     numerator = xr.DataArray([2.0, -3.0, 4.0], dims=("time",))
     denominator = xr.DataArray([1.0, -2.0, 0.01], dims=("time",))

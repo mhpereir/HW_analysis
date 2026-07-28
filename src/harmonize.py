@@ -418,10 +418,53 @@ def _prepare_cloud_cover(
     region: str,
     time_dim: str,
 ) -> xr.DataArray:
-    """Return the regional mean of the global hourly cloud-cover field."""
+    """Return regional cloud cover from a global grid or pre-aggregated series."""
     source_name = FULL_DIAGNOSTIC_SOURCE_VARIABLES["cloud_cover"]
     source = _require_dataset_variable(ds, source_name, dataset_name="cloud_cover")
-    regional = preprocess.compute_region_mean(source, region).rename("cloud_cover")
+    has_lat = "lat" in source.dims
+    has_lon = "lon" in source.dims
+    if has_lat != has_lon:
+        raise ValueError(
+            "cloud_cover must contain both spatial dimensions 'lat' and 'lon', "
+            "or neither for an explicitly pre-aggregated regional source."
+        )
+
+    if has_lat:
+        regional = preprocess.compute_region_mean(source, region)
+        spatial_mean = "cosine-latitude weighted regional mean"
+        preaggregated = False
+    else:
+        if source.dims != (time_dim,):
+            raise ValueError(
+                "Pre-aggregated cloud_cover must be 1D over "
+                f"{time_dim!r}; got {source.dims!r}."
+            )
+        preaggregated = bool(
+            source.attrs.get(
+                "spatially_preaggregated",
+                ds.attrs.get("spatially_preaggregated", False),
+            )
+        )
+        if not preaggregated:
+            raise ValueError(
+                "Cloud-cover input without lat/lon must explicitly declare "
+                "spatially_preaggregated."
+            )
+        source_region = str(
+            source.attrs.get("source_region", ds.attrs.get("source_region", ""))
+        )
+        if source_region != region:
+            raise ValueError(
+                "Pre-aggregated cloud-cover region does not match the Stage-1 "
+                f"region: source={source_region!r}, requested={region!r}."
+            )
+        regional = source
+        spatial_mean = source.attrs.get(
+            "spatial_mean",
+            "precomputed cosine-latitude weighted regional mean",
+        )
+
+    regional = regional.rename("cloud_cover")
     out = _align_hourly_series(
         regional,
         hourly_time,
@@ -435,7 +478,17 @@ def _prepare_cloud_cover(
             "native_time_resolution": "hourly",
             "analysis_time_resolution": "hourly",
             "alignment_method": "exact_time_selection",
-            "spatial_mean": "cosine-latitude weighted regional mean",
+            "spatial_mean": spatial_mean,
+            "spatially_preaggregated": int(preaggregated),
+            "source_layout": source.attrs.get(
+                "source_layout", ds.attrs.get("source_layout", "")
+            ),
+            "source_root": source.attrs.get(
+                "source_root", ds.attrs.get("source_root", "")
+            ),
+            "source_region": source.attrs.get(
+                "source_region", ds.attrs.get("source_region", "")
+            ),
         }
     )
     return out

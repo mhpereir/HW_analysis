@@ -215,35 +215,35 @@ def add_grouped_components_and_ratios(
 
     grouped = grouped_advection_components(ds)
     out = xr.merge([ds, grouped], compat="override")
-    out["advection_zonal_meridional_ratio"] = masked_ratio(
-        out["advection_zonal"],
+    out["advection_meridional_zonal_ratio"] = masked_ratio(
         out["advection_meridional"],
+        out["advection_zonal"],
         epsilon=ratio_epsilon,
-        name="advection_zonal_meridional_ratio",
+        name="advection_meridional_zonal_ratio",
     )
-    out["advection_vertical_horizontal_ratio"] = masked_ratio(
-        out["advection_vertical"],
+    out["advection_horizontal_vertical_ratio"] = masked_ratio(
         out["advection_horizontal"],
+        out["advection_vertical"],
         epsilon=ratio_epsilon,
-        name="advection_vertical_horizontal_ratio",
+        name="advection_horizontal_vertical_ratio",
     )
-    out["advection_zonal_meridional_ratio"].attrs.update(
+    out["advection_meridional_zonal_ratio"].attrs.update(
         {
-            "long_name": "Zonal to meridional advective-tendency ratio",
-            "numerator": "advection_zonal",
-            "denominator": "advection_meridional",
+            "long_name": "Meridional to zonal advective-tendency ratio",
+            "numerator": "advection_meridional",
+            "denominator": "advection_zonal",
         }
     )
-    out["advection_vertical_horizontal_ratio"].attrs.update(
+    out["advection_horizontal_vertical_ratio"].attrs.update(
         {
-            "long_name": "Vertical to horizontal advective-tendency ratio",
-            "numerator": "advection_vertical",
-            "denominator": "advection_horizontal",
+            "long_name": "Horizontal to vertical advective-tendency ratio",
+            "numerator": "advection_horizontal",
+            "denominator": "advection_vertical",
         }
     )
     for name in (
-        "advection_zonal_meridional_ratio",
-        "advection_vertical_horizontal_ratio",
+        "advection_meridional_zonal_ratio",
+        "advection_horizontal_vertical_ratio",
     ):
         out[name].attrs.update(
             {

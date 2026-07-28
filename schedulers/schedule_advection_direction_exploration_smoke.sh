@@ -1,7 +1,7 @@
 #!/bin/bash
-#PBS -N advection_direction_exploration
-#PBS -l select=1:ncpus=8:mem=48gb
-#PBS -l walltime=08:00:00
+#PBS -N adv_direction_smoke
+#PBS -l select=1:ncpus=4:mem=24gb
+#PBS -l walltime=00:45:00
 #PBS -j oe
 #PBS -o /dev/null
 
@@ -17,7 +17,7 @@ test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)
 
 LOG_DIR="${PROJECT_ROOT}/logs"
 mkdir -p "${LOG_DIR}"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_advection_direction_exploration.log"
+LOGFILE="${LOG_DIR}/${PBS_JOBID}_advection_direction_smoke.log"
 exec > >(tee -a "${LOGFILE}") 2>&1
 
 export OMP_NUM_THREADS=1
@@ -33,16 +33,16 @@ BOTTOM_BOUNDARY="surface"
 TOP_BOUNDARY=700
 THRESHOLD_VARIABLE="tas"
 QUANTILE=90
-TIME_START=1940
+TIME_START=2024
 TIME_END=2024
 EHB_TIME_START=1940
 EHB_TIME_END=2025
 LEGACY_CLOUD_ROOT="/home/mhpereir/data-mhpereir/arco_era5/CloudCover_download/outputs"
 
-EXPLORATION_DIR="${PROJECT_ROOT}/results/stage1/advection_direction_exploration"
-STAGE1_BASE_PATH="${EXPLORATION_DIR}/base_stage1/harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
-STAGE1_ENHANCED_PATH="${EXPLORATION_DIR}/harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
-PLOT_OUTPUT_PATH="${PROJECT_ROOT}/results/plots_advection_direction_exploration/region_pnw_bartusek/boundary_surface_700hPa/time_range_1940_2024/advection_face_contributions.png"
+SMOKE_DIR="${PROJECT_ROOT}/results/stage1/advection_direction_exploration/smoke_2024"
+STAGE1_BASE_PATH="${SMOKE_DIR}/base_stage1/harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_2024_2024.nc"
+STAGE1_ENHANCED_PATH="${SMOKE_DIR}/harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_2024_2024.nc"
+PLOT_OUTPUT_PATH="${PROJECT_ROOT}/results/plots_advection_direction_exploration/smoke_2024/advection_face_contributions.png"
 
 echo "[info] job_id=${PBS_JOBID}"
 echo "[info] host=$(hostname)"

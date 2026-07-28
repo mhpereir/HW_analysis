@@ -18,6 +18,12 @@ def test_plot_advection_direction_exploration_has_four_panels_and_daily_glyphs()
         assert len(fig.axes[3].collections) == 4
         assert "Signed face contributions" == fig.axes[0].get_title()
         assert "Component ratios" in fig.axes[2].get_title()
+        assert {
+            line.get_label() for line in fig.axes[2].lines
+        } >= {
+            "Meridional / zonal",
+            "Horizontal / vertical",
+        }
         assert "not airflow direction" in fig.axes[3].get_title()
         assert {text.get_text() for text in fig.axes[3].texts} >= {
             "W",

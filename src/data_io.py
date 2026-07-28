@@ -35,7 +35,15 @@ DEFAULT_THRESHOLD_CHUNKS: dict[str, int] = {"dayofyear": 365}
 DEFAULT_HEAT_BUDGET_CHUNKS: dict[str, int] = {"time": 512}
 ChunkSpec: TypeAlias = Mapping[str, int] | str
 DEFAULT_GLOBAL_HOURLY_CHUNKS: str = "auto"
+DEFAULT_REGIONAL_HOURLY_CHUNKS: dict[str, int] = {"time": 24 * 31}
 DEFAULT_PBL_CHUNKS: str = "auto"
+
+CLOUD_COVER_LAYOUT_GLOBAL: str = "global-hourly-grid"
+CLOUD_COVER_LAYOUT_LEGACY_REGIONAL: str = "legacy-regional"
+CLOUD_COVER_LAYOUTS: tuple[str, ...] = (
+    CLOUD_COVER_LAYOUT_GLOBAL,
+    CLOUD_COVER_LAYOUT_LEGACY_REGIONAL,
+)
 
 
 SURFACE_DIAGNOSTIC_ROOTS: dict[str, str] = {
@@ -275,21 +283,79 @@ def open_era5_total_cloud_cover(
     *,
     years: Sequence[int] | None = None,
     chunks: ChunkSpec | None = None,
+    source_layout: str = CLOUD_COVER_LAYOUT_GLOBAL,
+    root: str | Path | None = None,
+    region: str | None = None,
 ) -> xr.Dataset:
-    """Open global hourly ERA5 total cloud-cover fields."""
-    pattern = f"{config.ERA5_CLOUD_COVER_ROOT}/cloud_cover_hour_ERA5_*.nc"
+    """Open hourly ERA5 cloud cover from an explicit supported source layout."""
+    if source_layout not in CLOUD_COVER_LAYOUTS:
+        valid = ", ".join(CLOUD_COVER_LAYOUTS)
+        raise ValueError(
+            f"Unsupported cloud-cover source layout {source_layout!r}. "
+            f"Expected one of: {valid}."
+        )
+
+    if source_layout == CLOUD_COVER_LAYOUT_GLOBAL:
+        if region is not None:
+            raise ValueError(
+                "region must be omitted for the global-hourly-grid cloud-cover layout."
+            )
+        source_root = Path(root or config.ERA5_CLOUD_COVER_ROOT)
+        pattern = str(source_root / "cloud_cover_hour_ERA5_*.nc")
+        source_chunks = chunks or DEFAULT_GLOBAL_HOURLY_CHUNKS
+    else:
+        if root is None:
+            raise ValueError(
+                "root is required for the temporary legacy-regional "
+                "cloud-cover layout."
+            )
+        if region is None:
+            raise ValueError(
+                "region is required for the legacy-regional cloud-cover layout."
+            )
+        source_root = Path(root)
+        pattern = str(
+            source_root / f"ERA5_ARCO_total_cloud_cover_{region}_*.nc"
+        )
+        source_chunks = chunks or DEFAULT_REGIONAL_HOURLY_CHUNKS
+
     paths = _glob_required(pattern)
     paths = _filter_yearly_files(paths, years)
     ds = _open_multiple_datasets(
         paths,
         combine="by_coords",
-        chunks=chunks or DEFAULT_GLOBAL_HOURLY_CHUNKS,
+        chunks=source_chunks,
     )
     ds = _standardize_common_structure(ds)
-    if "tcc" not in ds:
-        raise ValueError("ERA5 cloud-cover dataset is missing required variable 'tcc'.")
-    ds = ds.rename({"tcc": "total_cloud_cover"})
-    ds["total_cloud_cover"].attrs["source_variable"] = "tcc"
+
+    if source_layout == CLOUD_COVER_LAYOUT_GLOBAL:
+        if "tcc" not in ds:
+            raise ValueError(
+                "ERA5 cloud-cover dataset is missing required variable 'tcc'."
+            )
+        ds = ds.rename({"tcc": "total_cloud_cover"})
+        source_variable = "tcc"
+        source_region = ""
+        preaggregated = False
+    else:
+        if "total_cloud_cover" not in ds:
+            raise ValueError(
+                "Legacy regional cloud-cover dataset is missing required "
+                "variable 'total_cloud_cover'."
+            )
+        source_variable = "total_cloud_cover"
+        source_region = str(region)
+        preaggregated = True
+
+    provenance = {
+        "source_variable": source_variable,
+        "source_layout": source_layout,
+        "source_root": str(source_root),
+        "source_region": source_region,
+        "spatially_preaggregated": int(preaggregated),
+    }
+    ds.attrs.update(provenance)
+    ds["total_cloud_cover"].attrs.update(provenance)
     return ds
 
 

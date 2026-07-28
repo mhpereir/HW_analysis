@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned on branch `advection-direction-prototype`.
+Implemented for validation on branch `advection-direction-prototype`.
 
 This document defines the goal, scientific interpretation, implementation
 sequence, compatibility requirements, and intended outputs for a standalone
@@ -136,8 +136,8 @@ change. They do not directly describe the direction of the mean wind.
 
 ### Ratios and shares
 
-Direct ratios such as `A_zonal / A_meridional` and
-`A_vertical / A_horizontal` become unstable when the denominator approaches
+Direct ratios such as `A_meridional / A_zonal` and
+`A_horizontal / A_vertical` become unstable when the denominator approaches
 zero. The prototype will compare:
 
 - direct signed ratios with a documented near-zero denominator mask;
@@ -196,6 +196,44 @@ plotting code.
 
 Generated datasets, figures, and logs will remain outside Git under ignored
 result paths.
+
+## Temporary Legacy Cloud-Cover Validation Run
+
+The canonical Stage-1 cloud-cover source is the global hourly ERA5 dataset:
+
+```text
+/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/cloud_cover
+```
+
+That download is incomplete and cannot yet support the 1940-2024 prototype
+period. The validation run may temporarily use the historical, pre-aggregated
+regional source:
+
+```text
+/home/mhpereir/data-mhpereir/arco_era5/CloudCover_download/outputs
+```
+
+The temporary source contains a one-dimensional
+`total_cloud_cover(time)` series that was already reduced to
+`pnw_bartusek` with cosine-latitude weights. The Stage-1 builder must therefore
+select an explicit `legacy-regional` layout and must not apply a second spatial
+mean.
+
+This compatibility mode is limited to the isolated prototype run:
+
+- the global hourly grid remains the default and canonical source;
+- the legacy root and source layout must be explicit command-line arguments;
+- Stage 1 must record the selected root, layout, region, and pre-aggregation
+  provenance in dataset and variable metadata;
+- the temporary base Stage-1 file must be written beneath
+  `results/stage1/advection_direction_exploration/base_stage1/`;
+- existing canonical Stage-1 products must not be overwritten; and
+- the legacy override must be removed from the production scheduler when the
+  global download covers the complete analysis period.
+
+Run a one-year 2024 smoke build and plot first. Submit the full 1940-2024
+pipeline only after the smoke output passes source-layout, time-alignment,
+advection-reconstruction, event-count, and non-empty-figure checks.
 
 ## Planned Modifications
 
@@ -288,6 +326,8 @@ Generated paths:
 
 ```text
 results/stage1/advection_direction_exploration/
+  base_stage1/
+    harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc
   harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc
 
 results/plots_advection_direction_exploration/

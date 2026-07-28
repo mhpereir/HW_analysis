@@ -35,12 +35,12 @@ GROUP_LABELS = {
     "advection_face_total": "All faces",
 }
 RATIO_COLORS = {
-    "advection_zonal_meridional_ratio": "#6A5ACD",
-    "advection_vertical_horizontal_ratio": "#E69F00",
+    "advection_meridional_zonal_ratio": "#6A5ACD",
+    "advection_horizontal_vertical_ratio": "#E69F00",
 }
 RATIO_LABELS = {
-    "advection_zonal_meridional_ratio": "Zonal / meridional",
-    "advection_vertical_horizontal_ratio": "Vertical / horizontal",
+    "advection_meridional_zonal_ratio": "Meridional / zonal",
+    "advection_horizontal_vertical_ratio": "Horizontal / vertical",
 }
 
 
