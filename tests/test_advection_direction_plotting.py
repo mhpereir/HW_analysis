@@ -28,6 +28,7 @@ def test_plot_advection_direction_exploration_has_selected_three_panels():
             "Vertical",
             "All faces",
         }
+        assert fig.axes[1].get_legend()._ncols == 5
         assert "not airflow direction" in fig.axes[2].get_title()
         assert {text.get_text() for text in fig.axes[2].texts} >= {
             "W",

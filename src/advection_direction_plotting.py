@@ -149,7 +149,7 @@ def _plot_grouped_timeseries(
     ax.set_ylabel("Grouped contribution [K hr-1]")
     ax.set_title("Grouped advective contributions")
     _add_upper_axis_headroom(ax)
-    ax.legend(ncol=4, loc="upper center", **plot_style.legend_kwargs())
+    ax.legend(ncol=5, loc="upper center", **plot_style.legend_kwargs())
 
 
 def _add_upper_axis_headroom(

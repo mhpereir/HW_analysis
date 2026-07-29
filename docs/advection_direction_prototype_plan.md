@@ -27,7 +27,24 @@ The legends in the first two panels remain centered inside their axes. After
 autoscaling the plotted data, each of these panels must add upper y-axis
 headroom equal to 30 percent of its autoscaled y-range. The lower limit must
 remain unchanged. This data-relative rule keeps the legends clear of the
-traces without hardcoding limits for one composite.
+traces without hardcoding limits for one composite. The grouped-component
+legend uses five columns so all five series remain on one row.
+
+## Sequential PBS Execution
+
+Each durable step must run as its own explicit PBS task. Building base Stage 1,
+adding the face-resolved exploration variables, and rendering the plot must not
+be hidden inside one combined scheduler job.
+
+The earlier combined production scheduler, combined smoke scheduler, and shell
+pipeline runner have therefore been removed. The retained
+`schedulers/schedule_plot_advection_direction_exploration.sh` is plot-only: it
+consumes an existing enhanced Stage-1 product and writes a new figure.
+
+If the base or enhanced Stage-1 products need to be rebuilt, add or use a
+tracked scheduler for that one builder only, submit it independently, validate
+its durable output, and then submit the next stage. Do not restore a scheduler
+that chains multiple durable stages.
 
 ## Goal
 
@@ -297,6 +314,8 @@ advection-reconstruction, event-count, and non-empty-figure checks.
   three-panel figure.
 - Add 30 percent data-relative upper y-axis headroom to the signed-face and
   grouped-component panels so their centered legends do not obscure traces.
+- Keep the five grouped-component legend entries on one row using five
+  columns.
 - Render one 24-hour face-contribution glyph for each daily lag from day `-7`
   through day `+7`.
 - Put the glyphs in a dedicated ribbon or inset cells so each day's west, east,
@@ -397,8 +416,8 @@ Local validation in `dev_env`:
 - masked behavior for near-zero denominators;
 - metadata and unit validation;
 - plotting tests for the three-panel order, absence of the ratio panel,
-  data-relative legend headroom, glyph count, lag placement, scale, labels,
-  and non-empty output; and
+  data-relative legend headroom, the five-column grouped legend, glyph count,
+  lag placement, scale, labels, and non-empty output; and
 - the full repository test suite.
 
 Venus validation through OpenPBS:
