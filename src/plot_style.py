@@ -7,7 +7,13 @@ from pathlib import Path
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-from matplotlib.ticker import AutoMinorLocator, Formatter, NullFormatter
+from matplotlib.ticker import (
+    AutoMinorLocator,
+    Formatter,
+    MultipleLocator,
+    NullFormatter,
+    StrMethodFormatter,
+)
 import numpy as np
 import seaborn as sns
 
@@ -185,6 +191,15 @@ def format_time_axis(ax) -> None:
     ax.xaxis.set_major_formatter(formatter)
     ax.xaxis.set_minor_locator(mdates.AutoDateLocator(minticks=8, maxticks=18))
     ax.xaxis.set_minor_formatter(NullFormatter())
+
+
+def format_integer_axis(axis, *, spacing: int = 1) -> None:
+    """Format a numeric axis with integer labels at a fixed integer spacing."""
+    if isinstance(spacing, bool) or not isinstance(spacing, int) or spacing < 1:
+        raise ValueError("spacing must be a positive integer.")
+    axis.set_major_locator(MultipleLocator(spacing))
+    axis.set_major_formatter(StrMethodFormatter("{x:.0f}"))
+    use_default_numeric_formatter(axis)
 
 
 def style_axis(ax, *, grid: bool = True) -> None:

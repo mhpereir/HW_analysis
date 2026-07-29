@@ -40,7 +40,7 @@ def test_plot_defaults_to_enhanced_stage1_and_separate_plot_tree():
 
     assert out.input_path.parent.name == "advection_direction_exploration"
     assert "plots_advection_direction_exploration" in out.output_path.parts
-    assert out.output_path.name == "advection_face_contributions_three_panel.png"
+    assert out.output_path.name == "advection_face_contributions_two_panel.png"
 
 
 def _base_args() -> Namespace:

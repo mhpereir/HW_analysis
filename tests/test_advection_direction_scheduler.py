@@ -16,7 +16,7 @@ def test_plot_only_scheduler_reuses_enhanced_stage1_without_overwriting():
     assert 'PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"' in text
     assert 'EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"' in text
     assert "harmonized_regional_timeseries_pnw_bartusek" in text
-    assert "advection_face_contributions_three_panel.png" in text
+    assert "advection_face_contributions_two_panel.png" in text
     assert "refusing to overwrite existing output" in text
     assert "build_stage1" not in text
     subprocess.run(["bash", "-n", str(PLOT_SCHEDULER)], check=True)

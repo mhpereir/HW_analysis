@@ -24,16 +24,14 @@ from src import (
 
 
 PLOT_NAME = "advection_direction_exploration"
-DEFAULT_OUTPUT_FILENAME = "advection_face_contributions_three_panel.png"
+DEFAULT_OUTPUT_FILENAME = "advection_face_contributions_two_panel.png"
 EXPLORATION_SUBDIR = "advection_direction_exploration"
 
 
 def parse_args() -> argparse.Namespace:
     """Parse standalone advection-direction plot arguments."""
     parser = argparse.ArgumentParser(
-        description=(
-            "Plot peak-aligned face advection tendencies and daily face glyphs."
-        )
+        description="Plot peak-aligned face and grouped advection tendencies."
     )
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(

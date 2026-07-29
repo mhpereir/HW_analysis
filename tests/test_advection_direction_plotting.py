@@ -5,17 +5,16 @@ import xarray as xr
 from HW_analysis.src import advection_direction, advection_direction_plotting
 
 
-def test_plot_advection_direction_exploration_has_selected_three_panels():
+def test_plot_advection_direction_exploration_has_selected_two_panels():
     composite = _make_composite()
 
     fig = advection_direction_plotting.plot_advection_direction_exploration(composite)
     try:
-        assert len(fig.axes) == 3
-        assert len(fig.axes[2].patches) == 4
-        assert len(fig.axes[2].collections) == 4
+        assert len(fig.axes) == 2
         assert "Signed face contributions" == fig.axes[0].get_title()
         assert "Grouped advective contributions" == fig.axes[1].get_title()
         assert all("Component ratios" not in ax.get_title() for ax in fig.axes)
+        assert all("glyph" not in ax.get_title().lower() for ax in fig.axes)
         assert {
             text.get_text() for text in fig.axes[0].get_legend().get_texts()
         } == {"West", "East", "South", "North", "Top"}
@@ -29,14 +28,24 @@ def test_plot_advection_direction_exploration_has_selected_three_panels():
             "All faces",
         }
         assert fig.axes[1].get_legend()._ncols == 5
-        assert "not airflow direction" in fig.axes[2].get_title()
-        assert {text.get_text() for text in fig.axes[2].texts} >= {
-            "W",
-            "E",
-            "S",
-            "N",
-            "T",
-        }
+        assert [ax.get_ylabel() for ax in fig.axes] == ["K hr-1", "K hr-1"]
+        assert fig.axes[1].get_xlabel() == "Days relative to event peak"
+        visible_ticks = fig.axes[1].get_xticks()
+        lower, upper = fig.axes[1].get_xlim()
+        visible_ticks = visible_ticks[
+            (visible_ticks >= lower) & (visible_ticks <= upper)
+        ]
+        np.testing.assert_array_equal(visible_ticks, np.arange(-2, 3))
+        assert all(float(tick).is_integer() for tick in visible_ticks)
+        advection_direction_plotting.plot_style.format_numeric_axes(fig)
+        formatter = fig.axes[1].xaxis.get_major_formatter()
+        assert [formatter(tick) for tick in visible_ticks] == [
+            "−2",
+            "−1",
+            "0",
+            "1",
+            "2",
+        ]
     finally:
         plt.close(fig)
 

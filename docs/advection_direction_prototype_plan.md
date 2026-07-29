@@ -10,18 +10,17 @@ advection-direction time-series prototype. The prototype uses an enhanced
 Stage-1 copy in an exploration subfolder. It does not yet change the canonical
 Stage-1 contract or any production figure.
 
-The first full-period figure has now been reviewed under command-center task
-`A2.4`. The selected follow-up figure contains three panels:
+The full-period figures have now been reviewed under command-center task
+`A2.4`. The selected follow-up figure contains two panels:
 
 1. individual signed face contributions;
 2. grouped zonal, meridional, horizontal, vertical, and all-face
-   contributions; and
-3. the daily 24-hour face-contribution glyph sequence.
+   contributions.
 
-The standalone signed-ratio panel is omitted because it was less informative
-than the component tendencies and glyph sequence. Ratio calculations remain
-available as experimental diagnostics, but they are not part of this selected
-figure.
+The standalone signed-ratio panel and daily face-contribution glyph sequence
+are omitted because the two component-tendency panels were the most
+informative. Ratio and glyph calculations remain available as experimental
+diagnostics, but they are not part of this selected figure.
 
 The legends in the first two panels remain centered inside their axes. After
 autoscaling the plotted data, each of these panels must add upper y-axis
@@ -29,6 +28,10 @@ headroom equal to 30 percent of its autoscaled y-range. The lower limit must
 remain unchanged. This data-relative rule keeps the legends clear of the
 traces without hardcoding limits for one composite. The grouped-component
 legend uses five columns so all five series remain on one row.
+
+Both y-axis labels contain only the units `K hr-1`; the panel titles and legends
+identify the plotted quantities. The shared x-axis represents days relative to
+the event peak and must use integer labels at one-day intervals.
 
 ## Sequential PBS Execution
 
@@ -188,7 +191,7 @@ No ratio will replace the underlying components.
 The initial denominator mask is `0.005 K hr-1`. In the inspected 2024 data,
 this is near the lower tail of the absolute meridional and horizontal
 contributions. The value remains explicit in the diagnostic API and output
-metadata so it can be assessed independently of the selected three-panel
+metadata so it can be assessed independently of the selected two-panel
 figure.
 
 ### Face-contribution visualization
@@ -311,18 +314,16 @@ advection-reconstruction, event-count, and non-empty-figure checks.
 - Render unnormalized component tendencies as the scientific reference.
 - Keep ratio, bounded-share, and angle calculations available for diagnostic
   comparison, but omit the standalone ratio panel from the selected
-  three-panel figure.
+  two-panel figure.
 - Add 30 percent data-relative upper y-axis headroom to the signed-face and
   grouped-component panels so their centered legends do not obscure traces.
 - Keep the five grouped-component legend entries on one row using five
   columns.
-- Render one 24-hour face-contribution glyph for each daily lag from day `-7`
-  through day `+7`.
-- Put the glyphs in a dedicated ribbon or inset cells so each day's west, east,
-  south, north, and top contributions remain distinguishable.
-- Encode warming or cooling by color and contribution magnitude by marker size
-  or length. Always include a scale and a clear `advective heating-rate
-  contribution` label.
+- Label both y-axes with `K hr-1` only.
+- Share the relative-day x-axis across both panels and label every integer day
+  at one-day intervals.
+- Keep the daily face-glyph calculation available for diagnostic review, but
+  omit the glyph panel from the selected figure.
 - Add a tracked OpenPBS smoke scheduler for the `pnw_bartusek` case.
 
 ### Phase 4: Review and select a representation
@@ -379,18 +380,19 @@ results/plots_advection_direction_exploration/
       time_range_1940_2024/
         advection_face_contributions.png
         advection_face_contributions_three_panel.png
+        advection_face_contributions_two_panel.png
 ```
 
 The original `advection_face_contributions.png` is retained as the reviewed
-four-panel baseline. `advection_face_contributions_three_panel.png` will show:
+four-panel baseline, and `advection_face_contributions_three_panel.png` is
+retained as the reviewed three-panel intermediate.
+`advection_face_contributions_two_panel.png` will show:
 
 - individual signed face contributions;
-- total, zonal, meridional, horizontal, and vertical contributions;
-- the daily 24-hour face-contribution glyph sequence.
+- total, zonal, meridional, horizontal, and vertical contributions.
 
 Each product and figure will record the region, pressure boundaries, event
-definition, years, season filter, lag window, 24-hour aggregation convention,
-input paths, and source commit.
+definition, years, season filter, lag window, input paths, and source commit.
 
 ## Compatibility Requirements
 
@@ -415,9 +417,9 @@ Local validation in `dev_env`:
 - face-component averaging before grouped reductions;
 - masked behavior for near-zero denominators;
 - metadata and unit validation;
-- plotting tests for the three-panel order, absence of the ratio panel,
-  data-relative legend headroom, the five-column grouped legend, glyph count,
-  lag placement, scale, labels, and non-empty output; and
+- plotting tests for the two-panel order, absence of ratio and glyph panels,
+  data-relative legend headroom, the five-column grouped legend, unit-only
+  y-axis labels, one-day integer x-axis ticks, and non-empty output; and
 - the full repository test suite.
 
 Venus validation through OpenPBS:
@@ -428,8 +430,8 @@ Venus validation through OpenPBS:
 - reconstruction-error statistics;
 - event count, season-selection count, and complete-window count;
 - non-empty NetCDF and PNG outputs;
-- visual inspection of panel order, legend clearance, face placement, sign
-  colors, magnitude scaling, and legibility; and
+- visual inspection of panel order, legend clearance, axis labels and ticks,
+  line colors, and legibility; and
 - recorded commit, job ID, exit status, elapsed time, CPU time, and peak memory.
 
 ## Decisions Required After the Prototype

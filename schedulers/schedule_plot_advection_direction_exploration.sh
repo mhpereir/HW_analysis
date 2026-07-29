@@ -29,7 +29,7 @@ source /home/mhpereir/miniconda3/etc/profile.d/mamba.sh
 mamba activate "${VENUS_MAMBA_ENV:-dev_env}"
 
 INPUT_PATH="${PROJECT_ROOT}/results/stage1/advection_direction_exploration/harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
-OUTPUT_PATH="${PROJECT_ROOT}/results/plots_advection_direction_exploration/region_pnw_bartusek/boundary_surface_700hPa/time_range_1940_2024/advection_face_contributions_three_panel.png"
+OUTPUT_PATH="${PROJECT_ROOT}/results/plots_advection_direction_exploration/region_pnw_bartusek/boundary_surface_700hPa/time_range_1940_2024/advection_face_contributions_two_panel.png"
 
 test -s "${INPUT_PATH}"
 if [[ -e "${OUTPUT_PATH}" ]]; then
