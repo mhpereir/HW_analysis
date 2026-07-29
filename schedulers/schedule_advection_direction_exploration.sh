@@ -42,7 +42,7 @@ LEGACY_CLOUD_ROOT="/home/mhpereir/data-mhpereir/arco_era5/CloudCover_download/ou
 EXPLORATION_DIR="${PROJECT_ROOT}/results/stage1/advection_direction_exploration"
 STAGE1_BASE_PATH="${EXPLORATION_DIR}/base_stage1/harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
 STAGE1_ENHANCED_PATH="${EXPLORATION_DIR}/harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
-PLOT_OUTPUT_PATH="${PROJECT_ROOT}/results/plots_advection_direction_exploration/region_pnw_bartusek/boundary_surface_700hPa/time_range_1940_2024/advection_face_contributions.png"
+PLOT_OUTPUT_PATH="${PROJECT_ROOT}/results/plots_advection_direction_exploration/region_pnw_bartusek/boundary_surface_700hPa/time_range_1940_2024/advection_face_contributions_three_panel.png"
 
 echo "[info] job_id=${PBS_JOBID}"
 echo "[info] host=$(hostname)"

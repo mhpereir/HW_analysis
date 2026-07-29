@@ -8,6 +8,9 @@ SMOKE_SCHEDULER = (
     REPO_ROOT / "schedulers" / "schedule_advection_direction_exploration_smoke.sh"
 )
 PIPELINE_RUNNER = REPO_ROOT / "scripts" / "run_advection_direction_pipeline.sh"
+PLOT_SCHEDULER = (
+    REPO_ROOT / "schedulers" / "schedule_plot_advection_direction_exploration.sh"
+)
 
 
 def test_advection_direction_scheduler_has_commit_and_resource_guards():
@@ -50,3 +53,17 @@ def test_advection_direction_pipeline_runner_uses_explicit_legacy_provenance():
     assert "build_stage1_advection_exploration.py" in text
     assert "plot_advection_direction_exploration.py" in text
     subprocess.run(["bash", "-n", str(PIPELINE_RUNNER)], check=True)
+
+
+def test_plot_only_scheduler_reuses_enhanced_stage1_without_overwriting():
+    text = PLOT_SCHEDULER.read_text()
+
+    assert "#PBS -l select=1:ncpus=2:mem=8gb" in text
+    assert "#PBS -l walltime=00:30:00" in text
+    assert 'PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"' in text
+    assert 'EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"' in text
+    assert "harmonized_regional_timeseries_pnw_bartusek" in text
+    assert "advection_face_contributions_three_panel.png" in text
+    assert "refusing to overwrite existing output" in text
+    assert "build_stage1" not in text
+    subprocess.run(["bash", "-n", str(PLOT_SCHEDULER)], check=True)

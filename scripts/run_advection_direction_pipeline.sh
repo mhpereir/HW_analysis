@@ -65,19 +65,18 @@ cd "${PROJECT_ROOT}/scripts"
     --output-path "${STAGE1_ENHANCED_PATH}"
 
 /usr/bin/time -v python plot_advection_direction_exploration.py \
-    --region "${REGION}" \
-    --bottom-boundary "${BOTTOM_BOUNDARY}" \
-    --top-boundary "${TOP_BOUNDARY}" \
-    --threshold-variable "${THRESHOLD_VARIABLE}" \
-    --quantile "${QUANTILE}" \
-    --start-year "${TIME_START}" \
-    --end-year "${TIME_END}" \
-    --input-path "${STAGE1_ENHANCED_PATH}" \
-    --output-path "${PLOT_OUTPUT_PATH}" \
-    --window-days 7 \
-    --ratio-epsilon 0.005 \
-    --season-months 6 7 8 \
-    --require-full-event
+  --region "${REGION}" \
+  --bottom-boundary "${BOTTOM_BOUNDARY}" \
+  --top-boundary "${TOP_BOUNDARY}" \
+  --threshold-variable "${THRESHOLD_VARIABLE}" \
+  --quantile "${QUANTILE}" \
+  --start-year "${TIME_START}" \
+  --end-year "${TIME_END}" \
+  --input-path "${STAGE1_ENHANCED_PATH}" \
+  --output-path "${PLOT_OUTPUT_PATH}" \
+  --window-days 7 \
+  --season-months 6 7 8 \
+  --require-full-event
 
 test -s "${STAGE1_BASE_PATH}"
 test -s "${STAGE1_ENHANCED_PATH}"

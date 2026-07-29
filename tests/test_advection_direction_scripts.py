@@ -33,7 +33,6 @@ def test_builder_rejects_output_equal_to_input():
 def test_plot_defaults_to_enhanced_stage1_and_separate_plot_tree():
     args = _base_args()
     args.window_days = 7
-    args.ratio_epsilon = 1e-4
     args.season_months = [6, 7, 8]
     args.require_full_event = True
 
@@ -41,7 +40,7 @@ def test_plot_defaults_to_enhanced_stage1_and_separate_plot_tree():
 
     assert out.input_path.parent.name == "advection_direction_exploration"
     assert "plots_advection_direction_exploration" in out.output_path.parts
-    assert out.output_path.name == "advection_face_contributions.png"
+    assert out.output_path.name == "advection_face_contributions_three_panel.png"
 
 
 def _base_args() -> Namespace:

@@ -42,7 +42,7 @@ LEGACY_CLOUD_ROOT="/home/mhpereir/data-mhpereir/arco_era5/CloudCover_download/ou
 SMOKE_DIR="${PROJECT_ROOT}/results/stage1/advection_direction_exploration/smoke_2024"
 STAGE1_BASE_PATH="${SMOKE_DIR}/base_stage1/harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_2024_2024.nc"
 STAGE1_ENHANCED_PATH="${SMOKE_DIR}/harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_2024_2024.nc"
-PLOT_OUTPUT_PATH="${PROJECT_ROOT}/results/plots_advection_direction_exploration/smoke_2024/advection_face_contributions.png"
+PLOT_OUTPUT_PATH="${PROJECT_ROOT}/results/plots_advection_direction_exploration/smoke_2024/advection_face_contributions_three_panel.png"
 
 echo "[info] job_id=${PBS_JOBID}"
 echo "[info] host=$(hostname)"

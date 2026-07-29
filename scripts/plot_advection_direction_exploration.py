@@ -24,7 +24,7 @@ from src import (
 
 
 PLOT_NAME = "advection_direction_exploration"
-DEFAULT_OUTPUT_FILENAME = "advection_face_contributions.png"
+DEFAULT_OUTPUT_FILENAME = "advection_face_contributions_three_panel.png"
 EXPLORATION_SUBDIR = "advection_direction_exploration"
 
 
@@ -32,8 +32,7 @@ def parse_args() -> argparse.Namespace:
     """Parse standalone advection-direction plot arguments."""
     parser = argparse.ArgumentParser(
         description=(
-            "Plot peak-aligned face advection tendencies, component ratios, "
-            "and daily face glyphs."
+            "Plot peak-aligned face advection tendencies and daily face glyphs."
         )
     )
     plot_paths.add_stage1_path_arguments(parser)
@@ -48,12 +47,6 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=7,
         help="Number of complete days on each side of event peak time.",
-    )
-    parser.add_argument(
-        "--ratio-epsilon",
-        type=float,
-        default=advection_direction.DEFAULT_RATIO_EPSILON,
-        help="Mask ratio denominators with absolute value at or below this K hr-1.",
     )
     parser.add_argument(
         "--season-months",
@@ -86,8 +79,6 @@ def finalize_args(args: argparse.Namespace) -> argparse.Namespace:
         raise ValueError("--start-year must be less than or equal to --end-year.")
     if args.window_days < 1:
         raise ValueError("--window-days must be >= 1.")
-    if args.ratio_epsilon < 0:
-        raise ValueError("--ratio-epsilon must be >= 0.")
     if args.require_full_event and args.season_months is None:
         raise ValueError("--require-full-event requires --season-months.")
     if args.season_months is not None:
@@ -196,7 +187,6 @@ def main() -> int:
         path = advection_direction_plotting.write_advection_direction_exploration_plot(
             composite,
             args.output_path,
-            ratio_epsilon=args.ratio_epsilon,
         )
     finally:
         ds.close()

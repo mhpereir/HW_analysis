@@ -10,6 +10,25 @@ advection-direction time-series prototype. The prototype uses an enhanced
 Stage-1 copy in an exploration subfolder. It does not yet change the canonical
 Stage-1 contract or any production figure.
 
+The first full-period figure has now been reviewed under command-center task
+`A2.4`. The selected follow-up figure contains three panels:
+
+1. individual signed face contributions;
+2. grouped zonal, meridional, horizontal, vertical, and all-face
+   contributions; and
+3. the daily 24-hour face-contribution glyph sequence.
+
+The standalone signed-ratio panel is omitted because it was less informative
+than the component tendencies and glyph sequence. Ratio calculations remain
+available as experimental diagnostics, but they are not part of this selected
+figure.
+
+The legends in the first two panels remain centered inside their axes. After
+autoscaling the plotted data, each of these panels must add upper y-axis
+headroom equal to 30 percent of its autoscaled y-range. The lower limit must
+remain unchanged. This data-relative rule keeps the legends clear of the
+traces without hardcoding limits for one composite.
+
 ## Goal
 
 Recover directional information that is hidden by the current scalar
@@ -151,8 +170,9 @@ No ratio will replace the underlying components.
 
 The initial denominator mask is `0.005 K hr-1`. In the inspected 2024 data,
 this is near the lower tail of the absolute meridional and horizontal
-contributions. The value remains explicit in the CLI, plot title, and output
-metadata so it can be assessed against the full composite.
+contributions. The value remains explicit in the diagnostic API and output
+metadata so it can be assessed independently of the selected three-panel
+figure.
 
 ### Face-contribution visualization
 
@@ -272,7 +292,11 @@ advection-reconstruction, event-count, and non-empty-figure checks.
   `scripts/plot_advection_direction_exploration.py`.
 - Use `src/plot_style.py` and the non-interactive Matplotlib backend.
 - Render unnormalized component tendencies as the scientific reference.
-- Compare the most promising ratio, bounded-share, and angle representations.
+- Keep ratio, bounded-share, and angle calculations available for diagnostic
+  comparison, but omit the standalone ratio panel from the selected
+  three-panel figure.
+- Add 30 percent data-relative upper y-axis headroom to the signed-face and
+  grouped-component panels so their centered legends do not obscure traces.
 - Render one 24-hour face-contribution glyph for each daily lag from day `-7`
   through day `+7`.
 - Put the glyphs in a dedicated ribbon or inset cells so each day's west, east,
@@ -335,13 +359,14 @@ results/plots_advection_direction_exploration/
     boundary_surface_700hPa/
       time_range_1940_2024/
         advection_face_contributions.png
+        advection_face_contributions_three_panel.png
 ```
 
-`advection_face_contributions.png` will show:
+The original `advection_face_contributions.png` is retained as the reviewed
+four-panel baseline. `advection_face_contributions_three_panel.png` will show:
 
 - individual signed face contributions;
 - total, zonal, meridional, horizontal, and vertical contributions;
-- signed ratios with invalid regions masked;
 - the daily 24-hour face-contribution glyph sequence.
 
 Each product and figure will record the region, pressure boundaries, event
@@ -371,8 +396,9 @@ Local validation in `dev_env`:
 - face-component averaging before grouped reductions;
 - masked behavior for near-zero denominators;
 - metadata and unit validation;
-- plotting tests for glyph count, lag placement, scale, labels, and non-empty
-  output; and
+- plotting tests for the three-panel order, absence of the ratio panel,
+  data-relative legend headroom, glyph count, lag placement, scale, labels,
+  and non-empty output; and
 - the full repository test suite.
 
 Venus validation through OpenPBS:
@@ -383,8 +409,8 @@ Venus validation through OpenPBS:
 - reconstruction-error statistics;
 - event count, season-selection count, and complete-window count;
 - non-empty NetCDF and PNG outputs;
-- visual inspection of face placement, sign colors, magnitude scaling, and
-  legibility; and
+- visual inspection of panel order, legend clearance, face placement, sign
+  colors, magnitude scaling, and legibility; and
 - recorded commit, job ID, exit status, elapsed time, CPU time, and peak memory.
 
 ## Decisions Required After the Prototype

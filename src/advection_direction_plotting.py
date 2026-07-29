@@ -34,22 +34,13 @@ GROUP_LABELS = {
     "advection_vertical": "Vertical",
     "advection_face_total": "All faces",
 }
-RATIO_COLORS = {
-    "advection_meridional_zonal_ratio": "#6A5ACD",
-    "advection_horizontal_vertical_ratio": "#E69F00",
-}
-RATIO_LABELS = {
-    "advection_meridional_zonal_ratio": "Meridional / zonal",
-    "advection_horizontal_vertical_ratio": "Horizontal / vertical",
-}
+LEGEND_HEADROOM_FRACTION = 0.30
 
 
 def plot_advection_direction_exploration(
     composite: xr.Dataset,
-    *,
-    ratio_epsilon: float = advection_direction.DEFAULT_RATIO_EPSILON,
 ) -> Figure:
-    """Return the standalone face-component, ratio, and glyph figure."""
+    """Return the standalone face-component and glyph figure."""
     required = (
         "advection",
         *(
@@ -58,30 +49,28 @@ def plot_advection_direction_exploration(
         ),
     )
     _require_variables(composite, required)
-    diagnostics = advection_direction.add_grouped_components_and_ratios(
-        composite,
-        ratio_epsilon=ratio_epsilon,
+    diagnostics = xr.merge(
+        [composite, advection_direction.grouped_advection_components(composite)],
+        compat="override",
     )
+    diagnostics.attrs.update(composite.attrs)
     daily = advection_direction.complete_daily_face_means(diagnostics)
 
     fig, axes = plt.subplots(
-        nrows=4,
+        nrows=3,
         ncols=1,
-        figsize=plot_style.publication_figsize("full", aspect=1.25),
-        gridspec_kw={"height_ratios": (1.0, 1.0, 0.9, 1.15)},
+        figsize=plot_style.publication_figsize(
+            "full",
+            aspect=plot_style.THREE_PANEL_STACK_ASPECT,
+        ),
+        gridspec_kw={"height_ratios": (1.0, 1.0, 1.15)},
         constrained_layout=True,
     )
-    face_ax, grouped_ax, ratio_ax, glyph_ax = axes
+    face_ax, grouped_ax, glyph_ax = axes
 
     lag_days = np.asarray(diagnostics["lag_hour"].values, dtype=float) / 24.0
     _plot_face_timeseries(face_ax, diagnostics, lag_days)
     _plot_grouped_timeseries(grouped_ax, diagnostics, lag_days)
-    _plot_ratio_timeseries(
-        ratio_ax,
-        diagnostics,
-        lag_days,
-        ratio_epsilon=ratio_epsilon,
-    )
     _plot_daily_face_glyphs(glyph_ax, daily)
 
     for ax in axes:
@@ -105,16 +94,11 @@ def plot_advection_direction_exploration(
 def write_advection_direction_exploration_plot(
     composite: xr.Dataset,
     output_path: str | Path,
-    *,
-    ratio_epsilon: float = advection_direction.DEFAULT_RATIO_EPSILON,
 ) -> Path:
-    """Write the standalone face-component, ratio, and glyph figure."""
+    """Write the standalone face-component and glyph figure."""
     path = Path(output_path).expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig = plot_advection_direction_exploration(
-        composite,
-        ratio_epsilon=ratio_epsilon,
-    )
+    fig = plot_advection_direction_exploration(composite)
     try:
         plot_style.save_figure(fig, path)
     finally:
@@ -138,6 +122,7 @@ def _plot_face_timeseries(
     plot_style.zero_line(ax)
     ax.set_ylabel("Face contribution [K hr-1]")
     ax.set_title("Signed face contributions")
+    _add_upper_axis_headroom(ax)
     ax.legend(ncol=5, loc="upper center", **plot_style.legend_kwargs())
 
 
@@ -163,30 +148,23 @@ def _plot_grouped_timeseries(
     plot_style.zero_line(ax)
     ax.set_ylabel("Grouped contribution [K hr-1]")
     ax.set_title("Grouped advective contributions")
+    _add_upper_axis_headroom(ax)
     ax.legend(ncol=4, loc="upper center", **plot_style.legend_kwargs())
 
 
-def _plot_ratio_timeseries(
+def _add_upper_axis_headroom(
     ax,
-    ds: xr.Dataset,
-    lag_days: np.ndarray,
     *,
-    ratio_epsilon: float,
+    fraction: float = LEGEND_HEADROOM_FRACTION,
 ) -> None:
-    for name in RATIO_LABELS:
-        ax.plot(
-            lag_days,
-            ds[name].values,
-            color=RATIO_COLORS[name],
-            label=RATIO_LABELS[name],
-        )
-    plot_style.zero_line(ax)
-    ax.set_ylabel("Signed ratio [1]")
-    ax.set_title(
-        "Component ratios "
-        f"(masked where |denominator| <= {ratio_epsilon:g} K hr-1)"
-    )
-    ax.legend(ncol=2, loc="upper center", **plot_style.legend_kwargs())
+    """Expand only the upper y-limit by a fraction of the autoscaled range."""
+    if fraction < 0:
+        raise ValueError("fraction must be >= 0.")
+    lower, upper = ax.get_ylim()
+    span = upper - lower
+    if not np.isfinite(span) or span <= 0:
+        raise ValueError("axis must have a finite positive y-range.")
+    ax.set_ylim(lower, upper + fraction * span)
 
 
 def _plot_daily_face_glyphs(ax, daily: xr.Dataset) -> None:

@@ -5,33 +5,57 @@ import xarray as xr
 from HW_analysis.src import advection_direction, advection_direction_plotting
 
 
-def test_plot_advection_direction_exploration_has_four_panels_and_daily_glyphs():
+def test_plot_advection_direction_exploration_has_selected_three_panels():
     composite = _make_composite()
 
-    fig = advection_direction_plotting.plot_advection_direction_exploration(
-        composite,
-        ratio_epsilon=0.005,
-    )
+    fig = advection_direction_plotting.plot_advection_direction_exploration(composite)
     try:
-        assert len(fig.axes) == 4
-        assert len(fig.axes[3].patches) == 4
-        assert len(fig.axes[3].collections) == 4
+        assert len(fig.axes) == 3
+        assert len(fig.axes[2].patches) == 4
+        assert len(fig.axes[2].collections) == 4
         assert "Signed face contributions" == fig.axes[0].get_title()
-        assert "Component ratios" in fig.axes[2].get_title()
+        assert "Grouped advective contributions" == fig.axes[1].get_title()
+        assert all("Component ratios" not in ax.get_title() for ax in fig.axes)
         assert {
-            line.get_label() for line in fig.axes[2].lines
-        } >= {
-            "Meridional / zonal",
-            "Horizontal / vertical",
+            text.get_text() for text in fig.axes[0].get_legend().get_texts()
+        } == {"West", "East", "South", "North", "Top"}
+        assert {
+            text.get_text() for text in fig.axes[1].get_legend().get_texts()
+        } == {
+            "Zonal (west + east)",
+            "Meridional (south + north)",
+            "Horizontal",
+            "Vertical",
+            "All faces",
         }
-        assert "not airflow direction" in fig.axes[3].get_title()
-        assert {text.get_text() for text in fig.axes[3].texts} >= {
+        assert "not airflow direction" in fig.axes[2].get_title()
+        assert {text.get_text() for text in fig.axes[2].texts} >= {
             "W",
             "E",
             "S",
             "N",
             "T",
         }
+    finally:
+        plt.close(fig)
+
+
+def test_add_upper_axis_headroom_expands_only_upper_limit():
+    fig, ax = plt.subplots()
+    try:
+        ax.plot([0, 1], [-2.0, 3.0])
+        lower, upper = ax.get_ylim()
+        span = upper - lower
+
+        advection_direction_plotting._add_upper_axis_headroom(ax)
+
+        new_lower, new_upper = ax.get_ylim()
+        assert new_lower == lower
+        assert np.isclose(
+            new_upper,
+            upper
+            + advection_direction_plotting.LEGEND_HEADROOM_FRACTION * span,
+        )
     finally:
         plt.close(fig)
 
