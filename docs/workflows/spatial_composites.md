@@ -141,6 +141,8 @@ events.
 `plot_dyn_net_spatial_composites.py` validates the composite contract and
 creates a sign-by-lag Lambert conformal map. It uses:
 
+- the default display lags `-2`, `0`, and `+2`, labeled `t-2`, `t (peak)`,
+  and `t+2`;
 - filled `t2m_anomaly` colors centered on zero;
 - `z500_anomaly` contours;
 - one shared horizontal colorbar;
@@ -148,7 +150,14 @@ creates a sign-by-lag Lambert conformal map. It uses:
 - the `pnw_bartusek` region outline; and
 - shared sizes, fonts, and DPI from `src/plot_style.py`.
 
+The plot-lag selection is configurable without changing the composite dataset.
+Every requested lag must be present in the input. The underlying default
+composite product remains the complete `-3` through `+3` lag window, so this
+display change requires no dataset rebuild or migration.
+
 Cartopy Natural Earth data must be available in the production environment.
+Use `schedulers/schedule_plot_dyn_net_spatial_composites.sh` to regenerate only
+the figure from an existing validated composite product.
 
 ## Validation
 
@@ -164,7 +173,7 @@ python -m pytest -q \
 
 For production changes, also run the relevant PBS smoke workflow and validate
 input coverage, event counts, exact grids, finite anomalies, metadata, output
-files, and the rendered map.
+files, the expected six map panels, and the rendered map.
 
 ## Boundaries
 

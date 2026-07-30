@@ -9,15 +9,45 @@ from HW_analysis.scripts.spatial_composites import (
 def test_plot_spatial_composites_creates_sign_by_lag_geoaxes():
     fig = plotter.plot_spatial_composites(_composite_dataset())
     try:
-        map_axes = fig.axes[:14]
-        assert len(map_axes) == 14
-        assert map_axes[0].get_title() == "$t-3$"
-        assert map_axes[3].get_title() == "$t$ (peak)"
-        assert map_axes[7].get_title() == ""
+        map_axes = fig.axes[:6]
+        assert len(map_axes) == 6
+        assert map_axes[0].get_title() == "$t-2$"
+        assert map_axes[1].get_title() == "$t$ (peak)"
+        assert map_axes[2].get_title() == "$t+2$"
+        assert map_axes[3].get_title() == ""
         assert all(len(ax.collections) > 1 for ax in map_axes)
-        assert len(fig.axes) == 15  # fourteen maps plus shared colorbar
+        assert len(fig.axes) == 7  # six maps plus shared colorbar
     finally:
         plotter.plt.close(fig)
+
+
+def test_plot_spatial_composites_accepts_explicit_lags():
+    fig = plotter.plot_spatial_composites(
+        _composite_dataset(),
+        plot_lags=(-3, -1, 0, 1, 3),
+    )
+    try:
+        assert len(fig.axes) == 11  # ten maps plus shared colorbar
+        assert [axis.get_title() for axis in fig.axes[:5]] == [
+            "$t-3$",
+            "$t-1$",
+            "$t$ (peak)",
+            "$t+1$",
+            "$t+3$",
+        ]
+    finally:
+        plotter.plt.close(fig)
+
+
+def test_plot_spatial_composites_rejects_missing_lag():
+    with np.testing.assert_raises_regex(
+        ValueError,
+        "absent from the composite",
+    ):
+        plotter.plot_spatial_composites(
+            _composite_dataset(),
+            plot_lags=(-2, 0, 4),
+        )
 
 
 def test_write_figure_creates_png(tmp_path):
