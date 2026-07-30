@@ -8,10 +8,12 @@ set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
+PBS_O_WORKDIR="${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
 test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
+test "$(realpath "${PBS_O_WORKDIR}")" = "$(realpath "${PROJECT_ROOT}")"
 
 LOG_DIR="${PROJECT_ROOT}/logs"
 mkdir -p "${LOG_DIR}"
@@ -38,7 +40,7 @@ echo "[info] start=$(date -Is)"
 "${python_executable}" --version
 test -s "${INPUT_PATH}"
 
-cd "${PROJECT_ROOT}"
+cd "${PBS_O_WORKDIR}"
 /usr/bin/time -v "${python_executable}" \
     scripts/spatial_composites/plot_dyn_net_spatial_composites.py \
     --input-path "${INPUT_PATH}" \
