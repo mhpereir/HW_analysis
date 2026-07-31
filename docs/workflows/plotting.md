@@ -65,6 +65,8 @@ figure entrypoints.
 - Use `plot_style.publication_figsize()` and shared line-width constants.
 - Use `plot_style.style_axis()` or `style_axes()` where appropriate.
 - Use `plot_style.legend_kwargs()` for standard legends.
+- Use shared numeric-axis helpers for reusable tick-spacing and formatting
+  rules, including integer-only axes.
 - Use `plot_style.save_figure()` for ordinary Matplotlib figures.
 - Map exports may use a dedicated writer when Cartopy layout requires it, but
   must still use shared theme, size, and DPI settings.

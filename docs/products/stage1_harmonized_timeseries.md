@@ -93,6 +93,13 @@ the global hourly ERA5 grid and reduced to the configured region with the same
 cosine-latitude weighted regional-mean procedure used by other gridded surface
 diagnostics.
 
+Production builds use
+`schedulers/schedule_build_stage1_harmonized_timeseries.sh`. The scheduler
+requires an explicit region and output path, enables the complete diagnostic
+set, and selects the canonical `global-hourly-grid` cloud-cover layout
+explicitly. Production output paths must be run-specific so a rebuild can be
+validated before any existing Stage-1 product is promoted or replaced.
+
 Surface-energy source signs are preserved. Approximate heating-rate variables
 use the pressure-coordinate control-volume approximation documented by the
 variable metadata and diagnostics code.
@@ -134,6 +141,11 @@ time_axis = "time"
 Run metadata should also record region, threshold variable, quantile, years,
 heat-budget pressure boundaries when applicable, preprocessing choices, and
 source paths or source identifiers where practical.
+
+For full-diagnostic builds, metadata must identify
+`cloud_cover_source_layout = "global-hourly-grid"` and the global cloud-cover
+source root. The temporary legacy-regional compatibility layout is not valid
+for a production rebuild.
 
 ## Downstream Consumers
 

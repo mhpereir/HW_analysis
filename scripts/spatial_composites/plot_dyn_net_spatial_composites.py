@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import sys
+from typing import Sequence
 
 import matplotlib
 import numpy as np
@@ -40,6 +41,7 @@ GROUP_DIM = "dyn_sign"
 LAG_DIM = "lag"
 MAP_EXTENT = (-170.0, -40.0, 10.0, 80.0)
 PNW_BARTUSEK_BOUNDS = (-130.0, -110.0, 40.0, 60.0)
+DEFAULT_PLOT_LAGS = (-2, 0, 2)
 
 
 def parse_args() -> argparse.Namespace:
@@ -50,6 +52,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--input-path", type=Path, default=DEFAULT_INPUT_PATH)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH)
+    parser.add_argument(
+        "--plot-lags",
+        type=int,
+        nargs="+",
+        default=DEFAULT_PLOT_LAGS,
+        help="Event-relative days to plot (default: -2 0 2).",
+    )
     parser.add_argument(
         "--temperature-limit",
         type=float,
@@ -66,6 +75,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def validate_args(args: argparse.Namespace) -> None:
+    if not args.plot_lags:
+        raise ValueError("--plot-lags must contain at least one lag.")
+    if len(set(args.plot_lags)) != len(args.plot_lags):
+        raise ValueError("--plot-lags must not contain duplicates.")
     if args.temperature_limit is not None and args.temperature_limit <= 0:
         raise ValueError("--temperature-limit must be > 0.")
     if args.height_contour_interval is not None and args.height_contour_interval <= 0:
@@ -79,6 +92,7 @@ def main() -> int:
     with xr.open_dataset(input_path, engine="h5netcdf", decode_timedelta=True) as ds:
         fig = plot_spatial_composites(
             ds.load(),
+            plot_lags=args.plot_lags,
             temperature_limit=args.temperature_limit,
             height_contour_interval=args.height_contour_interval,
         )
@@ -126,19 +140,24 @@ def validate_composite(ds: xr.Dataset) -> None:
 def plot_spatial_composites(
     ds: xr.Dataset,
     *,
+    plot_lags: Sequence[int] = DEFAULT_PLOT_LAGS,
     temperature_limit: float | None = None,
     height_contour_interval: float | None = None,
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return a sign-by-lag publication figure."""
     validate_composite(ds)
     plot_style.apply_theme()
-    lags = np.asarray(ds[LAG_DIM].values, dtype=int)
+    lags = select_plot_lags(ds, plot_lags)
+    plot_ds = ds.sel({LAG_DIM: lags})
 
     temperature_limit = temperature_limit or rounded_symmetric_limit(
-        ds["t2m_anomaly"].values,
+        plot_ds["t2m_anomaly"].values,
         step=0.5,
     )
-    height_limit = rounded_symmetric_limit(ds["z500_anomaly"].values, step=10.0)
+    height_limit = rounded_symmetric_limit(
+        plot_ds["z500_anomaly"].values,
+        step=10.0,
+    )
     interval = height_contour_interval or automatic_contour_interval(height_limit)
     contour_limit = max(interval, np.ceil(height_limit / interval) * interval)
     contour_levels = np.arange(-contour_limit, contour_limit + 0.5 * interval, interval)
@@ -162,7 +181,7 @@ def plot_spatial_composites(
     line_styles = ["dashed" if level < 0 else "solid" for level in contour_levels]
     line_widths = [1.2 if np.isclose(level, 0.0) else 0.7 for level in contour_levels]
     for row, group in enumerate(GROUPS):
-        group_panel = ds.sel({GROUP_DIM: group})
+        group_panel = plot_ds.sel({GROUP_DIM: group})
         count = int(group_panel["event_count"].item())
         dyn_mean = float(group_panel["I_dyn_net_mean"].item())
         for column, lag in enumerate(lags):
@@ -224,6 +243,22 @@ def plot_spatial_composites(
     colorbar.set_label("2 m temperature anomaly (K)")
     fig.suptitle("Heatwave Spatial Composite Evolution Relative to Peak Day")
     return fig
+
+
+def select_plot_lags(ds: xr.Dataset, requested: Sequence[int]) -> np.ndarray:
+    if not requested:
+        raise ValueError("At least one plot lag is required.")
+    lags = np.asarray(requested, dtype=int)
+    if np.unique(lags).size != lags.size:
+        raise ValueError("Plot lags must be unique.")
+    available = set(np.asarray(ds[LAG_DIM].values, dtype=int).tolist())
+    missing = [int(lag) for lag in lags if int(lag) not in available]
+    if missing:
+        raise ValueError(
+            "Requested plot lags are absent from the composite: "
+            + ", ".join(str(lag) for lag in missing)
+        )
+    return lags
 
 
 def decorate_map(

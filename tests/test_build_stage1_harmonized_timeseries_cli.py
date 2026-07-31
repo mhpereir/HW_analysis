@@ -1,11 +1,12 @@
 from argparse import Namespace
+from pathlib import Path
 
 import numpy as np
 import pytest
 import xarray as xr
 
 from HW_analysis.scripts import build_stage1_harmonized_timeseries as stage1_builder
-from HW_analysis.src import analysis_io
+from HW_analysis.src import analysis_io, config, data_io
 
 
 def test_parse_args_requires_start_and_end_year(monkeypatch):
@@ -67,6 +68,8 @@ def test_parse_args_builds_inclusive_analysis_years(monkeypatch):
     )
     assert args.threshold_variable == "tas"
     assert args.add_full_diagnostics is False
+    assert args.cloud_cover_source_layout == data_io.CLOUD_COVER_LAYOUT_GLOBAL
+    assert args.cloud_cover_root == Path(config.ERA5_CLOUD_COVER_ROOT)
     assert args.output_path == analysis_io.default_harmonized_timeseries_path(
         region="pnw_bartusek",
         bottom_boundary="surface",
@@ -148,6 +151,31 @@ def test_parse_args_accepts_add_full_diagnostics_flag(monkeypatch):
     args = stage1_builder.parse_args()
 
     assert args.add_full_diagnostics is True
+
+
+def test_parse_args_accepts_explicit_legacy_cloud_cover_source(monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "build_stage1_harmonized_timeseries.py",
+            "--start-year",
+            "1940",
+            "--end-year",
+            "1940",
+            "--add-full-diagnostics",
+            "--cloud-cover-source-layout",
+            "legacy-regional",
+            "--cloud-cover-root",
+            "/legacy/cloud",
+        ],
+    )
+
+    args = stage1_builder.parse_args()
+
+    assert args.cloud_cover_source_layout == (
+        data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
+    )
+    assert args.cloud_cover_root == Path("/legacy/cloud")
 
 
 def test_parse_args_accepts_custom_ehb_year_tokens(monkeypatch):
@@ -242,6 +270,8 @@ def test_load_full_diagnostic_inputs_routes_region_only_to_pbl(monkeypatch):
     args = Namespace(
         analysis_years=[1940, 1941],
         region="pnw_bartusek",
+        cloud_cover_source_layout=data_io.CLOUD_COVER_LAYOUT_GLOBAL,
+        cloud_cover_root=Path("/global/cloud"),
     )
     stage1_builder.load_full_diagnostic_inputs(args)
 
@@ -251,7 +281,14 @@ def test_load_full_diagnostic_inputs_routes_region_only_to_pbl(monkeypatch):
             "years": [1940, 1941],
         }
     ]
-    assert cloud_calls == [{"years": [1940, 1941]}]
+    assert cloud_calls == [
+        {
+            "years": [1940, 1941],
+            "source_layout": data_io.CLOUD_COVER_LAYOUT_GLOBAL,
+            "root": Path("/global/cloud"),
+            "region": None,
+        }
+    ]
 
 
 def test_append_event_summary_table_defaults_to_tas_events():

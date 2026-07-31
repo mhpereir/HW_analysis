@@ -108,34 +108,15 @@ contract after the fact merely to match an accidental implementation change.
 
 ## Track long-running work
 
-Use `/home/mhpereir/work/TODO_global.md` as the global command center for work
-performed below `/home/mhpereir/work`.
-
-- Track an operation when it may outlive the current agent session, uses
-  OpenPBS, has a process or job identity that must be recovered later, or
-  produces datasets or figures requiring later validation. Do not use elapsed
-  time alone as the inclusion rule.
-- Before submission, create or update one stable task entry with the intended
-  product, local repository, authoritative branch and commit, Venus checkout,
-  scheduler script, scientific configuration, requested resources, input
-  paths, log path, and expected outputs.
-- Immediately after `qsub`, record the exact PBS job ID before doing other
-  work. Preserve array notation, dependent job IDs, and separate attempt
-  identities.
-- Monitor initial queue state and logs for a few minutes. Record the observed
-  state, an ISO 8601 timestamp with timezone, and the next check or action.
-- Reconcile the command-center entry with live `qstat`, logs, and output state
-  before submitting a replacement. Append attempts instead of overwriting
-  previous IDs or failure evidence.
-- On handoff, cancellation, or failure, record terminal or last-observed state,
-  exit information when available, partial artifacts, log location, and the
-  exact next action.
-- Distinguish scheduler completion from scientific completion. Mark the task
-  complete only after the expected Stage 1, Stage 2, composite, spatial, or
-  figure artifacts pass their documented contracts and scientific checks.
-- Preserve detailed immutable provenance beside project outputs. The global
-  command center indexes active work and does not replace product metadata,
-  logs, or scientific validation records.
+- Invoke the `command-center` skill for qualifying asynchronous runs.
+- In addition to the shared schema, record the intended product, authoritative
+  branch and commit, Venus checkout, scheduler script, scientific
+  configuration, requested resources, input paths, log path, and expected
+  outputs.
+- Mark the task complete only after the expected Stage 1, Stage 2, composite,
+  spatial, or figure artifacts pass their documented contracts and scientific
+  checks.
+- Preserve detailed immutable provenance beside project outputs.
 
 ## Validation
 

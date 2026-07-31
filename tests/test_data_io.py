@@ -462,3 +462,54 @@ def test_open_era5_total_cloud_cover_rejects_missing_tcc(monkeypatch):
 
     with pytest.raises(ValueError, match="missing required variable 'tcc'"):
         data_io.open_era5_total_cloud_cover(years=[1940])
+
+
+def test_open_era5_total_cloud_cover_supports_explicit_legacy_regional_layout(
+    monkeypatch,
+):
+    captured = {}
+    ds = xr.Dataset(
+        data_vars={"total_cloud_cover": ("time", [0.5])},
+        coords={"time": np.array(["1940-05-01T00:00"], dtype="datetime64[m]")},
+        attrs={"region": "pnw_bartusek"},
+    )
+
+    def fake_glob_required(pattern):
+        captured["pattern"] = pattern
+        return [
+            "/legacy/ERA5_ARCO_total_cloud_cover_pnw_bartusek_1940.nc",
+        ]
+
+    def fake_open(paths, *, combine, chunks):
+        captured["paths"] = list(paths)
+        captured["chunks"] = chunks
+        return ds
+
+    monkeypatch.setattr(data_io, "_glob_required", fake_glob_required)
+    monkeypatch.setattr(data_io, "_open_multiple_datasets", fake_open)
+
+    out = data_io.open_era5_total_cloud_cover(
+        years=[1940],
+        source_layout=data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL,
+        root="/legacy",
+        region="pnw_bartusek",
+    )
+
+    assert captured["pattern"] == (
+        "/legacy/ERA5_ARCO_total_cloud_cover_pnw_bartusek_*.nc"
+    )
+    assert captured["chunks"] == data_io.DEFAULT_REGIONAL_HOURLY_CHUNKS
+    assert out["total_cloud_cover"].dims == ("time",)
+    assert out.attrs["source_layout"] == "legacy-regional"
+    assert out.attrs["source_root"] == "/legacy"
+    assert out.attrs["source_region"] == "pnw_bartusek"
+    assert out.attrs["spatially_preaggregated"] == 1
+
+
+def test_open_era5_total_cloud_cover_requires_root_for_legacy_layout():
+    with pytest.raises(ValueError, match="root is required"):
+        data_io.open_era5_total_cloud_cover(
+            years=[1940],
+            source_layout=data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL,
+            region="pnw_bartusek",
+        )
