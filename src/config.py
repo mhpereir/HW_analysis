@@ -24,6 +24,7 @@ CP_J_KG_K: float = 1005.0
 EARTH_RADIUS_M: float = 6.371e6
 
 REGIONS: dict[str, tuple[slice, slice]] = {
+    "eastern_canada": (slice(42, 52), slice(-83, -73)),
     "pnw_bartusek": (slice(40, 60), slice(-130.0, -110.0)),
     "pnw_hotz":     (slice(49, 59), slice(-125, -115)),
 
