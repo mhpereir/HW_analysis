@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N stage1_global_cloud
-#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l select=1:ncpus=8:mem=85gb
 #PBS -l walltime=24:00:00
 #PBS -j oe
 #PBS -o /dev/null

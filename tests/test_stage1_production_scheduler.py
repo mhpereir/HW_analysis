@@ -38,5 +38,5 @@ def test_stage1_scheduler_requires_global_cloud_cover_and_full_diagnostics():
 def test_stage1_scheduler_declares_production_resources():
     text = SCHEDULER.read_text()
 
-    assert "#PBS -l select=1:ncpus=8:mem=64gb" in text
+    assert "#PBS -l select=1:ncpus=8:mem=85gb" in text
     assert "#PBS -l walltime=24:00:00" in text
