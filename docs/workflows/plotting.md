@@ -43,6 +43,8 @@ results/plots_<plot_name>/
 | Input | Figure family | Entrypoints |
 | --- | --- | --- |
 | Stage 1 | all-event and split temporal composites | `scripts/plot_composite_timeseries_all.py`, `scripts/plot_composite_timeseries_split.py` |
+| Stage 1 plus regional hourly climatology | all-event and split climatological-anomaly composites | `scripts/plot_composite_timeseries_all_clim_anom.py`, `scripts/plot_composite_timeseries_split_clim_anom.py` |
+| Stage 1 plus regional hourly climatology | face-resolved advection climatological anomalies | `scripts/plot_advection_direction_exploration_clim_anom.py` |
 | Stage 1 | top-event traces | `scripts/plot_top_events.py` |
 | Stage 1 | diurnal, threshold, and event-summary diagnostics | `scripts/plot_diurnal_cycle.py`, `scripts/plot_threshold_timeseries.py`, `scripts/plot_event_summary.py` |
 | Stage 2 event features | feature grids, splits, and combined comparisons | `event_feature_grid_plot.py`, `plot_event_feature.py`, `plot_event_feature_split.py`, `plot_event_feature_split_combined.py` under `scripts/event_features/` |
@@ -72,6 +74,9 @@ figure entrypoints.
   must still use shared theme, size, and DPI settings.
 - Add or update synthetic plot tests when changing visual semantics or the
   shared style API.
+- Climatological-anomaly figures must identify the representation and baseline
+  period in their title or metadata, include a zero reference where
+  appropriate, and never overwrite their absolute-value counterparts.
 
 ## Validation
 

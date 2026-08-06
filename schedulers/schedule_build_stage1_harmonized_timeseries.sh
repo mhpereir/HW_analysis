@@ -53,6 +53,8 @@ echo "[info] python=${PYTHON_EXECUTABLE}"
 echo "[info] region=${REGION}"
 echo "[info] cloud_cover_source_layout=global-hourly-grid"
 echo "[info] cloud_cover_root=${CLOUD_COVER_ROOT}"
+echo "[info] stage1_contract_version=2"
+echo "[info] face_advection_contributions=enabled"
 echo "[info] output_path=${OUTPUT_PATH}"
 
 /usr/bin/time -v "${PYTHON_EXECUTABLE}" scripts/build_stage1_harmonized_timeseries.py \

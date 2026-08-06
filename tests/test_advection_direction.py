@@ -24,7 +24,7 @@ def test_add_face_advection_tendencies_normalizes_and_reconstructs_total():
     )
     assert out["advection_west"].attrs["units"] == "K hr-1"
     assert out["advection_west"].attrs["source_variable"] == "flux_contribution_west"
-    assert out.attrs["advection_face_contribution_exploration"] == 1
+    assert out.attrs["advection_face_contributions"] == 1
 
 
 def test_add_face_advection_tendencies_supports_optional_bottom_face():

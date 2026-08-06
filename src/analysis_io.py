@@ -19,8 +19,10 @@ Out of scope:
 from __future__ import annotations
 
 from collections.abc import Mapping
+import os
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import numpy as np
 import xarray as xr
@@ -34,7 +36,10 @@ DEFAULT_HARMONIZED_TIMESERIES_PATH = (
     / "harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
 )
 DEFAULT_STAGE1_OUTPUT_DIR = REPO_ROOT / "results" / "stage1"
+DEFAULT_STAGE1_CLIMATOLOGY_OUTPUT_DIR = REPO_ROOT / "results" / "stage1_climatology"
 EXPECTED_PIPELINE_STAGE = "stage_1_harmonized_regional_timeseries"
+EXPECTED_CLIMATOLOGY_PIPELINE_STAGE = "stage_1_regional_hourly_climatology"
+CURRENT_STAGE1_CONTRACT_VERSION = 2
 DEFAULT_TIME_DIM = "time"
 REQUIRED_HARMONIZED_VARIABLES: frozenset[str] = frozenset(
     {
@@ -61,6 +66,15 @@ REQUIRED_HARMONIZED_VARIABLES: frozenset[str] = frozenset(
         "lwa_c_threshold",
         "lwa_c_flag",
         "lwa_c_event_id",
+    }
+)
+REQUIRED_STAGE1_V2_VARIABLES: frozenset[str] = frozenset(
+    {
+        "advection_west",
+        "advection_east",
+        "advection_south",
+        "advection_north",
+        "advection_top",
     }
 )
 
@@ -103,6 +117,25 @@ def default_harmonized_timeseries_path(
     return DEFAULT_STAGE1_OUTPUT_DIR / filename
 
 
+def default_regional_hourly_climatology_path(
+    *,
+    region: str,
+    start_year: int,
+    end_year: int,
+    bottom_boundary: str | int,
+    top_boundary: str | int,
+) -> Path:
+    """Return the run-specific regional hourly climatology companion path."""
+    filename = (
+        "regional_hourly_climatology_"
+        f"{_filename_token(region)}_"
+        f"{_normalize_bottom_boundary_token(bottom_boundary)}_"
+        f"{_normalize_pressure_boundary_token(top_boundary)}_"
+        f"{start_year}_{end_year}.nc"
+    )
+    return DEFAULT_STAGE1_CLIMATOLOGY_OUTPUT_DIR / filename
+
+
 def save_harmonized_timeseries(
     ds: xr.Dataset,
     path: str | Path = DEFAULT_HARMONIZED_TIMESERIES_PATH,
@@ -113,7 +146,7 @@ def save_harmonized_timeseries(
     output_path = Path(path).expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     netcdf_ds = _prepare_for_netcdf(ds)
-    netcdf_ds.to_netcdf(output_path, engine="h5netcdf")
+    _write_netcdf_atomically(netcdf_ds, output_path)
     return output_path
 
 
@@ -130,6 +163,33 @@ def open_harmonized_timeseries(
 
     ds = xr.open_dataset(input_path, **kwargs)
     _validate_harmonized_timeseries(ds)
+    return ds
+
+
+def save_regional_hourly_climatology(
+    ds: xr.Dataset,
+    path: str | Path,
+) -> Path:
+    """Validate and save a regional hourly climatology companion product."""
+    _validate_regional_hourly_climatology(ds)
+    output_path = Path(path).expanduser().resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_netcdf_atomically(_prepare_for_netcdf(ds), output_path)
+    return output_path
+
+
+def open_regional_hourly_climatology(
+    path: str | Path,
+    *,
+    chunks: Mapping[str, int] | None = None,
+) -> xr.Dataset:
+    """Open and validate a regional hourly climatology companion product."""
+    input_path = Path(path).expanduser().resolve()
+    kwargs: dict[str, Any] = {"engine": "h5netcdf", "decode_timedelta": True}
+    if chunks is not None:
+        kwargs["chunks"] = dict(chunks)
+    ds = xr.open_dataset(input_path, **kwargs)
+    _validate_regional_hourly_climatology(ds)
     return ds
 
 
@@ -156,6 +216,36 @@ def _validate_harmonized_timeseries(ds: xr.Dataset) -> None:
             f"{', '.join(missing)}."
         )
 
+    contract_version = int(ds.attrs.get("stage1_contract_version", 1))
+    if contract_version < 1 or contract_version > CURRENT_STAGE1_CONTRACT_VERSION:
+        raise ValueError(
+            "Unsupported Stage-1 contract version "
+            f"{contract_version}; supported versions are 1-"
+            f"{CURRENT_STAGE1_CONTRACT_VERSION}."
+        )
+    if contract_version >= 2:
+        missing_v2 = sorted(REQUIRED_STAGE1_V2_VARIABLES.difference(ds.data_vars))
+        if missing_v2:
+            raise ValueError(
+                "Stage-1 contract version 2 is missing required face variables: "
+                f"{', '.join(missing_v2)}."
+            )
+
+
+def _validate_regional_hourly_climatology(ds: xr.Dataset) -> None:
+    """Validate the stable marker and coordinate for a climatology product."""
+    if not isinstance(ds, xr.Dataset):
+        raise TypeError(f"Expected xr.Dataset, got {type(ds).__name__}.")
+    pipeline_stage = ds.attrs.get("pipeline_stage")
+    if pipeline_stage != EXPECTED_CLIMATOLOGY_PIPELINE_STAGE:
+        raise ValueError(
+            "Expected regional hourly climatology with "
+            f"pipeline_stage={EXPECTED_CLIMATOLOGY_PIPELINE_STAGE!r}; "
+            f"got {pipeline_stage!r}."
+        )
+    if "climatology_time" not in ds.coords:
+        raise ValueError("Regional hourly climatology is missing climatology_time.")
+
 
 def _prepare_for_netcdf(ds: xr.Dataset) -> xr.Dataset:
     """Return a NetCDF-safe view of the dataset without mutating the caller."""
@@ -171,6 +261,18 @@ def _prepare_for_netcdf(ds: xr.Dataset) -> xr.Dataset:
             out[name].attrs = _normalize_attrs(out[name].attrs)
 
     return out
+
+
+def _write_netcdf_atomically(ds: xr.Dataset, output_path: Path) -> None:
+    """Write beside the destination and publish only a complete NetCDF file."""
+    temporary_path = output_path.with_name(
+        f".{output_path.name}.{uuid4().hex}.partial"
+    )
+    try:
+        ds.to_netcdf(temporary_path, engine="h5netcdf")
+        os.replace(temporary_path, output_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 def _normalize_attrs(attrs: Mapping[Any, Any]) -> dict[Any, Any]:

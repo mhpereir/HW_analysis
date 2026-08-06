@@ -70,6 +70,17 @@ def test_add_upper_axis_headroom_expands_only_upper_limit():
         plt.close(fig)
 
 
+def test_climatological_anomaly_title_is_explicit():
+    composite = _make_composite()
+    composite.attrs["data_representation"] = "climatological_anomaly"
+
+    fig = advection_direction_plotting.plot_advection_direction_exploration(composite)
+    try:
+        assert "advection climatological-anomaly composite" in fig._suptitle.get_text()
+    finally:
+        plt.close(fig)
+
+
 def test_write_advection_direction_exploration_plot_writes_nonempty_png(tmp_path):
     output = tmp_path / "advection_face_contributions.png"
 

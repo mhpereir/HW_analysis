@@ -174,7 +174,12 @@ def _figure_title(ds: xr.Dataset) -> str:
     n_events = ds.attrs.get("n_events", "unknown")
     pre_days = ds.attrs.get("pre_days", "?")
     post_days = ds.attrs.get("post_days", "?")
+    representation = (
+        " climatological-anomaly"
+        if ds.attrs.get("data_representation") == "climatological_anomaly"
+        else ""
+    )
     return (
-        f"Face-resolved advection composite for {region} "
+        f"Face-resolved advection{representation} composite for {region} "
         f"(n={n_events}, -{pre_days} to +{post_days} days)"
     )

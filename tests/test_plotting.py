@@ -187,6 +187,38 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
         plt.close(fig)
 
 
+def test_climatological_anomaly_composite_uses_explicit_titles_and_units():
+    composite = _make_composite()
+    composite.attrs["data_representation"] = "climatological_anomaly"
+
+    fig = plotting.plot_composite_timeseries(composite)
+    try:
+        assert "climatological-anomaly composite" in fig._suptitle.get_text()
+        assert fig.axes[0].get_ylabel() == "T_mean anomaly [K]"
+        assert fig.axes[1].get_ylabel() == "anomaly [K hr-1]"
+        assert fig.axes[3].get_ylabel() == "LWA anomaly [m hPa]"
+        assert fig.axes[4].get_ylabel() == "volume anomaly [m2 Pa]"
+    finally:
+        plt.close(fig)
+
+
+def test_extended_anomaly_cloud_axis_is_not_bounded_to_fraction_range():
+    composite = _make_composite()
+    composite.attrs["data_representation"] = "climatological_anomaly"
+    composite["cloud_cover"] = composite["cloud_cover"] - 0.5
+
+    fig = plotting.plot_composite_timeseries(
+        composite,
+        plot_extended_variables=True,
+    )
+    try:
+        cloud_axis = fig.axes[11]
+        assert cloud_axis.get_ylabel() == "cloud cover fraction anomaly"
+        assert cloud_axis.get_ylim() != (0.0, 1.0)
+    finally:
+        plt.close(fig)
+
+
 def test_plot_composite_timeseries_extended_layout_requires_optional_variables():
     composite = _make_composite().drop_vars("cloud_cover")
 

@@ -80,6 +80,23 @@ SPLIT_EXTENDED_PLOT_VARIABLES: tuple[str, ...] = (
 PBL_PRESSURE_TO_HPA = 0.01
 
 
+def _is_climatological_anomaly(ds: xr.Dataset) -> bool:
+    """Return whether the dataset contains climatological anomalies."""
+    return ds.attrs.get("data_representation") == "climatological_anomaly"
+
+
+def _representation_title_fragment(ds: xr.Dataset) -> str:
+    """Return the title fragment for the dataset representation."""
+    return " climatological-anomaly" if _is_climatological_anomaly(ds) else ""
+
+
+def _anomaly_axis_label(ds: xr.Dataset, absolute_label: str) -> str:
+    """Prefix a units-only label when plotting climatological anomalies."""
+    if _is_climatological_anomaly(ds):
+        return f"anomaly {absolute_label}"
+    return absolute_label
+
+
 def plot_composite_timeseries(
     composite: xr.Dataset,
     *,
@@ -122,7 +139,8 @@ def plot_composite_timeseries(
         else ""
     )
     fig.suptitle(
-        f"HW event-mean composite centered on peak tas "
+        f"HW event-mean{_representation_title_fragment(composite)} composite "
+        f"centered on peak tas "
         f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
     ax3.set_xlabel("Lag from event peak (hours)")
@@ -176,7 +194,8 @@ def plot_split_composite_timeseries(
     )
     split_variable = composite.attrs.get("split_variable", "event metric")
     fig.suptitle(
-        f"HW event-mean composites split by {split_variable} "
+        f"HW event-mean{_representation_title_fragment(composite)} composites "
+        f"split by {split_variable} "
         f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
     ax3.set_xlabel("Lag from event peak (hours)")
@@ -342,7 +361,8 @@ def _plot_extended_composite_timeseries(composite: xr.Dataset) -> Figure:
         else ""
     )
     fig.suptitle(
-        f"HW event-mean composite centered on peak tas "
+        f"HW event-mean{_representation_title_fragment(composite)} composite "
+        f"centered on peak tas "
         f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
     left[-1].set_xlabel("Lag from event peak (hours)")
@@ -412,7 +432,8 @@ def _plot_extended_split_composite_timeseries(composite: xr.Dataset) -> Figure:
     )
     split_variable = composite.attrs.get("split_variable", "event metric")
     fig.suptitle(
-        f"HW event-mean composites split by {split_variable} "
+        f"HW event-mean{_representation_title_fragment(composite)} composites "
+        f"split by {split_variable} "
         f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
     left[-1].set_xlabel("Lag from event peak (hours)")
@@ -741,7 +762,10 @@ def _plot_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
         label=_variable_label("T_mean"),
     )
     _plot_event_percentile_band(ax, lag, ds, "T_mean", color=temperature_color)
-    ax.set_ylabel("T_mean [K]", color=temperature_color)
+    ax.set_ylabel(
+        "T_mean anomaly [K]" if _is_climatological_anomaly(ds) else "T_mean [K]",
+        color=temperature_color,
+    )
     ax.tick_params(axis="y", labelcolor=temperature_color)
 
     ax_volume = ax.twinx()
@@ -752,7 +776,12 @@ def _plot_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
         label=_variable_label("volume"),
     )
     _plot_event_percentile_band(ax_volume, lag, ds, "volume", color=volume_color)
-    ax_volume.set_ylabel("volume [m2 Pa]", color=volume_color)
+    ax_volume.set_ylabel(
+        "volume anomaly [m2 Pa]"
+        if _is_climatological_anomaly(ds)
+        else "volume [m2 Pa]",
+        color=volume_color,
+    )
     ax_volume.tick_params(axis="y", labelcolor=volume_color)
 
     lines, labels = ax.get_legend_handles_labels()
@@ -828,7 +857,10 @@ def _plot_split_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
         "T_mean",
         color=VARIABLE_COLORS["T_mean"],
     )
-    ax.set_ylabel("T_mean [K]", color=VARIABLE_COLORS["T_mean"])
+    ax.set_ylabel(
+        "T_mean anomaly [K]" if _is_climatological_anomaly(ds) else "T_mean [K]",
+        color=VARIABLE_COLORS["T_mean"],
+    )
     ax.tick_params(axis="y", labelcolor=VARIABLE_COLORS["T_mean"])
 
     ax_volume = ax.twinx()
@@ -839,7 +871,12 @@ def _plot_split_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
         "volume",
         color=VARIABLE_COLORS["volume"],
     )
-    ax_volume.set_ylabel("volume [m2 Pa]", color=VARIABLE_COLORS["volume"])
+    ax_volume.set_ylabel(
+        "volume anomaly [m2 Pa]"
+        if _is_climatological_anomaly(ds)
+        else "volume [m2 Pa]",
+        color=VARIABLE_COLORS["volume"],
+    )
     ax_volume.tick_params(axis="y", labelcolor=VARIABLE_COLORS["volume"])
 
     ax.legend(
@@ -875,7 +912,7 @@ def _plot_single_variable_panel(
         color=color,
     )
     plot_style.zero_line(ax)
-    ax.set_ylabel(ylabel)
+    ax.set_ylabel(_anomaly_axis_label(ds, ylabel))
     ax.legend(loc="upper left")
 
 
@@ -902,7 +939,7 @@ def _plot_composite_variable_panel(
         color=color,
     )
     plot_style.zero_line(ax)
-    ax.set_ylabel(ylabel)
+    ax.set_ylabel(_anomaly_axis_label(ds, ylabel))
     ax.legend(handles=[_variable_legend_handle(name)], loc="upper left")
     ax.legend(loc="upper left")
 
@@ -931,7 +968,7 @@ def _plot_composite_multi_variable_panel(
             color=color,
         )
     plot_style.zero_line(ax)
-    ax.set_ylabel(ylabel)
+    ax.set_ylabel(_anomaly_axis_label(ds, ylabel))
     ax.legend(loc="upper left")
 
 
@@ -1016,7 +1053,7 @@ def _plot_split_single_variable_panel(
         color=VARIABLE_COLORS[name],
     )
     plot_style.zero_line(ax)
-    ax.set_ylabel(ylabel)
+    ax.set_ylabel(_anomaly_axis_label(ds, ylabel))
     ax.legend(handles=[_variable_legend_handle(name)], loc="upper left")
 
 
@@ -1037,7 +1074,7 @@ def _plot_split_multi_variable_panel(
             color=VARIABLE_COLORS[name],
         )
     plot_style.zero_line(ax)
-    ax.set_ylabel(ylabel)
+    ax.set_ylabel(_anomaly_axis_label(ds, ylabel))
     variable_legend = ax.legend(
         handles=[_variable_legend_handle(name) for name in names],
         loc="upper left",
@@ -1111,7 +1148,7 @@ def _plot_split_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
             color=VARIABLE_COLORS[name],
         )
     plot_style.zero_line(ax)
-    ax.set_ylabel("[K hr-1]")
+    ax.set_ylabel(_anomaly_axis_label(ds, "[K hr-1]"))
     _expand_yaxis(ax, factor=1.5)
     variable_legend = ax.legend(
         handles=[
@@ -1141,7 +1178,11 @@ def _plot_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
             name,
             color=color,
         )
-    ax.set_ylabel("LWA [m hPa]")
+    ax.set_ylabel(
+        "LWA anomaly [m hPa]"
+        if _is_climatological_anomaly(ds)
+        else "LWA [m hPa]"
+    )
     ax.legend(loc="upper left")
 
 
@@ -1175,7 +1216,11 @@ def _plot_pbl_pressure_panel(ax: Axes, ds: xr.Dataset) -> None:
             f"{_variable_label('pbl_p_p95')}"
         ),
     )
-    ax.set_ylabel("PBL [hPa]")
+    ax.set_ylabel(
+        "PBL anomaly [hPa]"
+        if _is_climatological_anomaly(ds)
+        else "PBL [hPa]"
+    )
     ax.invert_yaxis()
     ax.legend(loc="upper left")
 
@@ -1190,7 +1235,11 @@ def _plot_split_pbl_pressure_panel(ax: Axes, ds: xr.Dataset) -> None:
         color=VARIABLE_COLORS["pbl_p_mean"],
         scale=PBL_PRESSURE_TO_HPA,
     )
-    ax.set_ylabel("PBL [hPa]")
+    ax.set_ylabel(
+        "PBL anomaly [hPa]"
+        if _is_climatological_anomaly(ds)
+        else "PBL [hPa]"
+    )
     ax.invert_yaxis()
     variable_legend = ax.legend(
         handles=[_variable_legend_handle("pbl_p_mean")],
@@ -1303,7 +1352,11 @@ def _plot_split_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
             name,
             color=VARIABLE_COLORS[name],
         )
-    ax.set_ylabel("LWA [m hPa]")
+    ax.set_ylabel(
+        "LWA anomaly [m hPa]"
+        if _is_climatological_anomaly(ds)
+        else "LWA [m hPa]"
+    )
     variable_legend = ax.legend(
         handles=[
             _variable_legend_handle(name)
@@ -1326,7 +1379,12 @@ def _plot_soil_moisture_cloud_panel(ax: Axes, ds: xr.Dataset) -> None:
         label=_variable_label("soil_moisture"),
     )
     _plot_event_percentile_band(ax, lag, ds, "soil_moisture", color=soil_color)
-    ax.set_ylabel("soil moisture [m3 m-3]", color=soil_color)
+    ax.set_ylabel(
+        "soil moisture anomaly [m3 m-3]"
+        if _is_climatological_anomaly(ds)
+        else "soil moisture [m3 m-3]",
+        color=soil_color,
+    )
     ax.tick_params(axis="y", labelcolor=soil_color)
 
     ax_cloud = ax.twinx()
@@ -1337,9 +1395,15 @@ def _plot_soil_moisture_cloud_panel(ax: Axes, ds: xr.Dataset) -> None:
         label=_variable_label("cloud_cover"),
     )
     _plot_event_percentile_band(ax_cloud, lag, ds, "cloud_cover", color=cloud_color)
-    ax_cloud.set_ylabel("cloud cover fraction", color=cloud_color)
+    ax_cloud.set_ylabel(
+        "cloud cover fraction anomaly"
+        if _is_climatological_anomaly(ds)
+        else "cloud cover fraction",
+        color=cloud_color,
+    )
     ax_cloud.tick_params(axis="y", labelcolor=cloud_color)
-    ax_cloud.set_ylim(0, 1)
+    if not _is_climatological_anomaly(ds):
+        ax_cloud.set_ylim(0, 1)
 
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax_cloud.get_legend_handles_labels()
@@ -1358,7 +1422,12 @@ def _plot_split_soil_moisture_cloud_panel(ax: Axes, ds: xr.Dataset) -> None:
         "soil_moisture",
         color=soil_color,
     )
-    ax.set_ylabel("soil moisture [m3 m-3]", color=soil_color)
+    ax.set_ylabel(
+        "soil moisture anomaly [m3 m-3]"
+        if _is_climatological_anomaly(ds)
+        else "soil moisture [m3 m-3]",
+        color=soil_color,
+    )
     ax.tick_params(axis="y", labelcolor=soil_color)
 
     ax_cloud = ax.twinx()
@@ -1369,9 +1438,15 @@ def _plot_split_soil_moisture_cloud_panel(ax: Axes, ds: xr.Dataset) -> None:
         "cloud_cover",
         color=cloud_color,
     )
-    ax_cloud.set_ylabel("cloud cover fraction", color=cloud_color)
+    ax_cloud.set_ylabel(
+        "cloud cover fraction anomaly"
+        if _is_climatological_anomaly(ds)
+        else "cloud cover fraction",
+        color=cloud_color,
+    )
     ax_cloud.tick_params(axis="y", labelcolor=cloud_color)
-    ax_cloud.set_ylim(0, 1)
+    if not _is_climatological_anomaly(ds):
+        ax_cloud.set_ylim(0, 1)
 
     ax.legend(
         handles=[

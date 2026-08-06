@@ -1,7 +1,7 @@
-"""Face-resolved advective heating diagnostics for the Stage-1 prototype.
+"""Face-resolved advective heating diagnostics for Stage 1.
 
 Pipeline role:
-- Experimental analysis layer between raw EHB inputs and Stage 1.
+- Stage-1 harmonization and downstream diagnostic layer.
 
 Responsibilities:
 - Normalize signed EHB face heat contributions to domain-mean heating rates.
@@ -143,7 +143,7 @@ def add_face_advection_tendencies(
     out = stage1.assign(normalized)
     out.attrs.update(
         {
-            "advection_face_contribution_exploration": 1,
+            "advection_face_contributions": 1,
             "advection_face_contribution_faces": ",".join(faces),
             "advection_face_contribution_sign": (
                 "positive warming contribution; negative cooling contribution"
@@ -365,7 +365,7 @@ def source_face_variable(face: str) -> str:
 
 
 def stage1_face_variable(face: str) -> str:
-    """Return the experimental Stage-1 heating-rate variable for a face."""
+    """Return the Stage-1 heating-rate variable for a face."""
     return f"advection_{face}"
 
 

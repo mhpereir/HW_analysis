@@ -44,6 +44,22 @@ def test_default_harmonized_timeseries_path_omits_boundaries_when_not_given():
     )
 
 
+def test_default_regional_hourly_climatology_path_includes_run_tokens():
+    path = analysis_io.default_regional_hourly_climatology_path(
+        region="pnw_bartusek",
+        bottom_boundary="surface",
+        top_boundary=700,
+        start_year=1940,
+        end_year=2024,
+    )
+
+    assert path.parent == analysis_io.DEFAULT_STAGE1_CLIMATOLOGY_OUTPUT_DIR
+    assert path.name == (
+        "regional_hourly_climatology_"
+        "pnw_bartusek_surface_700hPa_1940_2024.nc"
+    )
+
+
 def test_save_harmonized_timeseries_creates_parent_and_writes_readable_file(tmp_path):
     ds = _make_harmonized_dataset()
     path = tmp_path / "nested" / "stage1.nc"
@@ -122,6 +138,67 @@ def test_open_harmonized_timeseries_rejects_missing_required_variables(tmp_path)
     with pytest.raises(ValueError, match="missing required variables"):
         opened = analysis_io.open_harmonized_timeseries(path)
         opened.close()
+
+
+def test_stage1_contract_version_2_requires_face_variables(tmp_path):
+    ds = _make_harmonized_dataset()
+    ds.attrs["stage1_contract_version"] = 2
+
+    with pytest.raises(ValueError, match="contract version 2"):
+        analysis_io.save_harmonized_timeseries(ds, tmp_path / "stage1.nc")
+
+
+def test_stage1_contract_version_2_with_face_variables_is_valid(tmp_path):
+    ds = _make_harmonized_dataset()
+    ds.attrs["stage1_contract_version"] = 2
+    for name in analysis_io.REQUIRED_STAGE1_V2_VARIABLES:
+        ds[name] = ("time", [0.1, 0.2])
+
+    path = analysis_io.save_harmonized_timeseries(ds, tmp_path / "stage1.nc")
+
+    with analysis_io.open_harmonized_timeseries(path) as reopened:
+        assert reopened.attrs["stage1_contract_version"] == 2
+        assert analysis_io.REQUIRED_STAGE1_V2_VARIABLES <= set(reopened.data_vars)
+
+
+def test_save_and_open_regional_hourly_climatology(tmp_path):
+    climate_time = np.array(
+        ["2000-05-01T00:00", "2000-05-01T01:00"],
+        dtype="datetime64[m]",
+    )
+    ds = xr.Dataset(
+        {"T_mean": ("climatology_time", [1.0, 2.0])},
+        coords={"climatology_time": climate_time},
+        attrs={"pipeline_stage": analysis_io.EXPECTED_CLIMATOLOGY_PIPELINE_STAGE},
+    )
+
+    path = analysis_io.save_regional_hourly_climatology(
+        ds,
+        tmp_path / "climatology.nc",
+    )
+
+    with analysis_io.open_regional_hourly_climatology(path) as reopened:
+        np.testing.assert_allclose(reopened["T_mean"], [1.0, 2.0])
+
+
+def test_atomic_netcdf_writer_cleans_partial_file_after_failure(
+    monkeypatch,
+    tmp_path,
+):
+    ds = xr.Dataset({"value": ("time", [1.0])})
+    output = tmp_path / "product.nc"
+
+    def fail_write(self, path, **kwargs):
+        Path(path).write_bytes(b"partial")
+        raise RuntimeError("simulated write failure")
+
+    monkeypatch.setattr(xr.Dataset, "to_netcdf", fail_write)
+
+    with pytest.raises(RuntimeError, match="simulated write failure"):
+        analysis_io._write_netcdf_atomically(ds, output)
+
+    assert not output.exists()
+    assert list(tmp_path.iterdir()) == []
 
 
 def _make_harmonized_dataset() -> xr.Dataset:

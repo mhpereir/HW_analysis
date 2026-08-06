@@ -46,6 +46,7 @@ authority rules.
 pre-calculated EHB + regional ERA5-family inputs + thresholds + LWA
   ->
 Product Stage 1: harmonized regional time series
+  |-> Stage 1 companion: regional calendar-hour climatology
   |-> Product Stage 2: baseline-day feature table
   `-> Product Stage 2: event-feature table
         |-> feature and event/baseline diagnostics
@@ -58,6 +59,7 @@ Product Stage 1
 | Product stage | Durable artifact | Producer | Main consumers |
 | --- | --- | --- | --- |
 | Stage 1 | `results/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_stage1_harmonized_timeseries.py` | event features, baseline features, composites, top-event plots |
+| Stage 1 companion | `results/stage1_climatology/regional_hourly_climatology_*.nc` | `scripts/build_stage1_hourly_climatology.py` | climatological-anomaly composites and face-advection diagnostics |
 | Stage 2 | event-feature table | `scripts/event_features/build_stage2_event_features.py` | feature plots, event comparisons, exploratory diagnostics |
 | Stage 2 | baseline-day feature table | `scripts/event_features/build_stage2_baseline_features.py` | event/baseline comparisons, exploratory diagnostics |
 
@@ -97,6 +99,7 @@ products or plotting dependencies.
 | `src/events.py` | Convert masks into event IDs, peaks, durations, ranks, and event summaries. |
 | `scripts/event_features/fixed_window_features.py` | Shared fixed-window reductions for event and baseline Stage-2 products. |
 | `src/composites.py` | Build event-centered extracts, means, spreads, and top-event products. |
+| `src/climatology.py` | Build regional calendar-hour climatologies and apply timestamp-matched anomalies. |
 | `src/diagnostics.py` | Domain-specific derived diagnostics such as residual checks and heating-rate approximations. |
 | `src/plotting.py` | Plot prepared products without raw loading or event generation. |
 | `src/plot_style.py` | Shared names, colors, dimensions, axis formatting, legends, and figure export. |
@@ -116,6 +119,10 @@ HW_analysis/
 |   `-- legacy/
 |-- scripts/
 |   |-- build_stage1_harmonized_timeseries.py
+|   |-- build_stage1_hourly_climatology.py
+|   |-- plot_composite_timeseries_all_clim_anom.py
+|   |-- plot_composite_timeseries_split_clim_anom.py
+|   |-- plot_advection_direction_exploration_clim_anom.py
 |   |-- event_features/
 |   |   |-- build_stage2_event_features.py
 |   |   |-- build_stage2_baseline_features.py
@@ -131,6 +138,7 @@ HW_analysis/
 |-- tests/
 `-- results/
     |-- stage1/
+    |-- stage1_climatology/
     |-- stage2_event_features/
     |-- stage2_baseline_features/
     `-- spatial_composites/
@@ -144,6 +152,7 @@ dataset contents rather than one exact run filename.
 ## Product Specs
 
 - [Stage 1: harmonized regional time series](products/stage1_harmonized_timeseries.md)
+- [Stage 1 companion: regional hourly climatology](products/stage1_regional_hourly_climatology.md)
 - [Stage 2: event features](products/stage2_event_features.md)
 - [Stage 2: baseline-day features](products/stage2_baseline_features.md)
 
@@ -165,6 +174,7 @@ the diagnostic they make rather than a product stage they produce.
 - [001: event-feature windows](decisions/001_event_feature_windows.md)
 - [004: baseline season and window boundaries](decisions/004_baseline_season_windows.md)
 - [005: Stage-1 event peak semantics](decisions/005_stage1_event_peak_semantics.md)
+- [006: regional hourly climatology baseline](decisions/006_regional_hourly_climatology.md)
 
 PCA and clustering decisions are indexed under
 [legacy documentation](legacy/README.md).

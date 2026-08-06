@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from . import diagnostics, preprocess
+from . import advection_direction, diagnostics, preprocess
 
 
 HEAT_BUDGET_VARIABLE_MAP: dict[str, str] = {
@@ -132,9 +132,11 @@ def build_regional_analysis_dataset(
         )
 
     ds = xr.Dataset(data_vars=data_vars, coords={time_dim: hourly_time})
+    ds = advection_direction.add_face_advection_tendencies(ds, heat_budget)
     ds.attrs.update(
         {
             "pipeline_stage": "stage_1_harmonized_regional_timeseries",
+            "stage1_contract_version": 2,
             "analysis_time_resolution": "hourly",
             "time_axis": time_dim,
         }
@@ -267,6 +269,10 @@ def _prepare_heat_budget_variables(
                 "analysis_time_resolution": "hourly",
             }
         )
+        if output_name == "T_mean":
+            da.attrs["units"] = "K"
+        elif output_name == "volume":
+            da.attrs["units"] = "m2 Pa"
         out[output_name] = da
 
     return out

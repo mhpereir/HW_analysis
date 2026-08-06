@@ -32,6 +32,8 @@ def test_stage1_scheduler_requires_global_cloud_cover_and_full_diagnostics():
     assert '--add-full-diagnostics \\\n' in text
     assert '--cloud-cover-source-layout "global-hourly-grid"' in text
     assert "--cloud-cover-root" in text
+    assert "stage1_contract_version=2" in text
+    assert "face_advection_contributions=enabled" in text
     assert "legacy-regional" not in text
 
 

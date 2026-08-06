@@ -160,6 +160,7 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
 
     assert out.sizes == {"time": 3}
     assert out.attrs["pipeline_stage"] == "stage_1_harmonized_regional_timeseries"
+    assert out.attrs["stage1_contract_version"] == 2
     assert out.attrs["analysis_time_resolution"] == "hourly"
     assert out.attrs["region"] == "pnw_bartusek"
     assert {"T_mean", "volume", "dTdt", "advection", "adiabatic", "diabatic"} <= set(out)
@@ -180,6 +181,8 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
     assert out["tas_region"].attrs["native_time_resolution"] == "daily"
     assert out["tas_region"].attrs["analysis_time_resolution"] == "hourly"
     assert out["T_mean"].attrs["native_time_resolution"] == "hourly"
+    assert out["T_mean"].attrs["units"] == "K"
+    assert out["volume"].attrs["units"] == "m2 Pa"
     assert out["dTdt"].attrs["units"] == "K hr-1"
     assert out["dTdt"].attrs["normalized_by"] == "domain_volume"
     assert out["advection"].attrs["sign_convention"] == (
@@ -410,14 +413,20 @@ def _daily_array(values, *, name: str) -> xr.DataArray:
 def _make_heat_budget(hourly_time: np.ndarray) -> xr.Dataset:
     coords = {"time": hourly_time}
     data = np.arange(hourly_time.size, dtype=float)
+    advection = data + 4.0
     return xr.Dataset(
         {
             "T_domain_avg": ("time", data + 1.0),
             "domain_volume": ("time", data + 2.0),
             "dT_dt": ("time", data + 3.0),
-            "advection_term": ("time", data + 4.0),
+            "advection_term": ("time", advection),
             "adiabatic_term": ("time", data + 5.0),
             "diabatic_term": ("time", data + 6.0),
+            "flux_contribution_west": ("time", advection),
+            "flux_contribution_east": ("time", np.zeros_like(data)),
+            "flux_contribution_south": ("time", np.zeros_like(data)),
+            "flux_contribution_north": ("time", np.zeros_like(data)),
+            "flux_contribution_top": ("time", np.zeros_like(data)),
         },
         coords=coords,
     )
