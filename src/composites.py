@@ -133,7 +133,12 @@ def stack_events_centered_on_peak(
             )
         windows.append(window.expand_dims({event_dim: [event_id]}))
 
-    stacked = xr.concat(windows, dim=event_dim)
+    stacked = xr.concat(
+        windows,
+        dim=event_dim,
+        coords="different",
+        compat="equals",
+    )
     stacked = _attach_event_metadata(
         stacked,
         event_table,

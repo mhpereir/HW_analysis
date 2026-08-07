@@ -43,3 +43,14 @@ def test_anomaly_plot_schedulers_require_stage1_climatology_and_output():
         assert 'OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"' in text
         assert "--input-path \"${INPUT_PATH}\"" in text
         assert "--climatology-path \"${CLIMATOLOGY_PATH}\"" in text
+
+
+def test_split_anomaly_scheduler_checks_the_script_derived_output_names():
+    text = SCHEDULERS[2].read_text()
+
+    expected = (
+        'SPLIT_OUTPUT_PATH="${OUTPUT_DIRECTORY}/${OUTPUT_STEM}_'
+        '${SPLIT_VARIABLE}.${OUTPUT_SUFFIX}"'
+    )
+    assert expected in text
+    assert "split_${SPLIT_VARIABLE}/" not in text
