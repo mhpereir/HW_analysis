@@ -37,7 +37,10 @@ The `climatology_time` coordinate uses reference year 2000. The reference year
 is only an encoding of month, day, and hour; it is not a climatology year or a
 forecast timestamp. The product contains exactly the calendar-hour keys found
 in its Stage-1 input. For the current May-October 1940-2024 product, that is
-4,414 keys with 85 source years per complete key.
+4,414 keys. Every non-PBL required variable has 85 source years per key. The
+upstream PBL product is incomplete, so the three PBL variables have 58-62
+finite source years per key. The stored count variables make this difference
+explicit.
 
 ## Variables
 
@@ -143,8 +146,9 @@ product path.
   month-day-hour key exactly once.
 - Every source timestamp maps to one climatology key.
 - No source year contains duplicate values for a calendar-hour key.
-- Counts are positive; the current complete production input has count 85 for
-  every required variable and key.
+- Counts are positive. The current production input has count 85 for every
+  non-PBL required variable and key, and counts of 58-62 for each PBL variable
+  and key because of upstream PBL missingness.
 - Mean source anomaly at every key is zero within floating-point tolerance.
 - Heat-budget and face-reconstruction identities remain valid after anomaly
   subtraction.
