@@ -61,16 +61,16 @@ def build_regional_hourly_climatology(
     keys = calendar_hour_keys(ds[time_dim], time_dim=time_dim)
     _validate_unique_year_keys(ds[time_dim], keys)
 
-    selected = ds[list(names)].assign_coords({CLIMATOLOGY_DIM: keys})
-    grouped = selected.groupby(CLIMATOLOGY_DIM)
-    means = grouped.mean(time_dim, skipna=True)
-    standard_deviations = grouped.std(time_dim, skipna=True, ddof=1)
-    counts = grouped.count(time_dim)
-
-    out = xr.Dataset(coords={CLIMATOLOGY_DIM: means[CLIMATOLOGY_DIM]})
+    key_values, key_indices = np.unique(keys.values, return_inverse=True)
+    out = xr.Dataset(coords={CLIMATOLOGY_DIM: key_values})
     for name in names:
+        means, standard_deviations, counts = _grouped_sample_statistics(
+            ds[name],
+            key_indices=key_indices,
+            group_count=key_values.size,
+        )
         source_attrs = dict(ds[name].attrs)
-        out[name] = means[name]
+        out[name] = (CLIMATOLOGY_DIM, means)
         out[name].attrs = source_attrs
         out[name].attrs.update(
             {
@@ -80,7 +80,7 @@ def build_regional_hourly_climatology(
         )
 
         std_name = f"{name}_std"
-        out[std_name] = standard_deviations[name]
+        out[std_name] = (CLIMATOLOGY_DIM, standard_deviations)
         out[std_name].attrs = source_attrs
         out[std_name].attrs.update(
             {
@@ -91,7 +91,7 @@ def build_regional_hourly_climatology(
         )
 
         count_name = f"{name}_count"
-        out[count_name] = counts[name].astype(np.int64)
+        out[count_name] = (CLIMATOLOGY_DIM, counts)
         out[count_name].attrs.update(
             {
                 "long_name": f"Finite source-year count for {name}",
@@ -319,6 +319,52 @@ def _validate_source_dataset(
         if not np.issubdtype(ds[name].dtype, np.number):
             raise TypeError(f"source variable {name!r} must be numeric.")
     return names
+
+
+def _grouped_sample_statistics(
+    values: xr.DataArray,
+    *,
+    key_indices: np.ndarray,
+    group_count: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return finite means, sample standard deviations, and counts by key.
+
+    Each source variable is materialized independently. This keeps memory bounded by
+    one time series instead of constructing a combined Dask groupby graph for every
+    variable and statistic in the climatology product.
+    """
+    array = np.asarray(values.values, dtype=np.float64)
+    finite = np.isfinite(array)
+    finite_keys = key_indices[finite]
+    finite_values = array[finite]
+
+    counts = np.bincount(finite_keys, minlength=group_count).astype(np.int64)
+    sums = np.bincount(
+        finite_keys,
+        weights=finite_values,
+        minlength=group_count,
+    )
+    means = np.full(group_count, np.nan, dtype=np.float64)
+    np.divide(sums, counts, out=means, where=counts > 0)
+
+    squared_deviations = np.square(finite_values - means[finite_keys])
+    squared_deviation_sums = np.bincount(
+        finite_keys,
+        weights=squared_deviations,
+        minlength=group_count,
+    )
+    standard_deviations = np.full(group_count, np.nan, dtype=np.float64)
+    np.sqrt(
+        np.divide(
+            squared_deviation_sums,
+            counts - 1,
+            out=np.zeros(group_count, dtype=np.float64),
+            where=counts > 1,
+        ),
+        out=standard_deviations,
+        where=counts > 1,
+    )
+    return means, standard_deviations, counts
 
 
 def _validate_unique_year_keys(time: xr.DataArray, keys: xr.DataArray) -> None:

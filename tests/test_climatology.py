@@ -46,6 +46,29 @@ def test_build_regional_hourly_climatology_computes_mean_std_and_count():
     assert climate.attrs["climatology_end_year"] == 2000
 
 
+def test_build_regional_hourly_climatology_skips_nonfinite_values_per_key():
+    source = _source_dataset(
+        [
+            "1999-05-01T00:00",
+            "1999-05-01T01:00",
+            "2000-05-01T00:00",
+            "2000-05-01T01:00",
+            "2001-05-01T00:00",
+            "2001-05-01T01:00",
+        ],
+        values=[1.0, 2.0, np.nan, 4.0, 5.0, np.inf],
+    )
+
+    climate = climatology.build_regional_hourly_climatology(
+        source,
+        variables=("T_mean",),
+    )
+
+    np.testing.assert_allclose(climate["T_mean"], [3.0, 3.0])
+    np.testing.assert_allclose(climate["T_mean_std"], [np.sqrt(8.0), np.sqrt(2.0)])
+    np.testing.assert_array_equal(climate["T_mean_count"], [2, 2])
+
+
 def test_build_regional_hourly_climatology_rejects_duplicate_year_key():
     source = _source_dataset(
         ["1999-05-01T00:00", "1999-05-01T00:30"],
