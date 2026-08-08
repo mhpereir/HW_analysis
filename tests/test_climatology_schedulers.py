@@ -59,7 +59,7 @@ def test_split_anomaly_scheduler_matches_absolute_production_split_matrix():
     assert _shell_array_values(text, variable_name="split_variable_list") == (
         expected_variables
     )
-    assert 'SPLIT_QUANTILE="${SPLIT_QUANTILE:-0.90}"' in text
+    assert 'SPLIT_QUANTILE="${SPLIT_QUANTILE:-0.75}"' in text
     assert 'SPLIT_YEAR="${SPLIT_YEAR:-1982}"' in text
     assert '--split-variable peak_time' in text
     assert '--split-years "${SPLIT_YEAR}"' in text
