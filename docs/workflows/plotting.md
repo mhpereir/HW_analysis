@@ -78,6 +78,30 @@ figure entrypoints.
   period in their title or metadata, include a zero reference where
   appropriate, and never overwrite their absolute-value counterparts.
 
+### Climatological-anomaly composite labels and surface-flux signs
+
+The all-event and split-event climatological-anomaly composite figures use the
+symbol `Δ` in panel-axis labels instead of spelling out `anomaly`. Place `Δ`
+immediately before the plotted variable name when the axis identifies a
+variable, for example `ΔT_mean [K]` or `ΔLWA [m hPa]`. For a shared or
+units-only tendency axis, place the symbol immediately before the units, for
+example `Δ [K hr-1]`. Figure titles continue to identify the
+climatological-anomaly representation explicitly.
+
+ERA5 sensible and latent surface heat fluxes use the source convention that
+positive values are directed toward the surface. In the all-event and
+split-event climatological-anomaly composite figures, render
+`sshf_heating_rate_approx` and `slhf_heating_rate_approx` with the opposite
+sign, so positive plotted anomalies denote heat transfer into the atmosphere
+and can be compared directly with the atmospheric diabatic-heating sign. Apply
+the same sign reversal to the composite mean and its event-percentile bounds.
+
+This is a display transform only. It must not mutate Stage 1, the climatology
+companion, the assembled composite dataset, absolute-value figures, or
+top-event figures. Synthetic plotting tests must verify the `Δ` labels, the
+reversed anomaly traces and bounds, and retention of native signs in absolute
+composites.
+
 ## Validation
 
 Run the plotting and spatial plot tests locally:

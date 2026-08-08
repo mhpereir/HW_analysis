@@ -187,17 +187,19 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
         plt.close(fig)
 
 
-def test_climatological_anomaly_composite_uses_explicit_titles_and_units():
+def test_climatological_anomaly_composite_uses_delta_axis_labels():
     composite = _make_composite()
     composite.attrs["data_representation"] = "climatological_anomaly"
 
     fig = plotting.plot_composite_timeseries(composite)
     try:
         assert "climatological-anomaly composite" in fig._suptitle.get_text()
-        assert fig.axes[0].get_ylabel() == "T_mean anomaly [K]"
-        assert fig.axes[1].get_ylabel() == "anomaly [K hr-1]"
-        assert fig.axes[3].get_ylabel() == "LWA anomaly [m hPa]"
-        assert fig.axes[4].get_ylabel() == "volume anomaly [m2 Pa]"
+        assert fig.axes[0].get_ylabel() == "ΔT_mean [K]"
+        assert fig.axes[1].get_ylabel() == "Δ [K hr-1]"
+        assert fig.axes[2].get_ylabel() == "Δ [K hr-1]"
+        assert fig.axes[3].get_ylabel() == "ΔLWA [m hPa]"
+        assert fig.axes[4].get_ylabel() == "Δvolume [m2 Pa]"
+        assert all("anomaly" not in ax.get_ylabel() for ax in fig.axes)
     finally:
         plt.close(fig)
 
@@ -213,8 +215,85 @@ def test_extended_anomaly_cloud_axis_is_not_bounded_to_fraction_range():
     )
     try:
         cloud_axis = fig.axes[11]
-        assert cloud_axis.get_ylabel() == "cloud cover fraction anomaly"
+        assert cloud_axis.get_ylabel() == "Δcloud cover fraction"
         assert cloud_axis.get_ylim() != (0.0, 1.0)
+    finally:
+        plt.close(fig)
+
+
+def test_extended_anomaly_composite_uses_delta_labels_and_atmospheric_flux_signs():
+    composite = _make_composite()
+    composite.attrs["data_representation"] = "climatological_anomaly"
+    source_sshf = composite["sshf_heating_rate_approx"].values.copy()
+    source_slhf = composite["slhf_heating_rate_approx"].values.copy()
+
+    fig = plotting.plot_composite_timeseries(
+        composite,
+        plot_extended_variables=True,
+    )
+    try:
+        _assert_extended_anomaly_axis_labels(fig)
+        surface_axis = fig.axes[7]
+        plotted = {
+            line.get_label(): line.get_ydata()
+            for line in surface_axis.lines
+            if not line.get_label().startswith("_")
+        }
+        np.testing.assert_allclose(
+            plotted[_display_label("sshf_heating_rate_approx")],
+            -source_sshf,
+        )
+        np.testing.assert_allclose(
+            plotted[_display_label("slhf_heating_rate_approx")],
+            -source_slhf,
+        )
+        for collection, name in zip(
+            surface_axis.collections,
+            ("sshf_heating_rate_approx", "slhf_heating_rate_approx"),
+            strict=True,
+        ):
+            source_bounds = composite[f"event_percentile_{name}"]
+            expected_lower = -source_bounds.sel(quantile=0.75).values
+            expected_upper = -source_bounds.sel(quantile=0.25).values
+            plotted_bounds = collection.get_datalim(surface_axis.transData)
+            np.testing.assert_allclose(
+                (plotted_bounds.ymin, plotted_bounds.ymax),
+                (expected_lower.min(), expected_upper.max()),
+            )
+        np.testing.assert_allclose(
+            composite["sshf_heating_rate_approx"].values,
+            source_sshf,
+        )
+        np.testing.assert_allclose(
+            composite["slhf_heating_rate_approx"].values,
+            source_slhf,
+        )
+    finally:
+        plt.close(fig)
+
+
+def test_absolute_composite_retains_native_surface_flux_signs():
+    composite = _make_composite()
+
+    fig = plotting.plot_composite_timeseries(
+        composite,
+        plot_extended_variables=True,
+    )
+    try:
+        surface_axis = fig.axes[7]
+        plotted = {
+            line.get_label(): line.get_ydata()
+            for line in surface_axis.lines
+            if not line.get_label().startswith("_")
+        }
+        np.testing.assert_allclose(
+            plotted[_display_label("sshf_heating_rate_approx")],
+            composite["sshf_heating_rate_approx"].values,
+        )
+        np.testing.assert_allclose(
+            plotted[_display_label("slhf_heating_rate_approx")],
+            composite["slhf_heating_rate_approx"].values,
+        )
     finally:
         plt.close(fig)
 
@@ -402,6 +481,39 @@ def test_plot_split_composite_timeseries_extended_labels_single_variable_panels(
                 for text in fig.axes[axis_index].get_legend().get_texts()
             ]
             assert _display_label(label) in legend_labels
+    finally:
+        plt.close(fig)
+
+
+def test_extended_split_anomaly_uses_delta_labels_and_atmospheric_flux_signs():
+    composite = _make_split_composite()
+    composite.attrs["data_representation"] = "climatological_anomaly"
+
+    fig = plotting.plot_split_composite_timeseries(
+        composite,
+        plot_extended_variables=True,
+    )
+    try:
+        _assert_extended_anomaly_axis_labels(fig)
+        surface_axis = fig.axes[7]
+        for variable_index, name in enumerate(
+            ("sshf_heating_rate_approx", "slhf_heating_rate_approx")
+        ):
+            line_offset = variable_index * composite.sizes["split_bin"] * 3
+            for split_index in range(composite.sizes["split_bin"]):
+                subset = composite.isel(split_bin=split_index)
+                mean_line = surface_axis.lines[line_offset + split_index * 3]
+                lower_line = surface_axis.lines[line_offset + split_index * 3 + 1]
+                upper_line = surface_axis.lines[line_offset + split_index * 3 + 2]
+                np.testing.assert_allclose(mean_line.get_ydata(), -subset[name].values)
+                np.testing.assert_allclose(
+                    lower_line.get_ydata(),
+                    -subset[f"event_percentile_{name}"].sel(quantile=0.25).values,
+                )
+                np.testing.assert_allclose(
+                    upper_line.get_ydata(),
+                    -subset[f"event_percentile_{name}"].sel(quantile=0.75).values,
+                )
     finally:
         plt.close(fig)
 
@@ -707,6 +819,24 @@ def _assert_all_spines_visible(fig) -> None:
         for ax in fig.axes
         for spine in ax.spines.values()
     )
+
+
+def _assert_extended_anomaly_axis_labels(fig) -> None:
+    """Require concise delta notation on every extended anomaly axis."""
+    assert [ax.get_ylabel() for ax in fig.axes] == [
+        "ΔT_mean [K]",
+        "ΔLWA [m hPa]",
+        "Δ [K hr-1]",
+        "ΔPBL [hPa]",
+        "Δ [K hr-1]",
+        "Δ [K hr-1]",
+        "Δ [K hr-1]",
+        "Δ [K hr-1]",
+        "Δ [K hr-1]",
+        "Δsoil moisture [m3 m-3]",
+        "Δvolume [m2 Pa]",
+        "Δcloud cover fraction",
+    ]
 
 
 def _make_split_composite() -> xr.Dataset:
