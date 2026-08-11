@@ -1,4 +1,4 @@
-# Exploratory matching of heatwaves by I_dyn sign
+# Exploratory matching of heatwaves by `I_dyn_pre` sign
 
 ## Status and question
 
@@ -178,13 +178,11 @@ SMD recomputes the pooled sample SD from the two retained groups. Consequently,
 the after-match SMD denominator is not necessarily the full-population scale
 used to form the matching calipers and pair distances.
 
-## Historical 72-hour data snapshot and provenance
+## 96-hour data snapshot and provenance
 
-The numerical results and figures below preserve the preliminary exploration
-generated with the former inclusive `(-72, 0)` window and a runtime component
-sum. They are not validation results for the current 96-hour `I_dyn_pre`
-contract. Regenerate them from the rebuilt suffix-free `tas` Stage-2 product
-before using the pair counts or SMD values as current results.
+The numerical results and figures below were regenerated from the canonical
+96-hour `I_dyn_pre` product by PBS job `2589929.venus` at source commit
+`9225f2ce3d96c0df7864f274b940bfb2a167b79e`.
 
 The source is the canonical PNW Bartusek surface-to-700 hPa, tas-q90,
 1940-2024 Stage-1 product on Venus:
@@ -194,55 +192,59 @@ The source is the canonical PNW Bartusek surface-to-700 hPa, tas-q90,
 harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc
 ```
 
-The existing compact Stage-2 table was compared with an in-memory Stage-2
-rebuild from that exact Stage-1 file. Event IDs and every variable used here
-were identical, including `I_advection_pre`, `I_adiabatic_pre`, peak severity,
-duration, season timing, and antecedent anomaly. The compact input used for the
-local figures was:
+The compact Stage-2 input used for the production figures was:
 
 ```text
 /home/mhpereir/HW_analysis/results/stage2_event_features/
 hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc
-sha256: 5df97ddaaffb7be26fca0fdfd4979ee728faa27506b8003d101f6ffc59455252
+sha256: 1a38fa88040bb3597a643e26dfd2882ecb4ac2e859285a01d524f127ef197780
 ```
 
-The historical Stage-2 universe requires complete June-August events. It
-contains 258 events, all with finite and nonzero `I_dyn`:
+The tracked matching settings were:
 
-| I_dyn sign | Events | Mean `tas_anom_peak` |
+```text
+/home/mhpereir/HW_analysis/scripts/Idyn_matching_exploration/
+matching_settings.json
+sha256: 6b65aaf712ef494a16e5794a19c24b2f2516e5565251a8e922a4311bec434244
+```
+
+The Stage-2 universe requires complete June-August events. It contains 258
+events, all with finite and nonzero `I_dyn_pre`:
+
+| `I_dyn_pre` sign | Events | Mean `tas_anom_peak` |
 | --- | ---: | ---: |
-| Negative | 90 | 3.179 K |
-| Positive | 168 | 3.679 K |
+| Negative | 117 | 3.212 K |
+| Positive | 141 | 3.747 K |
 
-Across all events, the Pearson correlation between `I_dyn` and
-`tas_anom_peak` is 0.339. The unmatched standardized mean difference (SMD) in
-peak anomaly is 0.598, where SMD is positive-group mean minus negative-group
+Across all events, the Pearson correlation between `I_dyn_pre` and
+`tas_anom_peak` is 0.403. The unmatched standardized mean difference (SMD) in
+peak anomaly is 0.645, where SMD is positive-group mean minus negative-group
 mean divided by the pooled within-group standard deviation.
 
-![Unmatched I_dyn populations and peak-anomaly distributions](../../results/Idyn_matching_exploration/idyn_population_overview.png)
+![Unmatched I_dyn_pre populations and peak-anomaly distributions](../../results/Idyn_matching_exploration/idyn_population_overview.png)
 
 ## Primary exploratory match
 
 The primary specification uses deterministic, one-to-one optimal matching
 without replacement:
 
-- reference population: negative `I_dyn` events;
-- candidate population: positive `I_dyn` events;
+- reference population: negative `I_dyn_pre` events;
+- candidate population: positive `I_dyn_pre` events;
 - matching variable: `tas_anom_peak`;
 - distance: absolute difference divided by the pooled within-group SD;
 - caliper: 0.20 pooled SD; and
 - objective: maximize pair count first, then minimize total distance.
 
-This produces 90 pairs. Every negative event is retained, while 90 of 168
-positive events are retained. The excluded 78 positive events lie outside the
-selected comparison set.
+This produces 97 pairs. It retains 97 of 117 negative events and 97 of 141
+positive events. The excluded 20 negative and 44 positive events lie outside
+the selected comparison set.
 
 | Pair diagnostic | Value |
 | --- | ---: |
-| Mean absolute anomaly difference | 0.023 K |
-| Maximum absolute anomaly difference | 0.128 K |
-| Peak-anomaly SMD before matching | 0.598 |
-| Peak-anomaly SMD after matching | 0.011 |
+| Mean absolute anomaly difference | 0.037 K |
+| Maximum absolute anomaly difference | 0.165 K |
+| Peak-anomaly SMD before matching | 0.645 |
+| Peak-anomaly SMD after matching | 0.041 |
 
 ![Before and after peak-anomaly matching](../../results/Idyn_matching_exploration/tas_anom_matching_diagnostics.png)
 
@@ -258,18 +260,19 @@ constrained by the matching algorithm.
 
 | Variable | Negative mean before | Positive mean before | SMD before | Negative mean after | Positive mean after | SMD after |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Peak temperature anomaly [K] | 3.179 | 3.679 | 0.598 | 3.179 | 3.185 | 0.011 |
-| Peak temperature [K] | 291.190 | 291.848 | 0.378 | 291.190 | 291.662 | 0.281 |
-| Peak threshold excess [K] | 0.708 | 1.218 | 0.632 | 0.708 | 0.746 | 0.068 |
-| Integrated threshold excess [K day] | 1.496 | 3.197 | 0.504 | 1.496 | 1.443 | -0.032 |
-| Duration [day] | 2.444 | 3.125 | 0.340 | 2.444 | 2.267 | -0.111 |
-| Days from June 21 [day] | 21.278 | 25.411 | 0.162 | 21.278 | 28.622 | 0.301 |
-| Antecedent mean anomaly [K] | 1.237 | 0.479 | -0.621 | 1.237 | 0.104 | -1.018 |
+| Peak temperature anomaly [K] | 3.212 | 3.747 | 0.645 | 3.322 | 3.349 | 0.041 |
+| Peak temperature [K] | 291.245 | 291.928 | 0.394 | 291.443 | 291.752 | 0.194 |
+| Peak threshold excess [K] | 0.745 | 1.285 | 0.677 | 0.848 | 0.906 | 0.092 |
+| Integrated threshold excess [K day] | 1.579 | 3.454 | 0.561 | 1.849 | 2.036 | 0.083 |
+| Duration [day] | 2.385 | 3.305 | 0.466 | 2.639 | 2.701 | 0.034 |
+| Days from June 21 [day] | 19.137 | 27.979 | 0.351 | 19.691 | 31.773 | 0.498 |
+| Antecedent mean anomaly [K] | 1.170 | 0.389 | -0.646 | 1.243 | 0.128 | -0.936 |
 
-Peak threshold excess and integrated threshold excess become well balanced as
-a consequence of matching peak anomaly. Absolute peak temperature retains a
-moderate difference. Season timing becomes less balanced, and the large
-antecedent-anomaly contrast becomes larger.
+Peak threshold excess, integrated threshold excess, and duration become well
+balanced as a consequence of matching peak anomaly. Absolute peak temperature
+improves but retains a modest difference. Season timing becomes less balanced,
+and the large antecedent-anomaly contrast becomes larger. Five of the seven
+audited variables improve in absolute SMD.
 
 Those remaining contrasts are not automatically matching failures. They may
 be part of the mechanism that distinguishes the dynamical-sign populations.
@@ -282,9 +285,11 @@ which variables remain outcomes or explanatory diagnostics.
 
 The enlarged antecedent-temperature contrast after peak-anomaly matching is
 consistent with a compensation pattern: within events reaching comparable
-peak anomalies, the positive-`I_dyn` group begins from a cooler antecedent
-state. Matching alone does not establish that those events *need* a cooler
-start, but it makes that mechanism a useful hypothesis for the composites.
+peak anomalies, the positive-`I_dyn_pre` group begins from a cooler antecedent
+state. In the matched sample, the positive-group antecedent mean anomaly is
+0.128 K versus 1.243 K in the negative group. Matching alone does not establish
+that those events *need* a cooler start, but it makes that mechanism a useful
+hypothesis for the composites.
 
 Matching on `I_dTdt_pre` and `T_anom_mean_ant` directly was tested against the
 same seven-variable balance audit. It is not a better replacement under the
@@ -293,37 +298,37 @@ sample loss.
 
 | Specification | Caliper [pooled SD] | Pairs | Variables improved | Mean absolute SMD | Worst absolute SMD |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Before matching | - | - | - | 0.462 | 0.632 |
-| Peak anomaly | 0.20 | 90 | 5 of 7 | 0.260 | 1.018 |
-| `I_dTdt_pre` and antecedent anomaly | 0.10 | 22 | 6 of 7 | 0.203 | 0.544 |
-| `I_dTdt_pre` and antecedent anomaly | 0.20 | 43 | 4 of 7 | 0.422 | 1.048 |
-| Peak anomaly, season timing, and antecedent anomaly | 0.75 | 83 | 7 of 7 | 0.212 | 0.302 |
-| Peak anomaly, season timing, and antecedent anomaly | 0.50 | 69 | 7 of 7 | 0.097 | 0.165 |
+| Before matching | - | - | - | 0.534 | 0.677 |
+| Peak anomaly | 0.20 | 97 | 5 of 7 | 0.268 | 0.936 |
+| `I_dTdt_pre` and antecedent anomaly | 0.10 | 33 | 5 of 7 | 0.424 | 1.122 |
+| `I_dTdt_pre` and antecedent anomaly | 0.20 | 57 | 4 of 7 | 0.476 | 1.306 |
+| Peak anomaly, season timing, and antecedent anomaly | 0.75 | 91 | 7 of 7 | 0.293 | 0.420 |
+| Peak anomaly, season timing, and antecedent anomaly | 0.50 | 70 | 7 of 7 | 0.194 | 0.322 |
 
-The strict 0.10-SD integrated-warming match balances both requested matching
-variables: the `I_dTdt_pre` SMD changes from 1.630 to -0.015 and the antecedent
-anomaly SMD changes from -0.621 to -0.041. However, it retains only 22 of the
-90 negative events, and the absolute season-timing SMD increases from 0.162 to
-0.544. Relaxing the caliper to 0.20 retains 43 pairs but improves only four of
-the seven audit variables.
+The strict 0.10-SD integrated-warming match retains 33 pairs and improves five
+of the seven audit variables, but its worst absolute SMD is 1.122. Relaxing the
+caliper to 0.20 retains 57 pairs but improves only four variables and increases
+the worst absolute SMD to 1.306. Neither specification improves the full
+balance audit.
 
-The weak overlap is scientifically meaningful. Before matching, mean
-`I_dTdt_pre` is 1.787 K in negative-`I_dyn` events and 4.878 K in positive
-events, giving an SMD of 1.630. `I_dTdt_pre` is also strongly correlated with
-`I_dyn` across events (`r = 0.779`). It is therefore not a neutral nuisance
-covariate. Conditioning on it asks a narrower question about how events with
-the same realized pre-peak warming and antecedent state partition their
-dynamical and other contributions.
+The weak overlap is scientifically meaningful. The unmatched `I_dTdt_pre` SMD
+is 1.382, and `I_dTdt_pre` is also strongly correlated with `I_dyn_pre` across
+events (`r = 0.718`). It is therefore not a neutral nuisance covariate.
+Conditioning on it asks a narrower question about how events with the same
+realized pre-peak warming and antecedent state partition their dynamical and
+other contributions.
 
 ![Balance and retention tradeoffs among candidate specifications](../../results/Idyn_matching_exploration/matching_specification_tradeoff.png)
 
 For the next comparison, the most defensible high-retention candidate in this
 small search is peak anomaly plus season timing plus antecedent anomaly. A
-0.75-SD per-variable caliper retains 83 pairs, or 92% of the negative-event
-reference population, and improves all seven SMDs. Its 0.50-SD version is a
-stronger-balance sensitivity that retains 69 pairs and reduces the worst
-absolute SMD to 0.165. These should remain two explicitly labeled estimands,
-not be selected after looking at downstream composite differences.
+0.75-SD per-variable caliper retains 91 pairs, or 78% of the 117-event negative
+reference population, and improves all seven SMDs. Its mean and worst absolute
+SMDs are 0.293 and 0.420. The 0.50-SD version is a stronger-balance sensitivity
+that retains 70 pairs, with mean and worst absolute SMDs of 0.194 and 0.322.
+Neither achieves uniformly negligible imbalance, so these should remain two
+explicitly labeled estimands rather than being selected after looking at
+downstream composite differences.
 
 ## Retention sensitivity
 
@@ -331,15 +336,15 @@ Using the same 0.20 pooled-SD caliper separately for every requested variable:
 
 | Matching variables | Matched pairs |
 | --- | ---: |
-| Peak anomaly | 90 |
+| Peak anomaly | 97 |
 | Peak anomaly and days from June 21 | 73 |
-| Peak anomaly and duration | 79 |
-| Peak anomaly, days from June 21, and duration | 40 |
+| Peak anomaly and duration | 74 |
+| Peak anomaly, days from June 21, and duration | 38 |
 
 Adding season timing or duration improves balance on those variables but
 changes the retained negative-event population and therefore changes the
 comparison being made. The three-variable specification retains fewer than
-half of the 90 negative events.
+one third of the 117 negative events.
 
 ## Questions for the next design step
 
@@ -350,10 +355,10 @@ half of the 90 negative events.
 3. Is duration part of event comparability, or is it a possible consequence of
    the different dynamical evolution?
 4. Should the primary comparison preserve antecedent temperature as a
-   mechanism, or should the 83-pair three-variable match define the comparable
+   mechanism, or should the 91-pair three-variable match define the comparable
    event population?
 5. Should `I_dTdt_pre` be reserved for a mechanism-conditioned sensitivity
-   because of its strong association with `I_dyn`?
+   because of its strong association with `I_dyn_pre`?
 6. Which existing temporal and spatial composites should first consume the
    matched event IDs as a sensitivity analysis?
 
