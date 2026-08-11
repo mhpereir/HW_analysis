@@ -135,6 +135,120 @@ def test_select_event_quantile_bin_rejects_datetime_metric():
         )
 
 
+def test_match_events_by_metric_sign_reproduces_single_variable_caliper():
+    event_table = _make_matching_event_table()
+
+    result = selectors.match_events_by_metric_sign(
+        event_table,
+        "I_dyn",
+        match_variables=("severity",),
+        caliper_sd=0.1,
+    )
+
+    assert result.pair_count == 3
+    np.testing.assert_array_equal(result.negative_event_ids, [11, 12, 13])
+    np.testing.assert_array_equal(result.positive_event_ids, [21, 22, 23])
+    assert len(set(result.positive_indices)) == result.pair_count
+    assert result.calipers_sd == {"severity": 0.1}
+    assert result.method == selectors.SIGN_MATCH_METHOD
+
+
+def test_match_events_by_metric_sign_applies_caliper_to_every_variable():
+    event_table = _make_matching_event_table()
+
+    result = selectors.match_events_by_metric_sign(
+        event_table,
+        event_table["I_dyn"],
+        match_variables=("severity", "timing"),
+        caliper_sd={"severity": 0.1, "timing": 0.1},
+    )
+
+    assert result.pair_count == 2
+    np.testing.assert_array_equal(result.negative_event_ids, [11, 12])
+    np.testing.assert_array_equal(result.positive_event_ids, [21, 22])
+
+
+def test_match_events_by_metric_sign_maximizes_pair_count_before_distance():
+    event_table = xr.Dataset(
+        data_vars={
+            "event_id": ("event", [11, 12, 21, 22]),
+            "I_dyn": ("event", [-1.0, -1.0, 1.0, 1.0]),
+            "severity": ("event", [0.0, 1.0, 0.4, -0.4]),
+        },
+        coords={"event": np.arange(4)},
+    )
+
+    result = selectors.match_events_by_metric_sign(
+        event_table,
+        "I_dyn",
+        match_variables=("severity",),
+        caliper_sd=1.0,
+    )
+
+    assert result.pair_count == 2
+    np.testing.assert_array_equal(result.negative_event_ids, [11, 12])
+    np.testing.assert_array_equal(result.positive_event_ids, [22, 21])
+
+
+def test_match_events_by_metric_sign_is_invariant_to_event_row_order():
+    event_table = _make_matching_event_table()
+    shuffled = event_table.isel(event=[4, 2, 6, 0, 3, 1, 5])
+
+    expected = selectors.match_events_by_metric_sign(
+        event_table,
+        "I_dyn",
+        match_variables=("severity", "timing"),
+        caliper_sd=0.1,
+    )
+    actual = selectors.match_events_by_metric_sign(
+        shuffled,
+        "I_dyn",
+        match_variables=("severity", "timing"),
+        caliper_sd=0.1,
+    )
+
+    np.testing.assert_array_equal(
+        actual.negative_event_ids,
+        expected.negative_event_ids,
+    )
+    np.testing.assert_array_equal(
+        actual.positive_event_ids,
+        expected.positive_event_ids,
+    )
+    np.testing.assert_allclose(actual.distances, expected.distances)
+
+
+def test_match_events_by_metric_sign_converts_timedelta_matching_variable():
+    event_table = _make_matching_event_table()
+    event_table["duration"] = (
+        "event",
+        np.array([2, 3, 4, 2, 3, 4, 9], dtype="timedelta64[D]"),
+    )
+
+    result = selectors.match_events_by_metric_sign(
+        event_table,
+        "I_dyn",
+        match_variables=("duration",),
+        caliper_sd=0.1,
+    )
+
+    assert result.pair_count == 3
+    np.testing.assert_array_equal(result.negative_event_ids, [11, 12, 13])
+    np.testing.assert_array_equal(result.positive_event_ids, [21, 22, 23])
+
+
+def test_match_events_by_metric_sign_rejects_incomplete_caliper_mapping():
+    event_table = _make_matching_event_table()
+
+    with pytest.raises(ValueError, match="exactly match"):
+        selectors.match_events_by_metric_sign(
+            event_table,
+            "I_dyn",
+            match_variables=("severity", "timing"),
+            caliper_sd={"severity": 0.1},
+        )
+
+
 def _make_event_table() -> xr.Dataset:
     event = np.arange(5)
     time = np.array(
@@ -215,4 +329,25 @@ def _make_metric_event_table(
             ),
         },
         coords={"event": event},
+    )
+
+
+def _make_matching_event_table() -> xr.Dataset:
+    return xr.Dataset(
+        data_vars={
+            "event_id": (
+                "event",
+                np.array([11, 12, 13, 21, 22, 23, 24], dtype=np.int64),
+            ),
+            "I_dyn": ("event", np.array([-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0])),
+            "severity": (
+                "event",
+                np.array([1.0, 2.0, 3.0, 1.01, 2.01, 3.01, 9.0]),
+            ),
+            "timing": (
+                "event",
+                np.array([0.0, 0.0, 10.0, 0.01, 0.02, 0.0, 50.0]),
+            ),
+        },
+        coords={"event": np.arange(7)},
     )

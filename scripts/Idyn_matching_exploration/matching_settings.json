@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "group": {
+    "name": "I_dyn",
+    "operation": "sum",
+    "variables": [
+      "I_adiabatic_pre",
+      "I_advection_pre"
+    ],
+    "reference_sign": "negative"
+  },
+  "matching": {
+    "method": "maximum_cardinality_minimum_distance",
+    "standardization": "pooled_group_standard_deviation",
+    "distance": "root_mean_square_standardized_difference",
+    "replacement": false,
+    "caliper_rule": "all_variables_within_threshold"
+  },
+  "balance_variables": [
+    "tas_anom_peak",
+    "tas_peak",
+    "tas_excess_peak",
+    "tas_excess_integral",
+    "duration",
+    "days_from_solstice",
+    "T_anom_mean_ant"
+  ],
+  "families": {
+    "peak_anomaly": {
+      "label": "Peak anomaly",
+      "variables": [
+        "tas_anom_peak"
+      ]
+    },
+    "peak_anomaly_timing": {
+      "label": "Anomaly + season timing",
+      "variables": [
+        "tas_anom_peak",
+        "days_from_solstice"
+      ]
+    },
+    "peak_anomaly_duration": {
+      "label": "Anomaly + duration",
+      "variables": [
+        "tas_anom_peak",
+        "duration"
+      ]
+    },
+    "peak_anomaly_timing_duration": {
+      "label": "Anomaly + timing + duration",
+      "variables": [
+        "tas_anom_peak",
+        "days_from_solstice",
+        "duration"
+      ]
+    },
+    "integrated_warming_antecedent": {
+      "label": "Integrated warming + antecedent",
+      "variables": [
+        "I_dTdt_pre",
+        "T_anom_mean_ant"
+      ]
+    },
+    "peak_anomaly_timing_antecedent": {
+      "label": "Peak anomaly + timing + antecedent",
+      "variables": [
+        "tas_anom_peak",
+        "days_from_solstice",
+        "T_anom_mean_ant"
+      ]
+    }
+  },
+  "specifications": {
+    "peak_anomaly_0p20": {
+      "family": "peak_anomaly",
+      "caliper_sd": 0.2
+    },
+    "peak_anomaly_timing_0p20": {
+      "family": "peak_anomaly_timing",
+      "caliper_sd": 0.2
+    },
+    "peak_anomaly_duration_0p20": {
+      "family": "peak_anomaly_duration",
+      "caliper_sd": 0.2
+    },
+    "peak_anomaly_timing_duration_0p20": {
+      "family": "peak_anomaly_timing_duration",
+      "caliper_sd": 0.2
+    },
+    "integrated_warming_antecedent_0p10": {
+      "family": "integrated_warming_antecedent",
+      "caliper_sd": 0.1
+    },
+    "integrated_warming_antecedent_0p20": {
+      "family": "integrated_warming_antecedent",
+      "caliper_sd": 0.2
+    },
+    "peak_anomaly_timing_antecedent_0p50": {
+      "family": "peak_anomaly_timing_antecedent",
+      "caliper_sd": 0.5
+    },
+    "peak_anomaly_timing_antecedent_0p75": {
+      "family": "peak_anomaly_timing_antecedent",
+      "caliper_sd": 0.75
+    }
+  },
+  "plots": {
+    "primary_specification": "peak_anomaly_0p20",
+    "retention_sensitivity": [
+      "peak_anomaly_0p20",
+      "peak_anomaly_timing_0p20",
+      "peak_anomaly_duration_0p20",
+      "peak_anomaly_timing_duration_0p20"
+    ],
+    "balance_comparison": [
+      "peak_anomaly_0p20",
+      "integrated_warming_antecedent_0p10",
+      "peak_anomaly_timing_antecedent_0p75"
+    ],
+    "summary_specifications": [
+      "peak_anomaly_0p20",
+      "integrated_warming_antecedent_0p10",
+      "integrated_warming_antecedent_0p20",
+      "peak_anomaly_timing_antecedent_0p50",
+      "peak_anomaly_timing_antecedent_0p75"
+    ],
+    "frontier_families": [
+      "peak_anomaly",
+      "integrated_warming_antecedent",
+      "peak_anomaly_timing_antecedent"
+    ],
+    "frontier_calipers_sd": [
+      0.1,
+      0.2,
+      0.3,
+      0.5,
+      0.75,
+      1.0
+    ]
+  }
+}

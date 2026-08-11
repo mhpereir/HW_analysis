@@ -145,12 +145,16 @@ boundary events and missing hourly samples to downstream consumers.
 ## Downstream Consumers
 
 - event-feature plots and split diagnostics under `scripts/event_features/`;
-- event-versus-baseline comparison plots; and
+- event-versus-baseline comparison plots;
+- settings-driven in-memory event matching under
+  `scripts/Idyn_matching_exploration/`; and
 - `scripts/spatial_composites/build_dyn_net_spatial_composites.py`, which uses
   `peak_time`, `I_adiabatic_pre`, and `I_advection_pre` to define
   dynamical-sign groups and lagged dates.
 
 ## Non-goals
 
-Stage 2 does not perform PCA, clustering, composites, new event detection, or
-adaptive `dTdt > 0` growth-window calculations.
+Stage 2 does not perform PCA, clustering, composites, new event detection,
+adaptive `dTdt > 0` growth-window calculations, or persist one analysis-specific
+matched population. Matching workflows derive membership from this unchanged
+table using [decision 007](../decisions/007_idyn_sign_matching.md).

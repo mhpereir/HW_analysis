@@ -37,6 +37,10 @@ authority rules.
    rebuild event IDs, or hide reusable analysis logic.
 8. **One shared figure contract**: active figures use `src/plot_style.py`
    directly or through `src/plotting.py`.
+9. **Lightweight configured selections may be recomputed**: a deterministic
+   event-table selector may run in memory for each figure when its settings are
+   tracked, its logic is reusable under `src/`, and no new physical data are
+   derived.
 
 ## Active Data-flow Map
 
@@ -54,6 +58,9 @@ Product Stage 1: harmonized regional time series
 
 Product Stage 1
   `-> temporal composites, top events, threshold, diurnal, and event summaries
+
+Product Stage 2: event-feature table + tracked matching settings
+  `-> in-memory I_dyn sign matching -> matched-population diagnostics
 ```
 
 | Product stage | Durable artifact | Producer | Main consumers |
@@ -95,7 +102,7 @@ products or plotting dependencies.
 | `src/preprocess.py` | Low-level time, coordinate, unit, averaging, anomaly, and resampling utilities. |
 | `src/harmonize.py` | Align sources into the Stage-1 regional time-series product. |
 | `src/analysis_io.py` | Save/open internal products, especially the Stage-1 handoff, and validate metadata. |
-| src/selectors.py | Filter event tables and build reusable event/time selection masks. |
+| `src/selectors.py` | Filter event tables, build reusable event/time masks, and perform deterministic standardized event matching. |
 | `src/events.py` | Convert masks into event IDs, peaks, durations, ranks, and event summaries. |
 | `scripts/event_features/fixed_window_features.py` | Shared fixed-window reductions for event and baseline Stage-2 products. |
 | `src/composites.py` | Build event-centered extracts, means, spreads, and top-event products. |
@@ -175,6 +182,7 @@ the diagnostic they make rather than a product stage they produce.
 - [004: baseline season and window boundaries](decisions/004_baseline_season_windows.md)
 - [005: Stage-1 event peak semantics](decisions/005_stage1_event_peak_semantics.md)
 - [006: regional hourly climatology baseline](decisions/006_regional_hourly_climatology.md)
+- [007: in-memory I_dyn sign matching](decisions/007_idyn_sign_matching.md)
 
 PCA and clustering decisions are indexed under
 [legacy documentation](legacy/README.md).

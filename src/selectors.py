@@ -10,6 +10,7 @@ Responsibilities:
 - Apply seasonal filtering so selected events stay within the target season.
 - Support quantile-based selection modes.
 - Support top-N event selection modes.
+- Perform deterministic one-to-one event matching with standardized calipers.
 
 Out of scope:
 - Converting masks into event objects or event IDs.
@@ -20,14 +21,178 @@ Out of scope:
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from types import MappingProxyType
 
 import numpy as np
+from scipy.optimize import linear_sum_assignment
 import xarray as xr
 
 
 DEFAULT_EVENT_DIM = "event"
 DEFAULT_EVENT_ID_NAME = "event_id"
+SIGN_MATCH_METHOD = "maximum_cardinality_minimum_distance"
+SIGN_MATCH_STANDARDIZATION = "pooled_group_standard_deviation"
+SIGN_MATCH_DISTANCE = "root_mean_square_standardized_difference"
+SIGN_MATCH_CALIPER_RULE = "all_variables_within_threshold"
+
+
+@dataclass(frozen=True)
+class SignMatchResult:
+    """One-to-one matches between negative and positive metric populations."""
+
+    negative_indices: np.ndarray
+    positive_indices: np.ndarray
+    negative_event_ids: np.ndarray
+    positive_event_ids: np.ndarray
+    distances: np.ndarray
+    match_variables: tuple[str, ...]
+    pooled_scales: Mapping[str, float]
+    calipers_sd: Mapping[str, float]
+    group_metric_name: str
+    reference_sign: str
+    method: str = SIGN_MATCH_METHOD
+    standardization: str = SIGN_MATCH_STANDARDIZATION
+    distance_method: str = SIGN_MATCH_DISTANCE
+    caliper_rule: str = SIGN_MATCH_CALIPER_RULE
+    replacement: bool = False
+
+    @property
+    def pair_count(self) -> int:
+        """Return the number of retained one-to-one pairs."""
+        return int(self.distances.size)
+
+
+def match_events_by_metric_sign(
+    event_table: xr.Dataset,
+    group_metric: str | xr.DataArray,
+    *,
+    match_variables: Sequence[str],
+    caliper_sd: float | Mapping[str, float],
+    reference_sign: str = "negative",
+    event_id_name: str = DEFAULT_EVENT_ID_NAME,
+    event_dim: str = DEFAULT_EVENT_DIM,
+) -> SignMatchResult:
+    """Match negative and positive event populations without replacement.
+
+    Every cross-sign pair is standardized independently for each matching
+    variable using the pooled within-group standard deviation. A pair is valid
+    only when every standardized difference is within its configured caliper.
+    The assignment maximizes pair count first and minimizes total root-mean-
+    square standardized distance second.
+
+    ``group_metric`` may name an event-table variable or provide a derived
+    one-dimensional DataArray, such as ``I_adiabatic_pre + I_advection_pre``.
+    Events where the grouping metric is zero are excluded from both groups.
+    """
+    _validate_event_table(event_table, event_dim=event_dim)
+    if reference_sign not in {"negative", "positive"}:
+        raise ValueError("reference_sign must be 'negative' or 'positive'.")
+
+    variables = _validate_match_variables(match_variables)
+    calipers = _match_calipers(caliper_sd, match_variables=variables)
+    event_ids = _validated_event_ids(
+        event_table,
+        event_id_name=event_id_name,
+        event_dim=event_dim,
+    )
+    group_da = _group_metric_dataarray(
+        event_table,
+        group_metric,
+        event_dim=event_dim,
+    )
+    group_values = _metric_values(group_da)
+    if not np.isfinite(group_values).all():
+        raise ValueError(
+            f"Grouping metric {group_da.name!r} contains non-finite values."
+        )
+
+    negative = np.flatnonzero(group_values < 0)
+    positive = np.flatnonzero(group_values > 0)
+    if negative.size == 0 or positive.size == 0:
+        raise ValueError(
+            "Both negative and positive nonzero grouping-metric events are required."
+        )
+
+    negative = negative[np.argsort(event_ids[negative], kind="mergesort")]
+    positive = positive[np.argsort(event_ids[positive], kind="mergesort")]
+    if reference_sign == "negative":
+        reference = negative
+        candidate = positive
+    else:
+        reference = positive
+        candidate = negative
+
+    standardized_differences: list[np.ndarray] = []
+    pooled_scales: dict[str, float] = {}
+    for name in variables:
+        _validate_event_metric_table(event_table, name, event_dim=event_dim)
+        values = _metric_values(event_table[name])
+        if not np.isfinite(values).all():
+            raise ValueError(f"Matching variable {name!r} contains non-finite values.")
+        scale = pooled_standard_deviation(values[negative], values[positive])
+        if not np.isfinite(scale) or scale <= 0:
+            raise ValueError(
+                f"Matching variable {name!r} has no finite positive pooled scale."
+            )
+        pooled_scales[name] = scale
+        standardized_differences.append(
+            np.abs(values[reference, None] - values[candidate][None, :]) / scale
+        )
+
+    difference_cube = np.stack(standardized_differences, axis=2)
+    variable_calipers = np.asarray([calipers[name] for name in variables])
+    valid = np.all(difference_cube <= variable_calipers[None, None, :], axis=2)
+    distance = np.sqrt(np.mean(difference_cube**2, axis=2))
+
+    maximum_caliper = float(np.max(variable_calipers))
+    dummy_penalty = (reference.size + 1) * (maximum_caliper + 1.0)
+    invalid_penalty = 2.0 * dummy_penalty
+    augmented_cost = np.concatenate(
+        [
+            np.where(valid, distance, invalid_penalty),
+            np.full((reference.size, reference.size), dummy_penalty),
+        ],
+        axis=1,
+    )
+    row_indices, column_indices = linear_sum_assignment(augmented_cost)
+    matched = column_indices < candidate.size
+    reference_matched = reference[row_indices[matched]]
+    candidate_matched = candidate[column_indices[matched]]
+    matched_distances = distance[row_indices[matched], column_indices[matched]]
+
+    if reference_sign == "negative":
+        negative_matched = reference_matched
+        positive_matched = candidate_matched
+    else:
+        negative_matched = candidate_matched
+        positive_matched = reference_matched
+
+    return SignMatchResult(
+        negative_indices=negative_matched,
+        positive_indices=positive_matched,
+        negative_event_ids=np.asarray(event_ids[negative_matched]).copy(),
+        positive_event_ids=np.asarray(event_ids[positive_matched]).copy(),
+        distances=np.asarray(matched_distances, dtype=float),
+        match_variables=variables,
+        pooled_scales=MappingProxyType(pooled_scales),
+        calipers_sd=MappingProxyType(calipers),
+        group_metric_name=str(group_da.name),
+        reference_sign=reference_sign,
+    )
+
+
+def pooled_standard_deviation(left: np.ndarray, right: np.ndarray) -> float:
+    """Return the pooled sample standard deviation for two populations."""
+    left = np.asarray(left, dtype=float)
+    right = np.asarray(right, dtype=float)
+    if left.size < 2 or right.size < 2:
+        return float("nan")
+    numerator = (left.size - 1) * np.var(left, ddof=1) + (
+        right.size - 1
+    ) * np.var(right, ddof=1)
+    return float(np.sqrt(numerator / (left.size + right.size - 2)))
 
 
 def select_events_by_metric(
@@ -153,10 +318,19 @@ def select_top_n_events(
     else:
         candidate_values = metric_values.copy()
         fill_value = -np.inf if largest else np.inf
-        candidate_values = np.where(np.isnan(candidate_values), fill_value, candidate_values)
+        candidate_values = np.where(
+            np.isnan(candidate_values),
+            fill_value,
+            candidate_values,
+        )
 
     if candidate_idx.size == 0:
-        return _empty_ranked_selection(event_table, metric, event_dim=event_dim, selection_type="top_n")
+        return _empty_ranked_selection(
+            event_table,
+            metric,
+            event_dim=event_dim,
+            selection_type="top_n",
+        )
 
     order = np.argsort(candidate_values, kind="mergesort")
     if largest:
@@ -436,6 +610,117 @@ def _validate_event_metric_table(
         )
 
 
+def _validate_match_variables(match_variables: Sequence[str]) -> tuple[str, ...]:
+    """Return a validated ordered tuple of matching-variable names."""
+    if isinstance(match_variables, (str, bytes)):
+        raise TypeError("match_variables must be a sequence of variable names.")
+    variables = tuple(match_variables)
+    if not variables:
+        raise ValueError("At least one matching variable is required.")
+    if any(not isinstance(name, str) or not name for name in variables):
+        raise ValueError("match_variables must contain nonempty strings.")
+    if len(set(variables)) != len(variables):
+        raise ValueError("match_variables must not contain duplicates.")
+    return variables
+
+
+def _match_calipers(
+    caliper_sd: float | Mapping[str, float],
+    *,
+    match_variables: Sequence[str],
+) -> dict[str, float]:
+    """Return one validated SD caliper for every matching variable."""
+    if isinstance(caliper_sd, Mapping):
+        missing = sorted(set(match_variables).difference(caliper_sd))
+        extra = sorted(set(caliper_sd).difference(match_variables))
+        if missing or extra:
+            details = []
+            if missing:
+                details.append("missing " + ", ".join(missing))
+            if extra:
+                details.append("unexpected " + ", ".join(extra))
+            raise ValueError(
+                "caliper_sd keys must exactly match match_variables: "
+                + "; ".join(details)
+                + "."
+            )
+        raw_calipers = {name: caliper_sd[name] for name in match_variables}
+    else:
+        raw_calipers = {name: caliper_sd for name in match_variables}
+
+    calipers: dict[str, float] = {}
+    for name, value in raw_calipers.items():
+        if isinstance(value, (bool, np.bool_)):
+            raise ValueError("caliper_sd values must be finite positive numbers.")
+        try:
+            caliper = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "caliper_sd values must be finite positive numbers."
+            ) from exc
+        if not np.isfinite(caliper) or caliper <= 0:
+            raise ValueError("caliper_sd values must be finite positive numbers.")
+        calipers[name] = caliper
+    return calipers
+
+
+def _validated_event_ids(
+    event_table: xr.Dataset,
+    *,
+    event_id_name: str,
+    event_dim: str,
+) -> np.ndarray:
+    """Return unique one-dimensional event IDs used for deterministic ordering."""
+    if event_id_name not in event_table:
+        raise ValueError(f"event_table is missing event-ID variable {event_id_name!r}.")
+    event_id = event_table[event_id_name]
+    if event_id.dims != (event_dim,):
+        raise ValueError(
+            f"Event IDs {event_id_name!r} must be 1D with dims ({event_dim!r},); "
+            f"got {event_id.dims!r}."
+        )
+    values = np.asarray(event_id.compute().values)
+    if np.issubdtype(values.dtype, np.number) and not np.isfinite(values).all():
+        raise ValueError(f"Event IDs {event_id_name!r} contain non-finite values.")
+    if np.unique(values).size != values.size:
+        raise ValueError(f"Event IDs {event_id_name!r} must be unique.")
+    return values
+
+
+def _group_metric_dataarray(
+    event_table: xr.Dataset,
+    group_metric: str | xr.DataArray,
+    *,
+    event_dim: str,
+) -> xr.DataArray:
+    """Return and validate a named one-dimensional grouping metric."""
+    if isinstance(group_metric, str):
+        if group_metric not in event_table:
+            raise ValueError(
+                f"event_table is missing grouping metric {group_metric!r}."
+            )
+        group_da = event_table[group_metric]
+    elif isinstance(group_metric, xr.DataArray):
+        group_da = group_metric
+    else:
+        raise TypeError("group_metric must be a variable name or xr.DataArray.")
+    if group_da.dims != (event_dim,):
+        raise ValueError(
+            f"Grouping metric must be 1D with dims ({event_dim!r},); "
+            f"got {group_da.dims!r}."
+        )
+    if group_da.sizes[event_dim] != event_table.sizes[event_dim]:
+        raise ValueError("Grouping metric does not align with the event table.")
+    if event_dim in event_table.coords and event_dim in group_da.coords:
+        if not group_da[event_dim].equals(event_table[event_dim]):
+            raise ValueError(
+                "Grouping-metric event coordinates do not align with the event table."
+            )
+    if group_da.name is None:
+        group_da = group_da.rename("group_metric")
+    return group_da
+
+
 def _validate_event_table(event_table: xr.Dataset, *, event_dim: str) -> None:
     """Validate common event-table shape inputs."""
     if not isinstance(event_table, xr.Dataset):
@@ -444,7 +729,12 @@ def _validate_event_table(event_table: xr.Dataset, *, event_dim: str) -> None:
         raise ValueError(f"event_table is missing required dimension {event_dim!r}.")
 
 
-def _validate_event_time_variable(event_table: xr.Dataset, name: str, *, event_dim: str) -> None:
+def _validate_event_time_variable(
+    event_table: xr.Dataset,
+    name: str,
+    *,
+    event_dim: str,
+) -> None:
     """Validate that a timestamp variable is 1D on the event dimension."""
     if name not in event_table:
         raise ValueError(f"event_table is missing time variable {name!r}.")
@@ -465,7 +755,10 @@ def _validate_season_months(season_months: Sequence[int]) -> tuple[int, ...]:
 
     months: list[int] = []
     for month in season_months:
-        if isinstance(month, (bool, np.bool_)) or not isinstance(month, (int, np.integer)):
+        if isinstance(month, (bool, np.bool_)) or not isinstance(
+            month,
+            (int, np.integer),
+        ):
             raise ValueError("season_months must contain only integer month numbers.")
         month_int = int(month)
         if month_int < 1 or month_int > 12:
@@ -493,12 +786,22 @@ def _finite_metric_mask(metric_da: xr.DataArray) -> xr.DataArray:
     return xr.apply_ufunc(np.isfinite, metric_da).fillna(False).astype(bool)
 
 
-def _lower_bound_mask(metric_da: xr.DataArray, value: float, *, inclusive: bool) -> xr.DataArray:
+def _lower_bound_mask(
+    metric_da: xr.DataArray,
+    value: float,
+    *,
+    inclusive: bool,
+) -> xr.DataArray:
     """Return lower-bound mask."""
     return metric_da >= value if inclusive else metric_da > value
 
 
-def _upper_bound_mask(metric_da: xr.DataArray, value: float, *, inclusive: bool) -> xr.DataArray:
+def _upper_bound_mask(
+    metric_da: xr.DataArray,
+    value: float,
+    *,
+    inclusive: bool,
+) -> xr.DataArray:
     """Return upper-bound mask."""
     return metric_da <= value if inclusive else metric_da < value
 
@@ -529,7 +832,10 @@ def _selection_metric_units(metric_da: xr.DataArray) -> str | None:
     return None
 
 
-def _event_time_month_mask(time_da: xr.DataArray, months: Sequence[int]) -> xr.DataArray:
+def _event_time_month_mask(
+    time_da: xr.DataArray,
+    months: Sequence[int],
+) -> xr.DataArray:
     """Return a boolean event mask based on event timestamp month."""
     mask = time_da.dt.month.isin(months)
     return mask.fillna(False).astype(bool)
@@ -553,7 +859,11 @@ def _full_event_season_mask(
         ],
         dtype=bool,
     )
-    return xr.DataArray(selected, dims=(event_dim,), coords={event_dim: start_time[event_dim]})
+    return xr.DataArray(
+        selected,
+        dims=(event_dim,),
+        coords={event_dim: start_time[event_dim]},
+    )
 
 
 def _interval_months_are_in_season(
@@ -567,7 +877,11 @@ def _interval_months_are_in_season(
 
     start_month = start.astype("datetime64[M]")
     end_month = end.astype("datetime64[M]")
-    month_values = np.arange(start_month, end_month + np.timedelta64(1, "M"), dtype="datetime64[M]")
+    month_values = np.arange(
+        start_month,
+        end_month + np.timedelta64(1, "M"),
+        dtype="datetime64[M]",
+    )
     month_numbers = (month_values.astype(int) % 12) + 1
     return bool(np.isin(month_numbers, list(allowed_months)).all())
 
@@ -603,7 +917,10 @@ def _count_true(mask: xr.DataArray) -> int:
     return int(mask.sum().compute().item())
 
 
-def _rank_values_for_selected_indices(selected_idx: np.ndarray, ranked_idx: np.ndarray) -> np.ndarray:
+def _rank_values_for_selected_indices(
+    selected_idx: np.ndarray,
+    ranked_idx: np.ndarray,
+) -> np.ndarray:
     """Return 1-based rank values aligned to ``selected_idx`` order."""
     rank_lookup = {int(idx): rank for rank, idx in enumerate(ranked_idx, start=1)}
     return np.asarray([rank_lookup[int(idx)] for idx in selected_idx], dtype=np.int64)

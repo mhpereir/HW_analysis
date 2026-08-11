@@ -50,6 +50,7 @@ results/plots_<plot_name>/
 | Stage 2 event features | feature grids, splits, and combined comparisons | `event_feature_grid_plot.py`, `plot_event_feature.py`, `plot_event_feature_split.py`, `plot_event_feature_split_combined.py` under `scripts/event_features/` |
 | Stage 2 event features | adiabatic, advection, and diabatic event diagnostics | `plot_adiabatic_advection_comparison.py`, `plot_adiabatic_diabatic_advection.py` under `scripts/event_features/` |
 | Stage 2 event and baseline features | event-versus-baseline comparisons | `plot_adiabatic_advection_comparison_baseline.py`, `plot_adiabatic_diabatic_advection_baseline.py` under `scripts/event_features/` |
+| Stage 2 event features plus tracked settings | matched positive/negative `I_dyn` diagnostics | `scripts/Idyn_matching_exploration/explore_idyn_matching.py` |
 | Spatial composite product | sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |
 
 Scripts under `scripts/event_features/old/` are legacy and are not active
@@ -62,6 +63,10 @@ figure entrypoints.
   product contract is required.
 - Keep analysis and selection logic in reusable modules, not in visual styling
   code.
+- Matching-aware figures must load a tracked static settings file and call the
+  reusable matching implementation in `src/selectors.py`. They may recompute
+  lightweight event indices in memory, but must not carry a private assignment
+  implementation or mutate the Stage-2 input.
 - Use `plot_style.VARIABLE_NAME_MAPPING` and shared color dictionaries for
   existing variables.
 - Use `plot_style.publication_figsize()` and shared line-width constants.

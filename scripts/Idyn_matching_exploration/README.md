@@ -2,8 +2,9 @@
 
 ## Status and question
 
-This is an isolated exploration for command-center task A2.8. It is not yet an
-active Stage-2 product or scientific default.
+This is the configuration-driven exploration for command-center task A2.8. It
+does not create or modify a Stage-2 product, and the candidate matching
+specifications have not yet been promoted to one final scientific default.
 
 The question is whether positive and negative integrated dynamical-heating
 heatwaves can be compared after matching their event severity. The initial
@@ -19,6 +20,26 @@ I_dyn = I_adiabatic_pre + I_advection_pre
 Both terms are Stage-2 sums over the inclusive 72-hour pre-peak window
 `(-72, 0)`. Positive `I_dyn` events are the candidate population and negative
 `I_dyn` events are the reference population.
+
+## Workflow architecture
+
+The matching workflow has three tracked inputs:
+
+1. the unchanged Stage-2 event-feature table;
+2. [`matching_settings.json`](matching_settings.json), which defines the
+   grouping metric, matching method, variable families, and SD calipers; and
+3. the reusable implementation in [`src/selectors.py`](../../src/selectors.py).
+
+The plotting script derives `I_dyn` in memory, calls
+`selectors.match_events_by_metric_sign()` for every configured specification,
+and uses the returned indices directly. It writes figures, not a matched-event
+data product. Its JSON console summary reports the resolved settings path and
+SHA-256 checksum for provenance.
+
+This preserves the complete Stage-2 event universe and allows different plots
+to reproduce the same selection from one settings file. The accepted boundary
+and algorithm are recorded in
+[decision 007](../../docs/decisions/007_idyn_sign_matching.md).
 
 ## Data snapshot and provenance
 
@@ -114,6 +135,53 @@ which variables remain outcomes or explanatory diagnostics.
 
 ![Balance audit and multi-variable retention sensitivity](../../results/Idyn_matching_exploration/covariate_balance_and_sensitivity.png)
 
+## Follow-up: integrated warming plus antecedent temperature
+
+The enlarged antecedent-temperature contrast after peak-anomaly matching is
+consistent with a compensation pattern: within events reaching comparable
+peak anomalies, the positive-`I_dyn` group begins from a cooler antecedent
+state. Matching alone does not establish that those events *need* a cooler
+start, but it makes that mechanism a useful hypothesis for the composites.
+
+Matching on `I_dTdt_pre` and `T_anom_mean_ant` directly was tested against the
+same seven-variable balance audit. It is not a better replacement under the
+criterion that every shown absolute SMD should improve without excessive
+sample loss.
+
+| Specification | Caliper [pooled SD] | Pairs | Variables improved | Mean absolute SMD | Worst absolute SMD |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Before matching | - | - | - | 0.462 | 0.632 |
+| Peak anomaly | 0.20 | 90 | 5 of 7 | 0.260 | 1.018 |
+| `I_dTdt_pre` and antecedent anomaly | 0.10 | 22 | 6 of 7 | 0.203 | 0.544 |
+| `I_dTdt_pre` and antecedent anomaly | 0.20 | 43 | 4 of 7 | 0.422 | 1.048 |
+| Peak anomaly, season timing, and antecedent anomaly | 0.75 | 83 | 7 of 7 | 0.212 | 0.302 |
+| Peak anomaly, season timing, and antecedent anomaly | 0.50 | 69 | 7 of 7 | 0.097 | 0.165 |
+
+The strict 0.10-SD integrated-warming match balances both requested matching
+variables: the `I_dTdt_pre` SMD changes from 1.630 to -0.015 and the antecedent
+anomaly SMD changes from -0.621 to -0.041. However, it retains only 22 of the
+90 negative events, and the absolute season-timing SMD increases from 0.162 to
+0.544. Relaxing the caliper to 0.20 retains 43 pairs but improves only four of
+the seven audit variables.
+
+The weak overlap is scientifically meaningful. Before matching, mean
+`I_dTdt_pre` is 1.787 K in negative-`I_dyn` events and 4.878 K in positive
+events, giving an SMD of 1.630. `I_dTdt_pre` is also strongly correlated with
+`I_dyn` across events (`r = 0.779`). It is therefore not a neutral nuisance
+covariate. Conditioning on it asks a narrower question about how events with
+the same realized pre-peak warming and antecedent state partition their
+dynamical and other contributions.
+
+![Balance and retention tradeoffs among candidate specifications](../../results/Idyn_matching_exploration/matching_specification_tradeoff.png)
+
+For the next comparison, the most defensible high-retention candidate in this
+small search is peak anomaly plus season timing plus antecedent anomaly. A
+0.75-SD per-variable caliper retains 83 pairs, or 92% of the negative-event
+reference population, and improves all seven SMDs. Its 0.50-SD version is a
+stronger-balance sensitivity that retains 69 pairs and reduces the worst
+absolute SMD to 0.165. These should remain two explicitly labeled estimands,
+not be selected after looking at downstream composite differences.
+
 ## Retention sensitivity
 
 Using the same 0.20 pooled-SD caliper separately for every requested variable:
@@ -138,9 +206,12 @@ half of the 90 negative events.
    variable, or only a post-match diagnostic?
 3. Is duration part of event comparability, or is it a possible consequence of
    the different dynamical evolution?
-4. Should antecedent temperature anomaly remain available as a mechanism to
-   explain different `I_dyn`, rather than being balanced away?
-5. Which existing temporal and spatial composites should first consume the
+4. Should the primary comparison preserve antecedent temperature as a
+   mechanism, or should the 83-pair three-variable match define the comparable
+   event population?
+5. Should `I_dTdt_pre` be reserved for a mechanism-conditioned sensitivity
+   because of its strong association with `I_dyn`?
+6. Which existing temporal and spatial composites should first consume the
    matched event IDs as a sensitivity analysis?
 
 ## Reproduce the exploration
@@ -152,8 +223,10 @@ under the ignored `results/` tree.
 mamba activate dev_env
 python scripts/Idyn_matching_exploration/explore_idyn_matching.py \
   --input-path /path/to/hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc \
+  --settings-path scripts/Idyn_matching_exploration/matching_settings.json \
   --output-dir results/Idyn_matching_exploration
 ```
 
-Use `--caliper` to explore another per-variable pooled-SD caliper. Use
-`--overwrite` only when intentionally replacing prior exploratory figures.
+Edit a copied settings file and pass it with `--settings-path` when evaluating
+different matching variables or SD calipers. Use `--overwrite` only when
+intentionally replacing prior exploratory figures.

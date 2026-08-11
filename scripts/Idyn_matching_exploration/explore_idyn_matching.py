@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import sys
-from typing import Mapping, Sequence
+from typing import Mapping
 
 import matplotlib
 
@@ -20,7 +20,6 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.optimize import linear_sum_assignment
 import xarray as xr
 
 
@@ -28,7 +27,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src import plot_style  # noqa: E402
+from scripts.Idyn_matching_exploration import matching_settings  # noqa: E402
+from src import plot_style, selectors  # noqa: E402
 
 
 DEFAULT_INPUT_PATH = (
@@ -37,36 +37,15 @@ DEFAULT_INPUT_PATH = (
     / "hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc"
 )
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "results/Idyn_matching_exploration"
-DEFAULT_CALIPER = 0.2
 
 OVERVIEW_FILENAME = "idyn_population_overview.png"
 MATCHING_FILENAME = "tas_anom_matching_diagnostics.png"
 BALANCE_FILENAME = "covariate_balance_and_sensitivity.png"
+COMPARISON_FILENAME = "matching_specification_tradeoff.png"
 
 POSITIVE_COLOR = plot_style.COLORS["diabatic"]
 NEGATIVE_COLOR = plot_style.COLORS["advection"]
 MATCHED_COLOR = plot_style.COLORS["temperature_tendency"]
-
-PRIMARY_MATCH_VARIABLES = ("tas_anom_peak",)
-BALANCE_VARIABLES = (
-    "tas_anom_peak",
-    "tas_peak",
-    "tas_excess_peak",
-    "tas_excess_integral",
-    "duration",
-    "days_from_solstice",
-    "T_anom_mean_ant",
-)
-SENSITIVITY_SPECS = {
-    "Peak anomaly": ("tas_anom_peak",),
-    "Anomaly + season timing": ("tas_anom_peak", "days_from_solstice"),
-    "Anomaly + duration": ("tas_anom_peak", "duration"),
-    "Anomaly + timing + duration": (
-        "tas_anom_peak",
-        "days_from_solstice",
-        "duration",
-    ),
-}
 
 VARIABLE_LABELS = {
     "tas_anom_peak": "Peak temperature anomaly",
@@ -76,37 +55,27 @@ VARIABLE_LABELS = {
     "duration": "Duration",
     "days_from_solstice": "Days from June 21",
     "T_anom_mean_ant": "Antecedent mean anomaly",
+    "I_dTdt_pre": "Integrated temperature change",
 }
-
-
-@dataclass(frozen=True)
-class MatchResult:
-    """One-to-one event matches and their standardized distances."""
-
-    negative_indices: np.ndarray
-    positive_indices: np.ndarray
-    distances: np.ndarray
-    match_variables: tuple[str, ...]
-    pooled_scales: Mapping[str, float]
-    caliper: float
-
-    @property
-    def pair_count(self) -> int:
-        return int(self.negative_indices.size)
 
 
 @dataclass(frozen=True)
 class Exploration:
     """Prepared arrays, primary matches, and balance diagnostics."""
 
+    settings: matching_settings.MatchingSettings
     event_ids: np.ndarray
     values: Mapping[str, np.ndarray]
     i_dyn: np.ndarray
     negative_indices: np.ndarray
     positive_indices: np.ndarray
-    primary_match: MatchResult
+    primary_match: selectors.SignMatchResult
     balance: Mapping[str, Mapping[str, float]]
-    sensitivity: Mapping[str, MatchResult]
+    specification_matches: Mapping[str, selectors.SignMatchResult]
+    frontier_matches: Mapping[
+        str,
+        Mapping[float, selectors.SignMatchResult],
+    ]
 
 
 def parse_args() -> argparse.Namespace:
@@ -126,10 +95,10 @@ def parse_args() -> argparse.Namespace:
         help="Directory for exploratory PNG figures.",
     )
     parser.add_argument(
-        "--caliper",
-        type=float,
-        default=DEFAULT_CALIPER,
-        help="Per-variable caliper in pooled-standard-deviation units.",
+        "--settings-path",
+        type=Path,
+        default=matching_settings.DEFAULT_SETTINGS_PATH,
+        help="Tracked JSON file defining matching methods and SD calipers.",
     )
     parser.add_argument(
         "--overwrite",
@@ -140,10 +109,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def validate_args(args: argparse.Namespace) -> None:
-    if not np.isfinite(args.caliper) or args.caliper <= 0:
-        raise ValueError("--caliper must be a finite positive number.")
     if not args.input_path.expanduser().resolve().is_file():
         raise FileNotFoundError(f"Input file does not exist: {args.input_path}")
+    if not args.settings_path.expanduser().resolve().is_file():
+        raise FileNotFoundError(
+            f"Matching settings file does not exist: {args.settings_path}"
+        )
 
     existing = [
         path
@@ -163,6 +134,7 @@ def output_paths(output_dir: str | Path) -> dict[str, Path]:
         "overview": root / OVERVIEW_FILENAME,
         "matching": root / MATCHING_FILENAME,
         "balance": root / BALANCE_FILENAME,
+        "comparison": root / COMPARISON_FILENAME,
     }
 
 
@@ -179,14 +151,19 @@ def open_event_features(path: str | Path) -> xr.Dataset:
 def prepare_exploration(
     features: xr.Dataset,
     *,
-    caliper: float = DEFAULT_CALIPER,
+    settings: matching_settings.MatchingSettings,
 ) -> Exploration:
     """Validate a Stage-2 table and prepare the matching diagnostics."""
+    configured_variables = {
+        variable
+        for family in settings.families.values()
+        for variable in family.variables
+    }
+    analysis_variables = set(settings.balance_variables).union(configured_variables)
     required = {
         "event_id",
-        "I_advection_pre",
-        "I_adiabatic_pre",
-        *BALANCE_VARIABLES,
+        *settings.group_variables,
+        *analysis_variables,
     }
     missing = sorted(required.difference(features.data_vars))
     if missing:
@@ -205,32 +182,30 @@ def prepare_exploration(
 
     values = {
         name: event_numeric_values(features[name], name=name)
-        for name in BALANCE_VARIABLES
+        for name in sorted(analysis_variables)
     }
-    advection = event_numeric_values(
-        features["I_advection_pre"],
-        name="I_advection_pre",
-    )
-    adiabatic = event_numeric_values(
-        features["I_adiabatic_pre"],
-        name="I_adiabatic_pre",
-    )
-    i_dyn = advection + adiabatic
+    group_metric = matching_settings.derive_group_metric(features, settings)
+    i_dyn = event_numeric_values(group_metric, name=settings.group_name)
     if not np.isfinite(i_dyn).all():
         raise ValueError("I_dyn contains non-finite values.")
 
     negative_indices = np.flatnonzero(i_dyn < 0)
     positive_indices = np.flatnonzero(i_dyn > 0)
     if negative_indices.size == 0 or positive_indices.size == 0:
-        raise ValueError("Both negative and positive nonzero I_dyn events are required.")
+        raise ValueError(
+            "Both negative and positive nonzero I_dyn events are required."
+        )
 
-    primary_match = optimal_sign_match(
-        event_ids,
-        i_dyn,
-        values,
-        match_variables=PRIMARY_MATCH_VARIABLES,
-        caliper=caliper,
-    )
+    specification_matches = {
+        identifier: match_specification(
+            features,
+            group_metric,
+            settings=settings,
+            specification=specification,
+        )
+        for identifier, specification in settings.specifications.items()
+    }
+    primary_match = specification_matches[settings.primary_specification]
     if primary_match.pair_count == 0:
         raise ValueError("The primary specification produced no matched pairs.")
 
@@ -241,19 +216,23 @@ def prepare_exploration(
             positive_indices=positive_indices,
             match=primary_match,
         )
-        for name in BALANCE_VARIABLES
+        for name in settings.balance_variables
     }
-    sensitivity = {
-        label: optimal_sign_match(
-            event_ids,
-            i_dyn,
-            values,
-            match_variables=variables,
-            caliper=caliper,
-        )
-        for label, variables in SENSITIVITY_SPECS.items()
+    frontier_matches = {
+        family_id: {
+            frontier_caliper: selectors.match_events_by_metric_sign(
+                features,
+                group_metric,
+                match_variables=settings.family(family_id).variables,
+                caliper_sd=frontier_caliper,
+                reference_sign=settings.reference_sign,
+            )
+            for frontier_caliper in settings.frontier_calipers_sd
+        }
+        for family_id in settings.frontier_families
     }
     return Exploration(
+        settings=settings,
         event_ids=event_ids,
         values=values,
         i_dyn=i_dyn,
@@ -261,7 +240,26 @@ def prepare_exploration(
         positive_indices=positive_indices,
         primary_match=primary_match,
         balance=balance,
-        sensitivity=sensitivity,
+        specification_matches=specification_matches,
+        frontier_matches=frontier_matches,
+    )
+
+
+def match_specification(
+    features: xr.Dataset,
+    group_metric: xr.DataArray,
+    *,
+    settings: matching_settings.MatchingSettings,
+    specification: matching_settings.MatchingSpecification,
+) -> selectors.SignMatchResult:
+    """Execute one validated named matching specification."""
+    family = settings.family(specification.family)
+    return selectors.match_events_by_metric_sign(
+        features,
+        group_metric,
+        match_variables=family.variables,
+        caliper_sd=specification.caliper_sd,
+        reference_sign=settings.reference_sign,
     )
 
 
@@ -278,99 +276,8 @@ def event_numeric_values(da: xr.DataArray, *, name: str) -> np.ndarray:
     return out
 
 
-def optimal_sign_match(
-    event_ids: np.ndarray,
-    i_dyn: np.ndarray,
-    values: Mapping[str, np.ndarray],
-    *,
-    match_variables: Sequence[str],
-    caliper: float,
-) -> MatchResult:
-    """Return maximum-cardinality, minimum-distance sign matches.
-
-    Negative events define the reference population. Each reference event can
-    be paired with at most one positive event. Every matched pair must satisfy
-    the caliper for every standardized matching variable.
-    """
-    if not match_variables:
-        raise ValueError("At least one matching variable is required.")
-    if not np.isfinite(caliper) or caliper <= 0:
-        raise ValueError("caliper must be a finite positive number.")
-
-    event_ids = np.asarray(event_ids)
-    i_dyn = np.asarray(i_dyn, dtype=float)
-    negative = np.flatnonzero(i_dyn < 0)
-    positive = np.flatnonzero(i_dyn > 0)
-    if negative.size == 0 or positive.size == 0:
-        raise ValueError("Both negative and positive I_dyn events are required.")
-
-    negative = negative[np.argsort(event_ids[negative], kind="mergesort")]
-    positive = positive[np.argsort(event_ids[positive], kind="mergesort")]
-
-    standardized_differences = []
-    scales: dict[str, float] = {}
-    for name in match_variables:
-        if name not in values:
-            raise KeyError(f"Unknown matching variable: {name}")
-        variable = np.asarray(values[name], dtype=float)
-        if variable.shape != i_dyn.shape:
-            raise ValueError(f"{name} does not align with the event axis.")
-        if not np.isfinite(variable).all():
-            raise ValueError(f"{name} contains non-finite values.")
-        scale = pooled_standard_deviation(variable[negative], variable[positive])
-        if not np.isfinite(scale) or scale <= 0:
-            raise ValueError(
-                f"Matching variable {name!r} has no finite positive pooled scale."
-            )
-        scales[name] = scale
-        standardized_differences.append(
-            np.abs(variable[negative, None] - variable[positive][None, :]) / scale
-        )
-
-    difference_cube = np.stack(standardized_differences, axis=2)
-    valid = np.all(difference_cube <= caliper, axis=2)
-    distance = np.sqrt(np.mean(difference_cube**2, axis=2))
-
-    # A dummy column allows each negative event to remain unmatched. The dummy
-    # penalty exceeds the maximum possible change in total valid-edge cost, so
-    # the assignment first maximizes pair count and then minimizes distance.
-    dummy_penalty = (negative.size + 1) * (caliper + 1.0)
-    invalid_penalty = 2.0 * dummy_penalty
-    augmented_cost = np.concatenate(
-        [
-            np.where(valid, distance, invalid_penalty),
-            np.full((negative.size, negative.size), dummy_penalty),
-        ],
-        axis=1,
-    )
-    row_indices, column_indices = linear_sum_assignment(augmented_cost)
-    matched = column_indices < positive.size
-    rows = row_indices[matched]
-    columns = column_indices[matched]
-
-    return MatchResult(
-        negative_indices=negative[rows],
-        positive_indices=positive[columns],
-        distances=distance[rows, columns],
-        match_variables=tuple(match_variables),
-        pooled_scales=scales,
-        caliper=float(caliper),
-    )
-
-
-def pooled_standard_deviation(left: np.ndarray, right: np.ndarray) -> float:
-    left = np.asarray(left, dtype=float)
-    right = np.asarray(right, dtype=float)
-    if left.size < 2 or right.size < 2:
-        return float("nan")
-    numerator = (left.size - 1) * np.var(left, ddof=1) + (
-        right.size - 1
-    ) * np.var(right, ddof=1)
-    return float(np.sqrt(numerator / (left.size + right.size - 2)))
-
-
 def standardized_mean_difference(left: np.ndarray, right: np.ndarray) -> float:
-    scale = pooled_standard_deviation(left, right)
+    scale = selectors.pooled_standard_deviation(left, right)
     mean_difference = float(np.mean(right) - np.mean(left))
     if scale == 0:
         return 0.0 if mean_difference == 0 else float(np.sign(mean_difference) * np.inf)
@@ -382,7 +289,7 @@ def variable_balance(
     *,
     negative_indices: np.ndarray,
     positive_indices: np.ndarray,
-    match: MatchResult,
+    match: selectors.SignMatchResult,
 ) -> dict[str, float]:
     return {
         "negative_mean_before": float(np.mean(values[negative_indices])),
@@ -400,6 +307,48 @@ def variable_balance(
     }
 
 
+def balance_for_match(
+    exploration: Exploration,
+    match: selectors.SignMatchResult,
+) -> dict[str, dict[str, float]]:
+    """Return the common balance audit for one matching specification."""
+    if match.pair_count < 2:
+        raise ValueError("Balance requires at least two retained pairs.")
+    return {
+        name: variable_balance(
+            exploration.values[name],
+            negative_indices=exploration.negative_indices,
+            positive_indices=exploration.positive_indices,
+            match=match,
+        )
+        for name in exploration.settings.balance_variables
+    }
+
+
+def balance_score(
+    exploration: Exploration,
+    match: selectors.SignMatchResult,
+) -> dict[str, float | int | None]:
+    """Summarize average, worst-case, and variable-wise SMD improvement."""
+    if match.pair_count < 2:
+        return {
+            "matched_pairs": match.pair_count,
+            "mean_absolute_smd": None,
+            "maximum_absolute_smd": None,
+            "variables_improved": 0,
+        }
+    balance = balance_for_match(exploration, match)
+    variables = exploration.settings.balance_variables
+    before = np.array([balance[name]["smd_before"] for name in variables])
+    after = np.array([balance[name]["smd_after"] for name in variables])
+    return {
+        "matched_pairs": match.pair_count,
+        "mean_absolute_smd": float(np.mean(np.abs(after))),
+        "maximum_absolute_smd": float(np.max(np.abs(after))),
+        "variables_improved": int(np.count_nonzero(np.abs(after) < np.abs(before))),
+    }
+
+
 def metrics_summary(exploration: Exploration) -> dict[str, object]:
     anomaly = exploration.values["tas_anom_peak"]
     match = exploration.primary_match
@@ -414,8 +363,20 @@ def metrics_summary(exploration: Exploration) -> dict[str, object]:
         "correlation_i_dyn_tas_anom_peak": float(
             np.corrcoef(exploration.i_dyn, anomaly)[0, 1]
         ),
+        "correlation_i_dyn_I_dTdt_pre": float(
+            np.corrcoef(exploration.i_dyn, exploration.values["I_dTdt_pre"])[0, 1]
+        ),
+        "I_dTdt_pre_smd_before": standardized_mean_difference(
+            exploration.values["I_dTdt_pre"][exploration.negative_indices],
+            exploration.values["I_dTdt_pre"][exploration.positive_indices],
+        ),
         "primary_match_variables": list(match.match_variables),
-        "caliper_pooled_sd": match.caliper,
+        "primary_specification": exploration.settings.primary_specification,
+        "calipers_pooled_sd": dict(match.calipers_sd),
+        "matching_method": match.method,
+        "matching_settings_path": str(exploration.settings.source_path),
+        "matching_settings_sha256": exploration.settings.sha256,
+        "matching_settings_schema_version": exploration.settings.schema_version,
         "matched_pairs": match.pair_count,
         "unmatched_negative_events": int(
             exploration.negative_indices.size - match.pair_count
@@ -427,8 +388,15 @@ def metrics_summary(exploration: Exploration) -> dict[str, object]:
         "max_absolute_pair_difference_K": float(np.max(pair_differences)),
         "balance": exploration.balance,
         "sensitivity_pair_counts": {
-            label: result.pair_count
-            for label, result in exploration.sensitivity.items()
+            identifier: exploration.specification_matches[identifier].pair_count
+            for identifier in exploration.settings.retention_sensitivity
+        },
+        "selected_specification_comparisons": {
+            identifier: balance_score(
+                exploration,
+                exploration.specification_matches[identifier],
+            )
+            for identifier in exploration.settings.summary_specifications
         },
     }
 
@@ -442,6 +410,7 @@ def write_figures(
     plot_population_overview(exploration, paths["overview"])
     plot_matching_diagnostics(exploration, paths["matching"])
     plot_balance_and_sensitivity(exploration, paths["balance"])
+    plot_matching_specification_tradeoff(exploration, paths["comparison"])
     return paths
 
 
@@ -584,9 +553,13 @@ def plot_matching_diagnostics(exploration: Exploration, path: str | Path) -> Non
     pair_ax.set_title(f"Pair agreement\nn = {match.pair_count} pairs")
     plot_style.format_one_to_one_axis(pair_ax)
 
+    primary_specification = exploration.settings.specification(
+        exploration.settings.primary_specification
+    )
+    primary_family = exploration.settings.family(primary_specification.family)
     fig.suptitle(
-        "One-to-one optimal matching on peak temperature anomaly "
-        f"(caliper = {match.caliper:.2f} pooled SD)"
+        f"One-to-one optimal matching on {primary_family.label.lower()} "
+        f"(caliper = {primary_specification.caliper_sd:.2f} pooled SD)"
     )
     fig.subplots_adjust(left=0.07, right=0.985, bottom=0.20, top=0.76, wspace=0.34)
     plot_style.save_figure(fig, path)
@@ -604,7 +577,7 @@ def plot_balance_and_sensitivity(
     )
     balance_ax, sensitivity_ax = axes
 
-    variables = list(BALANCE_VARIABLES)
+    variables = list(exploration.settings.balance_variables)
     positions = np.arange(len(variables))
     before = np.array(
         [exploration.balance[name]["smd_before"] for name in variables]
@@ -645,7 +618,9 @@ def plot_balance_and_sensitivity(
         zorder=3,
     )
     balance_ax.set_yticks(positions)
-    balance_ax.set_yticklabels([VARIABLE_LABELS[name] for name in variables])
+    balance_ax.set_yticklabels(
+        [VARIABLE_LABELS.get(name, name) for name in variables]
+    )
     plot_style.use_default_numeric_formatter(balance_ax.yaxis)
     balance_ax.invert_yaxis()
     balance_ax.set_xlabel("Standardized mean difference\n(positive minus negative)")
@@ -656,15 +631,26 @@ def plot_balance_and_sensitivity(
     plot_style.style_axis(balance_ax, grid=False)
     balance_ax.grid(True, axis="x", color=plot_style.COLORS["grid"], linewidth=0.6)
 
-    labels = list(exploration.sensitivity)
+    sensitivity_specifications = [
+        exploration.settings.specification(identifier)
+        for identifier in exploration.settings.retention_sensitivity
+    ]
+    labels = [
+        exploration.settings.family(specification.family).label
+        for specification in sensitivity_specifications
+    ]
     counts = np.array(
-        [exploration.sensitivity[label].pair_count for label in labels]
+        [
+            exploration.specification_matches[specification.identifier].pair_count
+            for specification in sensitivity_specifications
+        ]
     )
     bar_positions = np.arange(len(labels))
+    bar_colors = [MATCHED_COLOR, NEGATIVE_COLOR, POSITIVE_COLOR, "#777777"]
     bars = sensitivity_ax.barh(
         bar_positions,
         counts,
-        color=[MATCHED_COLOR, NEGATIVE_COLOR, POSITIVE_COLOR, "#777777"],
+        color=[bar_colors[index % len(bar_colors)] for index in bar_positions],
         alpha=0.88,
     )
     sensitivity_ax.set_yticks(bar_positions)
@@ -672,10 +658,19 @@ def plot_balance_and_sensitivity(
     plot_style.use_default_numeric_formatter(sensitivity_ax.yaxis)
     sensitivity_ax.invert_yaxis()
     sensitivity_ax.set_xlabel("Matched pairs")
-    sensitivity_ax.set_title(
-        f"Retention sensitivity\n{exploration.primary_match.caliper:.2f} SD per-variable caliper"
-    )
-    sensitivity_ax.set_xlim(0, max(exploration.negative_indices.size, counts.max()) * 1.12)
+    sensitivity_calipers = {
+        specification.caliper_sd
+        for specification in sensitivity_specifications
+    }
+    if len(sensitivity_calipers) == 1:
+        sensitivity_subtitle = (
+            f"{next(iter(sensitivity_calipers)):.2f} SD per-variable caliper"
+        )
+    else:
+        sensitivity_subtitle = "Configured per-variable SD calipers"
+    sensitivity_ax.set_title(f"Retention sensitivity\n{sensitivity_subtitle}")
+    maximum_count = max(exploration.negative_indices.size, counts.max())
+    sensitivity_ax.set_xlim(0, maximum_count * 1.12)
     for bar, count in zip(bars, counts, strict=True):
         sensitivity_ax.text(
             count + 1.2,
@@ -693,6 +688,186 @@ def plot_balance_and_sensitivity(
     plt.close(fig)
 
 
+def plot_matching_specification_tradeoff(
+    exploration: Exploration,
+    path: str | Path,
+) -> None:
+    """Compare the proposed match with current and high-retention designs."""
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=plot_style.publication_figsize("full", aspect=0.47),
+    )
+    balance_ax, frontier_ax = axes
+
+    selected: list[tuple[str, selectors.SignMatchResult | None, str, str]] = [
+        (
+            "Before matching",
+            None,
+            plot_style.COLORS["residual"],
+            "x",
+        )
+    ]
+    comparison_colors = (MATCHED_COLOR, POSITIVE_COLOR, NEGATIVE_COLOR)
+    comparison_markers = ("s", "^", "o")
+    for index, identifier in enumerate(exploration.settings.balance_comparison):
+        specification = exploration.settings.specification(identifier)
+        family = exploration.settings.family(specification.family)
+        selected.append(
+            (
+                f"{family.label} ({specification.caliper_sd:.2f} SD)",
+                exploration.specification_matches[identifier],
+                comparison_colors[index % len(comparison_colors)],
+                comparison_markers[index % len(comparison_markers)],
+            )
+        )
+
+    variables = exploration.settings.balance_variables
+    positions = np.arange(len(variables))
+    balance_ax.axvspan(-0.1, 0.1, color=plot_style.COLORS["grid"], alpha=0.7)
+    balance_ax.axvline(
+        0,
+        color=plot_style.COLORS["zero"],
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+    )
+    for label, match, color, marker in selected:
+        if match is None:
+            smds = np.array(
+                [exploration.balance[name]["smd_before"] for name in variables]
+            )
+        elif match.pair_count < 2:
+            smds = np.full(len(variables), np.nan)
+        else:
+            balance = balance_for_match(exploration, match)
+            smds = np.array(
+                [balance[name]["smd_after"] for name in variables]
+            )
+        balance_ax.scatter(
+            smds,
+            positions,
+            color=color,
+            marker=marker,
+            s=33,
+            label=label,
+            zorder=3,
+        )
+    balance_ax.set_yticks(positions)
+    balance_ax.set_yticklabels(
+        [VARIABLE_LABELS.get(name, name) for name in variables]
+    )
+    plot_style.use_default_numeric_formatter(balance_ax.yaxis)
+    balance_ax.invert_yaxis()
+    balance_ax.set_xlabel("Standardized mean difference\n(positive minus negative)")
+    balance_ax.set_title("Common seven-variable balance audit")
+    balance_ax.set_xlim(-1.15, 1.15)
+    plot_style.style_axis(balance_ax, grid=False)
+    balance_ax.grid(True, axis="x", color=plot_style.COLORS["grid"], linewidth=0.6)
+
+    frontier_colors = (MATCHED_COLOR, POSITIVE_COLOR, NEGATIVE_COLOR)
+    frontier_markers = ("s", "^", "o")
+    for index, family_id in enumerate(exploration.settings.frontier_families):
+        color = frontier_colors[index % len(frontier_colors)]
+        marker = frontier_markers[index % len(frontier_markers)]
+        family = exploration.settings.family(family_id)
+        matches = exploration.frontier_matches[family_id]
+        pair_counts = []
+        worst_smds = []
+        for frontier_caliper in exploration.settings.frontier_calipers_sd:
+            match = matches[frontier_caliper]
+            pair_counts.append(match.pair_count)
+            worst_smd = balance_score(exploration, match)["maximum_absolute_smd"]
+            worst_smds.append(np.nan if worst_smd is None else worst_smd)
+        frontier_ax.plot(
+            pair_counts,
+            worst_smds,
+            color=color,
+            marker=marker,
+            linewidth=plot_style.LINE_WIDTH_PT,
+            markersize=5,
+            label=family.label,
+        )
+        annotation_groups: list[tuple[int, float, list[float]]] = []
+        for pair_count, worst_smd, comparison_caliper in zip(
+            pair_counts,
+            worst_smds,
+            exploration.settings.frontier_calipers_sd,
+            strict=True,
+        ):
+            if not np.isfinite(worst_smd):
+                continue
+            existing_index = next(
+                (
+                    index
+                    for index, (group_count, group_smd, _) in enumerate(
+                        annotation_groups
+                    )
+                    if group_count == pair_count and np.isclose(group_smd, worst_smd)
+                ),
+                None,
+            )
+            if existing_index is None:
+                annotation_groups.append(
+                    (pair_count, worst_smd, [comparison_caliper])
+                )
+            else:
+                annotation_groups[existing_index][2].append(comparison_caliper)
+        for pair_count, worst_smd, group_calipers in annotation_groups:
+            if len(group_calipers) > 2:
+                caliper_label = f"{group_calipers[0]:g}-{group_calipers[-1]:g}"
+            else:
+                caliper_label = ", ".join(f"{value:g}" for value in group_calipers)
+            right_aligned = pair_count > 0.9 * exploration.negative_indices.size
+            frontier_ax.annotate(
+                caliper_label,
+                (pair_count, worst_smd),
+                xytext=(-4 if right_aligned else 4, 4),
+                textcoords="offset points",
+                ha="right" if right_aligned else "left",
+                fontsize=7,
+                color=color,
+            )
+    frontier_ax.axhline(
+        0.1,
+        color=plot_style.COLORS["zero"],
+        linestyle="--",
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+    )
+    frontier_ax.text(
+        2,
+        0.115,
+        "0.1 SMD target",
+        color=plot_style.COLORS["zero"],
+        fontsize=plot_style.LEGEND_FONT_SIZE_PT,
+    )
+    frontier_ax.set_xlabel("Matched pairs")
+    frontier_ax.set_ylabel(
+        f"Worst absolute SMD across {len(variables)} audit variables"
+    )
+    frontier_ax.set_title(
+        "Retention versus worst-case balance\n"
+        "(labels are calipers in pooled SD)"
+    )
+    frontier_ax.set_xlim(0, exploration.negative_indices.size * 1.05)
+    frontier_ax.set_ylim(0, 1.18)
+    plot_style.format_integer_axis(frontier_ax.xaxis, spacing=10)
+    plot_style.style_axis(frontier_ax)
+
+    fig.suptitle("Alternative matching specifications change both balance and estimand")
+    handles, labels = balance_ax.get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.90),
+        ncol=2,
+        fontsize=plot_style.LEGEND_FONT_SIZE_PT,
+        frameon=True,
+    )
+    fig.subplots_adjust(left=0.18, right=0.985, bottom=0.16, top=0.69, wspace=0.43)
+    plot_style.save_figure(fig, path)
+    plt.close(fig)
+
+
 def plot_ecdf(ax, values: np.ndarray, *, color: str, label: str) -> None:
     ordered = np.sort(np.asarray(values, dtype=float))
     cumulative = np.arange(1, ordered.size + 1, dtype=float) / ordered.size
@@ -702,8 +877,9 @@ def plot_ecdf(ax, values: np.ndarray, *, color: str, label: str) -> None:
 def main() -> int:
     args = parse_args()
     validate_args(args)
+    settings = matching_settings.load_matching_settings(args.settings_path)
     features = open_event_features(args.input_path)
-    exploration = prepare_exploration(features, caliper=args.caliper)
+    exploration = prepare_exploration(features, settings=settings)
     written = write_figures(exploration, args.output_dir)
 
     print(json.dumps(metrics_summary(exploration), indent=2, sort_keys=True))

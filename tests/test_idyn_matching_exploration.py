@@ -6,12 +6,14 @@ import xarray as xr
 from HW_analysis.scripts.Idyn_matching_exploration import (
     explore_idyn_matching as exploration,
 )
+from HW_analysis.scripts.Idyn_matching_exploration import matching_settings
 
 
 def test_prepare_exploration_builds_deterministic_complete_primary_match():
     features = make_event_features()
 
-    result = exploration.prepare_exploration(features, caliper=0.2)
+    settings = matching_settings.load_matching_settings()
+    result = exploration.prepare_exploration(features, settings=settings)
 
     assert result.negative_indices.size == 4
     assert result.positive_indices.size == 5
@@ -26,25 +28,49 @@ def test_prepare_exploration_builds_deterministic_complete_primary_match():
     assert result.balance["tas_anom_peak"]["smd_after"] < 0.05
 
 
-def test_optimal_match_uses_caliper_and_leaves_reference_event_unmatched():
-    event_ids = np.array([1, 2, 3, 4])
-    i_dyn = np.array([-1.0, -1.0, 1.0, 1.0])
-    values = {"tas_anom_peak": np.array([0.0, 10.0, 0.01, 1.0])}
+def test_prepare_exploration_calls_reusable_selector(monkeypatch):
+    settings = matching_settings.load_matching_settings()
+    selector = exploration.selectors.match_events_by_metric_sign
+    calls = []
 
-    result = exploration.optimal_sign_match(
-        event_ids,
-        i_dyn,
-        values,
-        match_variables=("tas_anom_peak",),
-        caliper=0.05,
+    def recording_selector(*args, **kwargs):
+        calls.append((args, kwargs))
+        return selector(*args, **kwargs)
+
+    monkeypatch.setattr(
+        exploration.selectors,
+        "match_events_by_metric_sign",
+        recording_selector,
     )
 
-    assert result.pair_count == 1
-    np.testing.assert_array_equal(result.negative_indices, [0])
-    np.testing.assert_array_equal(result.positive_indices, [2])
+    exploration.prepare_exploration(make_event_features(), settings=settings)
+
+    expected_calls = len(settings.specifications) + (
+        len(settings.frontier_families) * len(settings.frontier_calipers_sd)
+    )
+    assert len(calls) == expected_calls
 
 
-def test_main_writes_three_nonempty_figures(monkeypatch, tmp_path):
+def test_proposed_match_and_tradeoff_specs_are_prepared():
+    settings = matching_settings.load_matching_settings()
+    result = exploration.prepare_exploration(
+        make_event_features(),
+        settings=settings,
+    )
+
+    assert set(result.frontier_matches) == set(settings.frontier_families)
+    assert set(result.frontier_matches["integrated_warming_antecedent"]) == set(
+        settings.frontier_calipers_sd
+    )
+    score = exploration.balance_score(
+        result,
+        result.specification_matches["integrated_warming_antecedent_0p20"],
+    )
+    assert score["matched_pairs"] > 0
+    assert 0 <= score["variables_improved"] <= len(settings.balance_variables)
+
+
+def test_main_writes_four_nonempty_figures(monkeypatch, tmp_path):
     input_path = tmp_path / "features.nc"
     output_dir = tmp_path / "plots"
     make_event_features().to_netcdf(input_path, engine="h5netcdf")
@@ -96,6 +122,7 @@ def make_event_features() -> xr.Dataset:
             "event_id": ("event", event_ids),
             "I_advection_pre": ("event", i_dyn * 0.4),
             "I_adiabatic_pre": ("event", i_dyn * 0.6),
+            "I_dTdt_pre": ("event", anomaly - 1.0),
             "tas_anom_peak": ("event", anomaly),
             "tas_peak": ("event", 288.0 + anomaly),
             "tas_excess_peak": ("event", anomaly - 2.0),
@@ -104,7 +131,7 @@ def make_event_features() -> xr.Dataset:
                 "event",
                 duration_days.astype("timedelta64[D]").astype("timedelta64[ns]"),
             ),
-            "days_from_solstice": ("event", np.arange(-4, 5, dtype=float)),
+            "days_from_solstice": ("event", (event_ids % 10).astype(float)),
             "T_anom_mean_ant": ("event", anomaly * 0.2),
         },
         coords={"event": np.arange(event_ids.size)},
