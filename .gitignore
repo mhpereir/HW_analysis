@@ -1,6 +1,7 @@
 *__pycache__/*
 *.pyc
 *.png
+results/Idyn_matching_exploration/matching_summary.json
 logs/*
 results/stage1/*.nc
 *.old
