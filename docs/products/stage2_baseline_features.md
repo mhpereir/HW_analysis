@@ -51,6 +51,7 @@ variables as the Stage-2 event-feature product. Default output includes:
 I_dTdt_pre(baseline_day)
 I_advection_pre(baseline_day)
 I_adiabatic_pre(baseline_day)
+I_dyn_pre(baseline_day)
 I_diabatic_pre(baseline_day)
 I_lwa_a_pre_reference(baseline_day)
 I_lwa_c_pre_reference(baseline_day)
@@ -61,6 +62,15 @@ n_samples_heat_budget_pre(baseline_day)
 n_samples_lwa_pre_reference(baseline_day)
 n_samples_antecedent_state(baseline_day)
 ```
+
+`I_dyn_pre` is calculated identically to the event product:
+
+```text
+I_dyn_pre = I_adiabatic_pre + I_advection_pre
+```
+
+It uses the same inclusive `heat_budget_pre` window and metadata contract.
+Consumers must read this variable instead of rebuilding the sum.
 
 Extended mode adds the same land, cloud, PBL, and surface-energy features as
 the event-feature product.
@@ -112,6 +122,10 @@ n_clean_days = ...
 
 The producer fails when the selected event-ID source is missing, contains
 missing values, or is inconsistent within a calendar day.
+
+Validation must confirm that `I_dyn_pre` is exactly equal to
+`I_adiabatic_pre + I_advection_pre`, including missing-value propagation, and
+that all three variables use the `baseline_day` dimension and consistent units.
 
 ## Downstream Consumers
 

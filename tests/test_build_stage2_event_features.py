@@ -10,8 +10,8 @@ from HW_analysis.scripts.event_features import event_feature_config as feature_c
 
 
 def test_config_uses_expected_default_windows():
-    assert feature_config.WINDOWS["heat_budget_pre"] == (-72, 0)
-    assert feature_config.WINDOWS["lwa_pre_peak"] == (-72, 0)
+    assert feature_config.WINDOWS["heat_budget_pre"] == (-96, 0)
+    assert feature_config.WINDOWS["lwa_pre_peak"] == (-96, 0)
     assert feature_config.WINDOWS["antecedent_state"] == (-168, -24)
 
 
@@ -87,20 +87,34 @@ def test_build_default_features_uses_inclusive_windows_and_derived_tas_anom():
 
     assert out.sizes["event"] == 1
     np.testing.assert_array_equal(out["event_id"].values, [1])
-    assert out["n_samples_heat_budget_pre"].item() == 73
-    assert out["n_samples_lwa_pre_peak"].item() == 73
+    assert out["n_samples_heat_budget_pre"].item() == 97
+    assert out["n_samples_lwa_pre_peak"].item() == 97
     assert out["n_samples_antecedent_state"].item() == 145
-    assert out["I_dTdt_pre"].item() == 73.0
-    assert out["I_advection_pre"].item() == 146.0
-    assert out["I_adiabatic_pre"].item() == 219.0
-    assert out["I_diabatic_pre"].item() == 292.0
-    assert out["I_lwa_a_pre_peak"].item() == 365.0
-    assert out["I_lwa_c_pre_peak"].item() == 438.0
+    assert out["I_dTdt_pre"].item() == 97.0
+    assert out["I_advection_pre"].item() == 194.0
+    assert out["I_adiabatic_pre"].item() == 291.0
+    assert out["I_dyn_pre"].item() == 485.0
+    assert out["I_diabatic_pre"].item() == 388.0
+    assert out["I_lwa_a_pre_peak"].item() == 485.0
+    assert out["I_lwa_c_pre_peak"].item() == 582.0
     assert out["T_anom_mean_ant"].item() == 10.0
     assert out["days_from_solstice"].item() == -11.0
     assert out.attrs["all_seasons"] == 1
     assert out.attrs["dropped_boundary_events"] == 0
     assert out["I_dTdt_pre"].attrs["window_endpoint_inclusion"] == "inclusive"
+    assert out["I_dyn_pre"].attrs == {
+        "description": (
+            "Integrated pre-peak dynamical tendency: adiabatic plus advection."
+        ),
+        "source_variables": "I_adiabatic_pre,I_advection_pre",
+        "formula": "I_adiabatic_pre + I_advection_pre",
+        "operation": "sum",
+        "window_name": "heat_budget_pre",
+        "window_lag_hours": "-96,0",
+        "window_endpoint_inclusion": "inclusive",
+        "integral_method": "hourly_sum_assuming_1h_spacing",
+        "units": "K",
+    }
 
 
 def test_build_features_drops_boundary_events_when_required_window_is_outside_data():
@@ -110,6 +124,14 @@ def test_build_features_drops_boundary_events_when_required_window_is_outside_da
 
     np.testing.assert_array_equal(out["event_id"].values, [1])
     assert out.attrs["dropped_boundary_events"] == 1
+
+
+def test_build_features_rejects_inconsistent_dynamical_component_units():
+    ds = _make_feature_dataset()
+    ds["advection"].attrs["units"] = "m s-1"
+
+    with pytest.raises(ValueError, match="different units"):
+        build_event_features.build_event_features(ds, all_seasons=True)
 
 
 def test_build_features_applies_season_selection_and_full_event_requirement():
@@ -135,11 +157,11 @@ def test_build_extended_features_adds_optional_diagnostics():
         use_extended_variables=True,
     )
 
-    assert out["I_nslr_pre"].item() == 511.0
-    assert out["I_nssr_pre"].item() == 584.0
-    assert out["I_sshf_pre"].item() == 657.0
-    assert out["I_slhf_pre"].item() == 730.0
-    assert out["I_surface_energy_pre"].item() == 803.0
+    assert out["I_nslr_pre"].item() == 679.0
+    assert out["I_nssr_pre"].item() == 776.0
+    assert out["I_sshf_pre"].item() == 873.0
+    assert out["I_slhf_pre"].item() == 970.0
+    assert out["I_surface_energy_pre"].item() == 1067.0
     assert out["soil_moisture_mean_ant"].item() == pytest.approx(154.0 / 145.0)
     assert out["cloud_cover_mean_ant"].item() == 0.5
     assert out["pbl_p_mean_ant"].item() == 90000.0

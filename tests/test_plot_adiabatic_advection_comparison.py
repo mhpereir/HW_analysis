@@ -7,22 +7,24 @@ import xarray as xr
 from HW_analysis.scripts.event_features import plot_adiabatic_advection_comparison as plot_diag
 
 
-def test_net_dynamical_contribution_sums_adiabatic_and_advection():
-    x_values = np.array([1.0, 2.0, 4.0, -3.0])
-    y_values = np.array([-1.0, 0.0, 2.0, 1.0])
+def test_panels_consume_stored_i_dyn_pre_without_reconstructing_it():
+    features = _make_feature_table()
+    stored = np.array([10.0, 20.0, 30.0, 40.0, 50.0, 60.0])
+    features["I_dyn_pre"] = ("event", stored)
 
-    net_dynamical = plot_diag.net_dynamical_contribution(
-        x_values,
-        y_values,
-    )
-
-    np.testing.assert_allclose(
-        net_dynamical,
-        x_values + y_values,
-    )
-    assert net_dynamical[0] == 0.0
-    assert net_dynamical[1] > 0.0
-    assert net_dynamical[3] < 0.0
+    fig = plot_diag.plot_tendency_scatter(features)
+    try:
+        np.testing.assert_allclose(
+            np.asarray(fig.axes[1].collections[0].get_offsets())[:, 1],
+            stored,
+        )
+        for ax in fig.axes[2:4]:
+            np.testing.assert_allclose(
+                np.asarray(ax.collections[0].get_offsets())[:, 0],
+                stored,
+            )
+    finally:
+        plot_diag.plt.close(fig)
 
 
 def test_panels_use_expected_x_and_y_values():
@@ -35,10 +37,7 @@ def test_panels_use_expected_x_and_y_values():
         temperature_offsets = np.asarray(fig.axes[2].collections[0].get_offsets())
         diabatic_offsets = np.asarray(fig.axes[3].collections[0].get_offsets())
         expected_x = features["I_adiabatic_pre"].values
-        expected_net_dynamical = (
-            features["I_adiabatic_pre"].values
-            + features["I_advection_pre"].values
-        )
+        expected_net_dynamical = features["I_dyn_pre"].values
 
         np.testing.assert_allclose(top_offsets[:, 0], expected_x)
         np.testing.assert_allclose(middle_offsets[:, 0], expected_x)
@@ -93,6 +92,7 @@ def test_validate_feature_variables_requires_only_plotted_and_color_variables():
     for variable in (
         plot_diag.X_VARIABLE,
         plot_diag.ADVECTION_VARIABLE,
+        plot_diag.DYNAMICAL_VARIABLE,
         plot_diag.TEMPERATURE_CHANGE_VARIABLE,
         plot_diag.DIABATIC_VARIABLE,
         plot_diag.COLOR_VARIABLE,
@@ -132,8 +132,8 @@ def test_nonfinite_required_values_are_excluded_from_relevant_panels():
         np.array([1.0, 2.0, 3.0, 4.0, 5.0, np.nan]),
     )
     expected_adiabatic_x = np.array([1.0, 7.0, 8.0])
-    expected_temperature_x = np.array([0.0, 12.0])
-    expected_diabatic_x = np.array([0.0, 10.0])
+    expected_temperature_x = np.array([-1.0, 12.0])
+    expected_diabatic_x = np.array([-1.0, 10.0])
 
     fig = plot_diag.plot_tendency_scatter(features)
     try:
@@ -202,6 +202,7 @@ def _make_feature_table() -> xr.Dataset:
         data_vars={
             "I_adiabatic_pre": ("event", np.array([1.0, 2.0, 4.0, 5.0, 7.0, 8.0])),
             "I_advection_pre": ("event", np.array([-2.0, -1.0, 0.0, 2.0, 3.0, 4.0])),
+            "I_dyn_pre": ("event", np.array([-1.0, 1.0, 4.0, 7.0, 10.0, 12.0])),
             "I_dTdt_pre": ("event", np.array([-3.0, -1.0, 0.0, 1.0, 3.0, 5.0])),
             "I_diabatic_pre": ("event", np.array([2.0, 3.0, 5.0, 6.0, 8.0, 9.0])),
             "tas_anom_peak": ("event", np.array([2.0, 3.0, 4.0, 4.5, 5.0, 6.0])),

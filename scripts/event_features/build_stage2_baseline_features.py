@@ -187,6 +187,7 @@ def build_baseline_features(
         feature_name_for_source=feature_name_for_source,
         sample_count_name_for_window=sample_count_name_for_window,
     )
+    fixed.add_integrated_dynamical_feature(out, row_dim=BASELINE_DIM)
     relabel_baseline_windows(out)
     fixed.add_days_from_solstice(
         out,

@@ -120,8 +120,7 @@ def make_event_features() -> xr.Dataset:
     return xr.Dataset(
         data_vars={
             "event_id": ("event", event_ids),
-            "I_advection_pre": ("event", i_dyn * 0.4),
-            "I_adiabatic_pre": ("event", i_dyn * 0.6),
+            "I_dyn_pre": ("event", i_dyn),
             "I_dTdt_pre": ("event", anomaly - 1.0),
             "tas_anom_peak": ("event", anomaly),
             "tas_peak": ("event", 288.0 + anomaly),

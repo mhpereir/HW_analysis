@@ -48,8 +48,7 @@ GEOPOTENTIAL_TO_HEIGHT_M_S2 = config.G_M_S2
 REQUIRED_EVENT_VARIABLES = (
     "event_id",
     "peak_time",
-    "I_adiabatic_pre",
-    "I_advection_pre",
+    "I_dyn_pre",
 )
 
 
@@ -149,10 +148,8 @@ def prepare_events(features: xr.Dataset) -> xr.Dataset:
         raise ValueError(f"Event-feature table is missing dimension {EVENT_DIM!r}.")
 
     peak_values = np.asarray(features["peak_time"].values, dtype="datetime64[ns]")
-    adiabatic = np.asarray(features["I_adiabatic_pre"].values, dtype=float)
-    advection = np.asarray(features["I_advection_pre"].values, dtype=float)
-    dyn_net = adiabatic + advection
-    finite = (~np.isnat(peak_values)) & np.isfinite(adiabatic) & np.isfinite(advection)
+    dyn_net = np.asarray(features["I_dyn_pre"].values, dtype=float)
+    finite = (~np.isnat(peak_values)) & np.isfinite(dyn_net)
     if not finite.all():
         bad = int((~finite).sum())
         raise ValueError(f"Event-feature table contains {bad} non-finite required rows.")
@@ -163,6 +160,14 @@ def prepare_events(features: xr.Dataset) -> xr.Dataset:
         raise ValueError("No nonzero I_dyn_net events are available.")
     selected = features.isel({EVENT_DIM: keep}).copy()
     selected["I_dyn_net"] = (EVENT_DIM, dyn_net[keep])
+    selected["I_dyn_net"].attrs.update(
+        {
+            "description": (
+                "Stage-2 I_dyn_pre retained under the spatial-product audit name."
+            ),
+            "source_variable": "I_dyn_pre",
+        }
+    )
     signs = np.where(dyn_net[keep] > 0, "positive", "negative")
     selected["event_dyn_sign"] = (EVENT_DIM, signs)
     selected.attrs = dict(features.attrs)

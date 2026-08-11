@@ -1,12 +1,7 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "group": {
-    "name": "I_dyn",
-    "operation": "sum",
-    "variables": [
-      "I_adiabatic_pre",
-      "I_advection_pre"
-    ],
+    "variable": "I_dyn_pre",
     "reference_sign": "negative"
   },
   "matching": {

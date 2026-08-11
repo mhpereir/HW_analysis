@@ -51,6 +51,7 @@ DEFAULT_OUTPUT_PATH = (
 
 X_VARIABLE = "I_adiabatic_pre"
 ADVECTION_VARIABLE = "I_advection_pre"
+DYNAMICAL_VARIABLE = "I_dyn_pre"
 TEMPERATURE_CHANGE_VARIABLE = "I_dTdt_pre"
 DIABATIC_VARIABLE = "I_diabatic_pre"
 COLOR_VARIABLE = "tas_anom_peak"
@@ -65,6 +66,7 @@ VARIABLE_LABELS = {
     "lwa_a_peak": "Peak LWA A [hPa m]",
     "I_advection_pre": r"$I_{advective}$(K)",
     "I_adiabatic_pre": r"$I_{adiabatic}$ (K)",
+    "I_dyn_pre": r"$I_{dyn,net}$ (K)",
     "I_dTdt_pre": r"$I_{dT/dt}$ (K)",
     "I_diabatic_pre": r"$I_{diabatic}$ (K)",
 }
@@ -180,16 +182,17 @@ def plot_tendency_scatter(
 
     x_values = feature_values(features, X_VARIABLE)
     advection_values = feature_values(features, ADVECTION_VARIABLE)
-    net_dynamical_values = net_dynamical_contribution(
-        x_values,
-        advection_values,
-    )
+    net_dynamical_values = feature_values(features, DYNAMICAL_VARIABLE)
     temperature_change_values = feature_values(features, TEMPERATURE_CHANGE_VARIABLE)
     diabatic_values = feature_values(features, DIABATIC_VARIABLE)
     color_values = feature_values(features, color_variable) if color_variable else None
     color_norm = color_norm_for_values(color_values)
 
-    finite_adiabatic = np.isfinite(x_values) & np.isfinite(advection_values)
+    finite_adiabatic = (
+        np.isfinite(x_values)
+        & np.isfinite(advection_values)
+        & np.isfinite(net_dynamical_values)
+    )
     if color_values is not None:
         finite_adiabatic &= np.isfinite(color_values)
     finite_temperature_change = finite_adiabatic & np.isfinite(
@@ -367,6 +370,7 @@ def validate_feature_variables(
     required = [
         X_VARIABLE,
         ADVECTION_VARIABLE,
+        DYNAMICAL_VARIABLE,
         TEMPERATURE_CHANGE_VARIABLE,
         DIABATIC_VARIABLE,
     ]
@@ -390,14 +394,6 @@ def feature_values(features: xr.Dataset, variable: str | None) -> np.ndarray:
     else:
         out = np.asarray(values, dtype=float)
     return np.asarray(out, dtype=float)
-
-
-def net_dynamical_contribution(
-    x_values: np.ndarray,
-    y_values: np.ndarray,
-) -> np.ndarray:
-    """Return the net dynamical contribution from adiabatic and advective terms."""
-    return x_values + y_values
 
 
 def set_shared_x_data_limits(axes: np.ndarray, x_values: np.ndarray) -> None:

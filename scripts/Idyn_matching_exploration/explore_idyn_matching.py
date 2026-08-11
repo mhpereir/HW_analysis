@@ -1,7 +1,7 @@
-"""Explore deterministic matching of positive and negative I_dyn events.
+"""Explore deterministic matching of positive and negative I_dyn_pre events.
 
 This is an isolated Stage-2 exploration. It consumes an existing event-feature
-table, derives ``I_dyn = I_adiabatic_pre + I_advection_pre``, and compares the
+table, reads its canonical ``I_dyn_pre`` variable, and compares the
 unmatched sign populations with deterministic one-to-one optimal matches.
 """
 
@@ -80,7 +80,7 @@ class Exploration:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Explore matching positive and negative Stage-2 I_dyn events."
+        description="Explore matching positive and negative Stage-2 I_dyn_pre events."
     )
     parser.add_argument(
         "--input-path",
@@ -162,7 +162,7 @@ def prepare_exploration(
     analysis_variables = set(settings.balance_variables).union(configured_variables)
     required = {
         "event_id",
-        *settings.group_variables,
+        settings.group_variable,
         *analysis_variables,
     }
     missing = sorted(required.difference(features.data_vars))
@@ -184,16 +184,16 @@ def prepare_exploration(
         name: event_numeric_values(features[name], name=name)
         for name in sorted(analysis_variables)
     }
-    group_metric = matching_settings.derive_group_metric(features, settings)
-    i_dyn = event_numeric_values(group_metric, name=settings.group_name)
+    group_metric = features[settings.group_variable]
+    i_dyn = event_numeric_values(group_metric, name=settings.group_variable)
     if not np.isfinite(i_dyn).all():
-        raise ValueError("I_dyn contains non-finite values.")
+        raise ValueError("I_dyn_pre contains non-finite values.")
 
     negative_indices = np.flatnonzero(i_dyn < 0)
     positive_indices = np.flatnonzero(i_dyn > 0)
     if negative_indices.size == 0 or positive_indices.size == 0:
         raise ValueError(
-            "Both negative and positive nonzero I_dyn events are required."
+            "Both negative and positive nonzero I_dyn_pre events are required."
         )
 
     specification_matches = {

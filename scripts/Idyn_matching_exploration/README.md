@@ -14,23 +14,24 @@ each detected heatwave event.
 For this exploration:
 
 ```text
-I_dyn = I_adiabatic_pre + I_advection_pre
+I_dyn_pre = I_adiabatic_pre + I_advection_pre
 ```
 
-Both terms are Stage-2 sums over the inclusive 72-hour pre-peak window
-`(-72, 0)`. Positive `I_dyn` events are the candidate population and negative
-`I_dyn` events are the reference population.
+Both terms are Stage-2 sums over the inclusive 96-hour pre-peak window
+`(-96, 0)`. The Stage-2 builder stores the result as `I_dyn_pre`. Positive
+`I_dyn_pre` events are the candidate population and negative `I_dyn_pre` events
+are the reference population.
 
 ## Workflow architecture
 
 The matching workflow has three tracked inputs:
 
-1. the unchanged Stage-2 event-feature table;
+1. the Stage-2 event-feature table containing `I_dyn_pre`;
 2. [`matching_settings.json`](matching_settings.json), which defines the
    grouping metric, matching method, variable families, and SD calipers; and
 3. the reusable implementation in [`src/selectors.py`](../../src/selectors.py).
 
-The plotting script derives `I_dyn` in memory, calls
+The plotting script reads `I_dyn_pre`, calls
 `selectors.match_events_by_metric_sign()` for every configured specification,
 and uses the returned indices directly. It writes figures, not a matched-event
 data product. Its JSON console summary reports the resolved settings path and
@@ -41,7 +42,148 @@ to reproduce the same selection from one settings file. The accepted boundary
 and algorithm are recorded in
 [decision 007](../../docs/decisions/007_idyn_sign_matching.md).
 
-## Data snapshot and provenance
+## Mathematical description of SD clipping
+
+The implementation uses an SD caliper to remove inadmissible *pairs*, followed
+by optimal one-to-one assignment. It does not truncate, winsorize, or otherwise
+alter any event value. Let the grouping value for event \(e\) be
+
+$$
+g_e = I_{\mathrm{dyn,pre},e}.
+$$
+
+The two nonzero-sign populations are
+
+$$
+\mathcal{N} = \{e : g_e < 0\}, \qquad
+\mathcal{P} = \{e : g_e > 0\}.
+$$
+
+Events with \(g_e=0\) are excluded. The script also rejects the input if
+`I_dyn_pre` is non-finite or if either sign population is empty. Under the
+tracked settings, \(\mathcal{N}\) is the reference population and
+\(\mathcal{P}\) is the candidate population.
+
+Suppose a specification contains \(K\) matching variables, with event value
+\(x_{e,k}\) for variable \(k\). A `timedelta64` matching variable, such as
+duration, is first expressed as a floating-point number of days. For each
+variable, the selector calculates the sample variance separately over the
+complete negative and positive populations:
+
+$$
+s_{-,k}^2 = \frac{1}{n_- - 1}
+\sum_{e \in \mathcal{N}}(x_{e,k}-\bar{x}_{-,k})^2,
+\qquad
+s_{+,k}^2 = \frac{1}{n_+ - 1}
+\sum_{e \in \mathcal{P}}(x_{e,k}-\bar{x}_{+,k})^2.
+$$
+
+Their pooled within-group sample standard deviation is
+
+$$
+s_k = \sqrt{
+\frac{(n_- - 1)s_{-,k}^2 + (n_+ - 1)s_{+,k}^2}
+     {n_- + n_+ - 2}
+}.
+$$
+
+This scale is computed once, before matching, and is not recomputed as events
+are retained or excluded. Matching stops with an error if a variable has no
+finite positive pooled scale. For reference event \(i\) and candidate event
+\(j\), the standardized absolute difference on variable \(k\) is
+
+$$
+\delta_{ijk} = \frac{|x_{i,k}-x_{j,k}|}{s_k}.
+$$
+
+If the configured caliper for variable \(k\) is \(c_k\), pair \((i,j)\) is
+admissible exactly when
+
+$$
+\delta_{ijk} \le c_k \quad \text{for every } k=1,\ldots,K.
+$$
+
+The boundary is inclusive. A single scalar `caliper_sd` is applied separately
+to every variable in the specification. The reusable selector can also accept
+a mapping with a different positive caliper for each variable. Thus a
+multivariable 0.20-SD specification does not apply one joint 0.20-SD radius:
+it requires every individual standardized difference to be at most 0.20.
+
+For every admissible pair, the assignment distance is the root-mean-square of
+the standardized differences:
+
+$$
+d_{ij} = \sqrt{\frac{1}{K}\sum_{k=1}^{K}\delta_{ijk}^2}.
+$$
+
+Every matching variable therefore has equal weight after SD standardization.
+For a one-variable specification, such as the primary `tas_anom_peak` match,
+\(d_{ij}=\delta_{ij1}\).
+
+Let \(m_{ij}\in\{0,1\}\) indicate whether an admissible reference-candidate
+pair is selected. Without-replacement matching imposes
+
+$$
+\sum_j m_{ij} \le 1, \qquad
+\sum_i m_{ij} \le 1, \qquad
+m_{ij}=0 \text{ for inadmissible pairs}.
+$$
+
+The optimization is lexicographic. It first finds the largest feasible number
+of pairs,
+
+$$
+M^* = \max_m \sum_{i,j}m_{ij},
+$$
+
+and, among assignments with \(M^*\) pairs, minimizes total distance:
+
+$$
+m^* = \underset{m:\,\sum m_{ij}=M^*}{\arg\min}
+\sum_{i,j}m_{ij}d_{ij}.
+$$
+
+The code realizes those two priorities in one call to SciPy's linear-sum
+assignment solver. With \(n_R\) reference events and
+\(c_{\max}=\max_k c_k\), it sets
+
+$$
+\Lambda=(n_R+1)(c_{\max}+1),
+$$
+
+assigns cost \(d_{ij}\) to an admissible real pair, cost \(2\Lambda\) to an
+inadmissible real pair, and appends \(n_R\) dummy candidate columns with cost
+\(\Lambda\). A reference event assigned to a dummy is unmatched. Because every
+admissible distance is at most \(c_{\max}\), the dummy penalty makes one extra
+admissible real match preferable to any possible reduction in the summed real
+pair distances. The inadmissible-pair penalty and the availability of one dummy
+per reference event prevent inadmissible pairs from being returned.
+
+Before constructing this cost matrix, both populations are sorted by unique
+`event_id`. This makes the result independent of the Stage-2 row order. The
+returned indices still address the original Stage-2 table, and each event can
+appear in at most one returned pair.
+
+The SMD values reported for balance are diagnostics rather than assignment
+costs. For any audited variable \(y\), the script reports
+
+$$
+\operatorname{SMD}(y) =
+\frac{\bar{y}_{+}-\bar{y}_{-}}{s_{\mathrm{pooled}}(y)}.
+$$
+
+The before-match SMD uses all negative and positive events. The after-match
+SMD recomputes the pooled sample SD from the two retained groups. Consequently,
+the after-match SMD denominator is not necessarily the full-population scale
+used to form the matching calipers and pair distances.
+
+## Historical 72-hour data snapshot and provenance
+
+The numerical results and figures below preserve the preliminary exploration
+generated with the former inclusive `(-72, 0)` window and a runtime component
+sum. They are not validation results for the current 96-hour `I_dyn_pre`
+contract. Regenerate them from the rebuilt suffix-free `tas` Stage-2 product
+before using the pair counts or SMD values as current results.
 
 The source is the canonical PNW Bartusek surface-to-700 hPa, tas-q90,
 1940-2024 Stage-1 product on Venus:
@@ -63,8 +205,8 @@ hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc
 sha256: 5df97ddaaffb7be26fca0fdfd4979ee728faa27506b8003d101f6ffc59455252
 ```
 
-The Stage-2 universe requires complete June-August events. It contains 258
-events, all with finite and nonzero `I_dyn`:
+The historical Stage-2 universe requires complete June-August events. It
+contains 258 events, all with finite and nonzero `I_dyn`:
 
 | I_dyn sign | Events | Mean `tas_anom_peak` |
 | --- | ---: | ---: |
@@ -86,7 +228,7 @@ without replacement:
 - reference population: negative `I_dyn` events;
 - candidate population: positive `I_dyn` events;
 - matching variable: `tas_anom_peak`;
-- distance: absolute difference divided by the pooled candidate SD;
+- distance: absolute difference divided by the pooled within-group SD;
 - caliper: 0.20 pooled SD; and
 - objective: maximize pair count first, then minimize total distance.
 

@@ -64,6 +64,7 @@ DEFAULT_OUTPUT_PATH = (
 
 X_VARIABLE = "I_adiabatic_pre"
 ADVECTION_VARIABLE = "I_advection_pre"
+DYNAMICAL_VARIABLE = "I_dyn_pre"
 TEMPERATURE_CHANGE_VARIABLE = "I_dTdt_pre"
 DIABATIC_VARIABLE = "I_diabatic_pre"
 EVENT_ADJACENT_VARIABLE = "event_adjacent"
@@ -71,6 +72,7 @@ EVENT_DIM = "event"
 PLOTTED_VARIABLES = (
     X_VARIABLE,
     ADVECTION_VARIABLE,
+    DYNAMICAL_VARIABLE,
     TEMPERATURE_CHANGE_VARIABLE,
     DIABATIC_VARIABLE,
 )
@@ -81,6 +83,7 @@ NET_DYNAMICAL_LABEL = r"$I_{dyn,net}$ (K)"
 VARIABLE_LABELS = {
     "I_advection_pre": r"$I_{advective}$(K)",
     "I_adiabatic_pre": r"$I_{adiabatic}$ (K)",
+    "I_dyn_pre": r"$I_{dyn,net}$ (K)",
     "I_dTdt_pre": r"$I_{dT/dt}$ (K)",
     "I_diabatic_pre": r"$I_{diabatic}$ (K)",
 }
@@ -439,11 +442,10 @@ def tendency_values(features: xr.Dataset) -> dict[str, np.ndarray]:
     """Return arrays used in the four comparison panels."""
     adiabatic = feature_values(features, X_VARIABLE)
     advection = feature_values(features, ADVECTION_VARIABLE)
-    net_dynamical = net_dynamical_contribution(adiabatic, advection)
     return {
         "adiabatic": adiabatic,
         "advection": advection,
-        "net_dynamical": net_dynamical,
+        "net_dynamical": feature_values(features, DYNAMICAL_VARIABLE),
         "temperature_change": feature_values(features, TEMPERATURE_CHANGE_VARIABLE),
         "diabatic": feature_values(features, DIABATIC_VARIABLE),
     }
@@ -457,14 +459,6 @@ def feature_values(features: xr.Dataset, variable: str) -> np.ndarray:
     else:
         out = np.asarray(values, dtype=float)
     return np.asarray(out, dtype=float)
-
-
-def net_dynamical_contribution(
-    x_values: np.ndarray,
-    y_values: np.ndarray,
-) -> np.ndarray:
-    """Return the net dynamical contribution from adiabatic and advective terms."""
-    return x_values + y_values
 
 
 def panel_x_values(axes: np.ndarray) -> np.ndarray:

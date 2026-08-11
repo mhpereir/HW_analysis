@@ -73,6 +73,15 @@ def test_panels_use_expected_baseline_and_event_values():
         plot_diag.plt.close(fig)
 
 
+def test_tendency_values_consume_stored_i_dyn_pre_without_reconstructing_it():
+    features = _make_event_table()
+    features["I_dyn_pre"] = ("event", np.array([10.0, 20.0, 30.0]))
+
+    values = plot_diag.tendency_values(features)
+
+    np.testing.assert_allclose(values["net_dynamical"], [10.0, 20.0, 30.0])
+
+
 def test_nonfinite_values_are_filtered_per_layer_and_limits_use_plotted_points():
     baseline = _make_baseline_table()
     events = _make_event_table()
@@ -101,18 +110,18 @@ def test_nonfinite_values_are_filtered_per_layer_and_limits_use_plotted_points()
 
         _assert_offsets(
             fig.axes[2].collections[1],
-            np.array([-15.0]),
-            np.array([0.0]),
+            np.array([0.0, 0.0]),
+            np.array([0.0, 2.0]),
         )
         _assert_offsets(
             fig.axes[3].collections[1],
-            np.array([-15.0]),
-            np.array([50.0]),
+            np.array([0.0, 0.0]),
+            np.array([50.0, 7.0]),
         )
         for ax in fig.axes[:2]:
             np.testing.assert_allclose(ax.get_xlim(), np.array([-20.0, 10.0]))
         for ax in fig.axes[2:]:
-            np.testing.assert_allclose(ax.get_xlim(), np.array([-15.0, 12.0]))
+            np.testing.assert_allclose(ax.get_xlim(), np.array([-1.0, 12.0]))
     finally:
         plot_diag.plt.close(fig)
 
@@ -154,6 +163,11 @@ def test_validate_feature_variables_checks_both_tables():
         plot_diag.validate_feature_variables(
             baseline,
             events.drop_vars("I_dTdt_pre"),
+        )
+    with pytest.raises(ValueError, match="Baseline-day.*I_dyn_pre"):
+        plot_diag.validate_feature_variables(
+            baseline.drop_vars("I_dyn_pre"),
+            events,
         )
 
 
@@ -279,6 +293,10 @@ def _make_baseline_table() -> xr.Dataset:
                 "baseline_day",
                 np.array([-2.0, -1.0, 0.0, 2.0, 3.0, 4.0]),
             ),
+            "I_dyn_pre": (
+                "baseline_day",
+                np.array([-1.0, 1.0, 4.0, 7.0, 10.0, 12.0]),
+            ),
             "I_dTdt_pre": (
                 "baseline_day",
                 np.array([-3.0, -1.0, 0.0, 1.0, 3.0, 5.0]),
@@ -297,6 +315,7 @@ def _make_event_table() -> xr.Dataset:
         data_vars={
             "I_adiabatic_pre": ("event", np.array([-3.0, 6.0, 10.0])),
             "I_advection_pre": ("event", np.array([3.0, -6.0, -9.0])),
+            "I_dyn_pre": ("event", np.array([0.0, 0.0, 1.0])),
             "I_dTdt_pre": ("event", np.array([-1.0, 2.0, 4.0])),
             "I_diabatic_pre": ("event", np.array([1.0, 7.0, 11.0])),
         },

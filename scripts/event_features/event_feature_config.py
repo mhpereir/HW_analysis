@@ -35,8 +35,8 @@ EVENT_ID_NAME = "event_id"
 
 # Fixed windows in hours relative to peak_time. Timestamp slices are inclusive.
 WINDOWS = {
-    "heat_budget_pre": (-72, 0),
-    "lwa_pre_peak": (-72, 0),
+    "heat_budget_pre": (-96, 0),
+    "lwa_pre_peak": (-96, 0),
     "antecedent_state": (-168, -24),
     "antecedent_change": (-168, 0),
     "near_peak": (-24, 24),
@@ -97,6 +97,12 @@ DEFAULT_FEATURE_NAMES = {
     "lwa_c_region": "I_lwa_c_pre_peak",
     "tas_anom": "T_anom_mean_ant",
 }
+
+DYNAMICAL_FEATURE_NAME = "I_dyn_pre"
+DYNAMICAL_COMPONENT_FEATURES = (
+    "I_adiabatic_pre",
+    "I_advection_pre",
+)
 
 EXTENDED_FEATURE_NAMES = {
     "soil_moisture": "soil_moisture_mean_ant",

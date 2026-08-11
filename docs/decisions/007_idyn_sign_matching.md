@@ -7,25 +7,26 @@ Accepted for command-center task A2.8.
 ## Decision
 
 Positive and negative integrated dynamical-heating event populations are
-matched in memory from an unchanged Stage-2 event-feature table. The matching
-configuration is a tracked static settings file consumed by plotting and
-diagnostic workflows. Matched membership is not published as another durable
-data product.
+matched in memory from the canonical `I_dyn_pre` variable in the Stage-2
+event-feature table. The matching configuration is a tracked static settings
+file consumed by plotting and diagnostic workflows. Matched membership is not
+published as another durable data product.
 
-For A2.8, the grouping metric is derived at runtime as:
+The Stage-2 builders calculate the grouping metric as:
 
 ```text
-I_dyn = I_adiabatic_pre + I_advection_pre
+I_dyn_pre = I_adiabatic_pre + I_advection_pre
 ```
 
-The negative-`I_dyn` population is the reference and the positive-`I_dyn`
-population is the candidate population. Events with exactly zero `I_dyn` are
-excluded from both populations.
+The negative-`I_dyn_pre` population is the reference and the positive-
+`I_dyn_pre` population is the candidate population. Events with exactly zero
+`I_dyn_pre` are excluded from both populations.
 
 Reusable matching logic belongs in `src/selectors.py`. Plotting scripts may
-load the tracked settings and unchanged Stage-2 table, derive `I_dyn`, call the
-selector, and use the returned event indices immediately. Plotting scripts do
-not implement their own assignment or caliper logic.
+load the tracked settings and Stage-2 table, read `I_dyn_pre`, call the selector,
+and use the returned event indices immediately. Plotting scripts do not
+reconstruct the dynamical sum or implement their own assignment or caliper
+logic.
 
 ## Matching method
 
@@ -54,7 +55,7 @@ mutate or write the Stage-2 dataset.
 
 The tracked A2.8 settings define:
 
-- the `I_dyn` component variables and reference sign;
+- the canonical `I_dyn_pre` group variable and reference sign;
 - the supported matching and standardization methods;
 - named matching-variable families;
 - named specifications linking a family to an SD caliper;
@@ -87,9 +88,13 @@ linear correlation or causal relationship with a matching variable.
 
 ## Compatibility
 
-Stage 1 and Stage 2 products remain unchanged. Existing unmatched figures and
-workflows continue to operate without a settings file. Matching-aware figures
-consume the same Stage-2 product plus the tracked A2.8 settings.
+Stage 1 remains unchanged. Stage-2 event and baseline products gain the
+canonical `I_dyn_pre` variable, so existing generated Stage-2 files must be
+rebuilt before updated consumers run. Matching-aware figures consume the
+rebuilt event product plus the tracked A2.8 settings. The stored equation is
+unchanged, but restoring the canonical 96-hour integration window can change
+its magnitude, sign, and resulting matched membership relative to preliminary
+72-hour diagnostics. Those diagnostics must therefore be regenerated.
 
 This decision does not establish one final scientific matching specification.
 The settings retain the single-variable and multivariable candidates needed to
@@ -103,6 +108,7 @@ evaluate that choice explicitly.
 - Settings-loader tests must cover the tracked file and representative invalid
   schemas.
 - Plot tests must verify that all figures are generated through the selector
-  rather than a private matching implementation.
-- A representative PNW Bartusek Stage-2 run must reproduce the documented pair
-  counts and SMD diagnostics before A2.8 is completed.
+  rather than a private matching implementation and that consumers read
+  `I_dyn_pre` without reconstructing it.
+- A representative 96-hour PNW Bartusek Stage-2 run must refresh the documented
+  pair counts and SMD diagnostics before A2.8 is completed.

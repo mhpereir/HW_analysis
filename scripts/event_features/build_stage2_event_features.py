@@ -153,6 +153,7 @@ def build_event_features(
             operation=operation,
         ),
     )
+    fixed.add_integrated_dynamical_feature(out, row_dim=config.EVENT_DIM)
     fixed.add_days_from_solstice(
         out,
         peak_times,

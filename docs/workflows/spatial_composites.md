@@ -69,20 +69,16 @@ The Venus entrypoint is
 `build_dyn_net_spatial_composites.py` consumes:
 
 - a Stage 2 event-feature dataset containing `event_id`, `peak_time`,
-  `I_adiabatic_pre`, and `I_advection_pre`;
+  and `I_dyn_pre`;
 - annual daily T2m/Z500 files; and
 - the daily climatology.
 
-For each event:
-
-```text
-I_dyn_net = I_adiabatic_pre + I_advection_pre
-```
-
-Zero-valued events are excluded. Remaining events are assigned to `positive`
-or `negative` `dyn_sign` groups. Event peak timestamps are normalized to UTC
-calendar dates. The default lag window is `-3` through `+3` days, with lag zero
-representing the peak date.
+The builder reads `I_dyn_pre` directly and retains the existing `I_dyn_net`
+audit-variable names in the spatial product for compatibility. Zero-valued
+events are excluded. Remaining events are assigned to `positive` or `negative`
+`dyn_sign` groups. Event peak timestamps are normalized to UTC calendar dates.
+The default lag window is `-3` through `+3` days, with lag zero representing the
+peak date.
 
 The composite uses equal event weight within each sign and lag. Actual fields
 are matched by timestamp. Climatology fields are matched by month and day.

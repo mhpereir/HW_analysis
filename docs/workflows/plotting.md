@@ -67,6 +67,9 @@ figure entrypoints.
   reusable matching implementation in `src/selectors.py`. They may recompute
   lightweight event indices in memory, but must not carry a private assignment
   implementation or mutate the Stage-2 input.
+- Event, baseline, matching, and spatial-composite consumers must read the
+  canonical Stage-2 `I_dyn_pre` variable. They must not reconstruct it from
+  `I_adiabatic_pre` and `I_advection_pre`.
 - Use `plot_style.VARIABLE_NAME_MAPPING` and shared color dictionaries for
   existing variables.
 - Use `plot_style.publication_figsize()` and shared line-width constants.

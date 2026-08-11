@@ -60,7 +60,7 @@ Product Stage 1
   `-> temporal composites, top events, threshold, diurnal, and event summaries
 
 Product Stage 2: event-feature table + tracked matching settings
-  `-> in-memory I_dyn sign matching -> matched-population diagnostics
+  `-> in-memory I_dyn_pre sign matching -> matched-population diagnostics
 ```
 
 | Product stage | Durable artifact | Producer | Main consumers |
@@ -77,7 +77,7 @@ raw hourly ERA5 T2m + Z500
   -> annual daily T2m/Z500
   -> 366-day T2m/Z500 climatology
 
-annual daily fields + climatology + Stage 2 event features
+annual daily fields + climatology + Stage 2 event features with I_dyn_pre
   -> lagged positive/negative I_dyn_net spatial composites
   -> sign-by-lag publication map
 ```

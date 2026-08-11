@@ -144,19 +144,16 @@ def test_write_composite_product_round_trips(tmp_path):
 def _event_features(*, include_zero: bool = False) -> xr.Dataset:
     peaks = [np.datetime64("2000-06-10"), np.datetime64("2000-06-20")]
     event_ids = [1, 2]
-    adiabatic = [2.0, -2.0]
-    advection = [-1.0, 1.0]
+    i_dyn = [1.0, -1.0]
     if include_zero:
         peaks.append(np.datetime64("2000-06-25"))
         event_ids.append(3)
-        adiabatic.append(2.0)
-        advection.append(-2.0)
+        i_dyn.append(0.0)
     return xr.Dataset(
         {
             "event_id": ("event", event_ids),
             "peak_time": ("event", np.asarray(peaks, dtype="datetime64[ns]")),
-            "I_adiabatic_pre": ("event", adiabatic),
-            "I_advection_pre": ("event", advection),
+            "I_dyn_pre": ("event", i_dyn),
         },
         coords={"event": np.arange(len(peaks))},
     )

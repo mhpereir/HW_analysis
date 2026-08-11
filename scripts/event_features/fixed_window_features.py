@@ -369,6 +369,55 @@ def add_window_features(
         )
 
 
+def add_integrated_dynamical_feature(out: xr.Dataset, *, row_dim: str) -> None:
+    """Add canonical integrated dynamical heating from its Stage-2 components."""
+    feature_name = config.DYNAMICAL_FEATURE_NAME
+    component_names = config.DYNAMICAL_COMPONENT_FEATURES
+    if feature_name in out:
+        raise ValueError(f"Output already contains derived feature {feature_name!r}.")
+
+    missing = [name for name in component_names if name not in out]
+    if missing:
+        raise ValueError(
+            "Cannot derive I_dyn_pre; output is missing component features: "
+            + ", ".join(missing)
+            + "."
+        )
+    for name in component_names:
+        if out[name].dims != (row_dim,):
+            raise ValueError(
+                f"Component feature {name!r} must have dims ({row_dim!r},); "
+                f"got {out[name].dims!r}."
+            )
+
+    first, second = component_names
+    out[feature_name] = out[first] + out[second]
+    attrs = {
+        "description": (
+            "Integrated pre-peak dynamical tendency: adiabatic plus advection."
+        ),
+        "source_variables": ",".join(component_names),
+        "formula": f"{first} + {second}",
+        "operation": "sum",
+        "window_name": "heat_budget_pre",
+        "window_lag_hours": ",".join(
+            str(value) for value in config.WINDOWS["heat_budget_pre"]
+        ),
+        "window_endpoint_inclusion": "inclusive",
+        "integral_method": config.INTEGRAL_METHOD,
+    }
+    component_units = tuple(out[name].attrs.get("units") for name in component_names)
+    if component_units[0] != component_units[1]:
+        raise ValueError(
+            "Cannot derive I_dyn_pre from component features with different units: "
+            f"{first}={component_units[0]!r}, {second}={component_units[1]!r}."
+        )
+    units = component_units[0]
+    if isinstance(units, str) and units:
+        attrs["units"] = units
+    out[feature_name].attrs = attrs
+
+
 def add_days_from_solstice(
     out: xr.Dataset,
     anchor_times: np.ndarray,

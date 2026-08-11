@@ -83,7 +83,7 @@ def match_events_by_metric_sign(
     square standardized distance second.
 
     ``group_metric`` may name an event-table variable or provide a derived
-    one-dimensional DataArray, such as ``I_adiabatic_pre + I_advection_pre``.
+    one-dimensional DataArray, such as ``event_table["I_dyn_pre"]``.
     Events where the grouping metric is zero are excluded from both groups.
     """
     _validate_event_table(event_table, event_dim=event_dim)

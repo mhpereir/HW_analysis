@@ -48,8 +48,8 @@ Timestamp slices are inclusive. Current defaults are:
 
 | Window | Lags relative to `peak_time` |
 | --- | --- |
-| `heat_budget_pre` | `(-72, 0)` hours |
-| `lwa_pre_peak` | `(-72, 0)` hours |
+| `heat_budget_pre` | `(-96, 0)` hours |
+| `lwa_pre_peak` | `(-96, 0)` hours |
 | `antecedent_state` | `(-168, -24)` hours |
 | `antecedent_change` | `(-168, 0)` hours |
 | `near_peak` | `(-24, 24)` hours |
@@ -77,6 +77,7 @@ lwa_c_peak(event)
 I_dTdt_pre(event)
 I_advection_pre(event)
 I_adiabatic_pre(event)
+I_dyn_pre(event)
 I_diabatic_pre(event)
 I_lwa_a_pre_peak(event)
 I_lwa_c_pre_peak(event)
@@ -87,6 +88,16 @@ n_samples_heat_budget_pre(event)
 n_samples_lwa_pre_peak(event)
 n_samples_antecedent_state(event)
 ```
+
+`I_dyn_pre` is the canonical integrated pre-peak dynamical contribution:
+
+```text
+I_dyn_pre = I_adiabatic_pre + I_advection_pre
+```
+
+It uses the same inclusive `heat_budget_pre` window and carries the component
+variable names, formula, units, window, and integration method in its metadata.
+Consumers must read `I_dyn_pre` rather than reconstructing this sum.
 
 `T_anom_mean_ant` is based on `tas_region - tas_climatology` when a direct
 `tas_anom` variable is not present. Heat-budget integrals use
@@ -142,6 +153,10 @@ output path exists without overwrite permission.
 The sample-count variables are part of the product contract because they expose
 boundary events and missing hourly samples to downstream consumers.
 
+Validation must also confirm that `I_dyn_pre` is exactly equal to
+`I_adiabatic_pre + I_advection_pre`, including missing-value propagation, and
+that all three variables use the same row dimension and units.
+
 ## Downstream Consumers
 
 - event-feature plots and split diagnostics under `scripts/event_features/`;
@@ -149,12 +164,11 @@ boundary events and missing hourly samples to downstream consumers.
 - settings-driven in-memory event matching under
   `scripts/Idyn_matching_exploration/`; and
 - `scripts/spatial_composites/build_dyn_net_spatial_composites.py`, which uses
-  `peak_time`, `I_adiabatic_pre`, and `I_advection_pre` to define
-  dynamical-sign groups and lagged dates.
+  `peak_time` and `I_dyn_pre` to define dynamical-sign groups and lagged dates.
 
 ## Non-goals
 
 Stage 2 does not perform PCA, clustering, composites, new event detection,
 adaptive `dTdt > 0` growth-window calculations, or persist one analysis-specific
-matched population. Matching workflows derive membership from this unchanged
-table using [decision 007](../decisions/007_idyn_sign_matching.md).
+matched population. Matching workflows derive membership from `I_dyn_pre` and
+tracked settings using [decision 007](../decisions/007_idyn_sign_matching.md).

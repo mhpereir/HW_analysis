@@ -10,11 +10,10 @@ from pathlib import Path
 from types import MappingProxyType
 
 import numpy as np
-import xarray as xr
 
 
 DEFAULT_SETTINGS_PATH = Path(__file__).with_name("matching_settings.json")
-SETTINGS_SCHEMA_VERSION = 1
+SETTINGS_SCHEMA_VERSION = 2
 
 SUPPORTED_METHOD = "maximum_cardinality_minimum_distance"
 SUPPORTED_STANDARDIZATION = "pooled_group_standard_deviation"
@@ -47,8 +46,7 @@ class MatchingSettings:
     source_path: Path
     sha256: str
     schema_version: int
-    group_name: str
-    group_variables: tuple[str, ...]
+    group_variable: str
     reference_sign: str
     method: str
     standardization: str
@@ -116,14 +114,13 @@ def load_matching_settings(
     group = _mapping(raw["group"], context="group")
     _require_exact_keys(
         group,
-        {"name", "operation", "variables", "reference_sign"},
+        {"variable", "reference_sign"},
         context="group",
     )
-    group_name = _nonempty_string(group["name"], context="group.name")
-    operation = _nonempty_string(group["operation"], context="group.operation")
-    if operation != "sum":
-        raise ValueError("group.operation must be 'sum'.")
-    group_variables = _unique_strings(group["variables"], context="group.variables")
+    group_variable = _nonempty_string(
+        group["variable"],
+        context="group.variable",
+    )
     reference_sign = _nonempty_string(
         group["reference_sign"],
         context="group.reference_sign",
@@ -226,8 +223,7 @@ def load_matching_settings(
         source_path=source_path,
         sha256=hashlib.sha256(raw_bytes).hexdigest(),
         schema_version=schema_version,
-        group_name=group_name,
-        group_variables=group_variables,
+        group_variable=group_variable,
         reference_sign=reference_sign,
         method=method,
         standardization=standardization,
@@ -244,28 +240,6 @@ def load_matching_settings(
         frontier_families=frontier_families,
         frontier_calipers_sd=frontier_calipers_sd,
     )
-
-
-def derive_group_metric(
-    event_table: xr.Dataset,
-    settings: MatchingSettings,
-) -> xr.DataArray:
-    """Derive the configured group metric without mutating the event table."""
-    missing = sorted(set(settings.group_variables).difference(event_table.data_vars))
-    if missing:
-        raise ValueError(
-            "Event table is missing configured group variables: " + ", ".join(missing)
-        )
-    components = [event_table[name] for name in settings.group_variables]
-    out = sum(components[1:], start=components[0].copy(deep=False))
-    out.name = settings.group_name
-    out.attrs.update(
-        {
-            "operation": "sum",
-            "source_variables": ",".join(settings.group_variables),
-        }
-    )
-    return out
 
 
 def _load_families(raw: object) -> dict[str, MatchingFamily]:
