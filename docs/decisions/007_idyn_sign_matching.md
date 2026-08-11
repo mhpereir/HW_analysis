@@ -110,5 +110,8 @@ evaluate that choice explicitly.
 - Plot tests must verify that all figures are generated through the selector
   rather than a private matching implementation and that consumers read
   `I_dyn_pre` without reconstructing it.
+- The production figure run must retain a machine-readable summary with exact
+  Stage-2 input and settings checksums so documented pair counts and SMD values
+  can be traced to their inputs.
 - A representative 96-hour PNW Bartusek Stage-2 run must refresh the documented
   pair counts and SMD diagnostics before A2.8 is completed.

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -42,6 +43,7 @@ OVERVIEW_FILENAME = "idyn_population_overview.png"
 MATCHING_FILENAME = "tas_anom_matching_diagnostics.png"
 BALANCE_FILENAME = "covariate_balance_and_sensitivity.png"
 COMPARISON_FILENAME = "matching_specification_tradeoff.png"
+SUMMARY_FILENAME = "matching_summary.json"
 
 POSITIVE_COLOR = plot_style.COLORS["diabatic"]
 NEGATIVE_COLOR = plot_style.COLORS["advection"]
@@ -118,7 +120,7 @@ def validate_args(args: argparse.Namespace) -> None:
 
     existing = [
         path
-        for path in output_paths(args.output_dir).values()
+        for path in artifact_paths(args.output_dir).values()
         if path.exists()
     ]
     if existing and not args.overwrite:
@@ -136,6 +138,13 @@ def output_paths(output_dir: str | Path) -> dict[str, Path]:
         "balance": root / BALANCE_FILENAME,
         "comparison": root / COMPARISON_FILENAME,
     }
+
+
+def artifact_paths(output_dir: str | Path) -> dict[str, Path]:
+    """Return all figure and machine-readable output paths."""
+    paths = output_paths(output_dir)
+    paths["summary"] = Path(output_dir).expanduser().resolve() / SUMMARY_FILENAME
+    return paths
 
 
 def open_event_features(path: str | Path) -> xr.Dataset:
@@ -399,6 +408,53 @@ def metrics_summary(exploration: Exploration) -> dict[str, object]:
             for identifier in exploration.settings.summary_specifications
         },
     }
+
+
+def add_input_provenance(
+    summary: dict[str, object],
+    *,
+    features: xr.Dataset,
+    input_path: str | Path,
+) -> dict[str, object]:
+    """Return summary metrics with exact Stage-2 input provenance."""
+    resolved = Path(input_path).expanduser().resolve()
+    out = dict(summary)
+    out.update(
+        {
+            "input_path": str(resolved),
+            "input_sha256": file_sha256(resolved),
+            "input_pipeline_stage": features.attrs.get("pipeline_stage"),
+            "I_dyn_pre_window_lag_hours": features["I_dyn_pre"].attrs.get(
+                "window_lag_hours"
+            ),
+        }
+    )
+    return out
+
+
+def file_sha256(path: str | Path) -> str:
+    """Return the SHA-256 digest for one file."""
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def write_metrics_summary(summary: Mapping[str, object], path: str | Path) -> Path:
+    """Atomically write one machine-readable matching summary."""
+    output_path = Path(path).expanduser().resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = output_path.with_name(output_path.name + ".tmp")
+    try:
+        temporary_path.write_text(
+            json.dumps(summary, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        temporary_path.replace(output_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+    return output_path
 
 
 def write_figures(
@@ -881,11 +937,21 @@ def main() -> int:
     features = open_event_features(args.input_path)
     exploration = prepare_exploration(features, settings=settings)
     written = write_figures(exploration, args.output_dir)
+    summary = add_input_provenance(
+        metrics_summary(exploration),
+        features=features,
+        input_path=args.input_path,
+    )
+    summary_written = write_metrics_summary(
+        summary,
+        artifact_paths(args.output_dir)["summary"],
+    )
 
-    print(json.dumps(metrics_summary(exploration), indent=2, sort_keys=True))
+    print(json.dumps(summary, indent=2, sort_keys=True))
     print("Wrote exploratory figures:")
     for path in written.values():
         print(f"  {path}")
+    print(f"Wrote matching summary:\n  {summary_written}")
     return 0
 
 

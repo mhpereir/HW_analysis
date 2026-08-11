@@ -67,6 +67,11 @@ figure entrypoints.
   reusable matching implementation in `src/selectors.py`. They may recompute
   lightweight event indices in memory, but must not carry a private assignment
   implementation or mutate the Stage-2 input.
+- The production matching exploration runs through
+  `schedulers/schedule_explore_idyn_matching.sh`. It publishes the four
+  README-linked PNGs and a `matching_summary.json` containing the input and
+  settings checksums plus the numerical diagnostics used to refresh the
+  exploratory Markdown.
 - Event, baseline, matching, and spatial-composite consumers must read the
   canonical Stage-2 `I_dyn_pre` variable. They must not reconstruct it from
   `I_adiabatic_pre` and `I_advection_pre`.

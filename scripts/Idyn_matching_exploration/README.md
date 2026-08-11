@@ -33,9 +33,10 @@ The matching workflow has three tracked inputs:
 
 The plotting script reads `I_dyn_pre`, calls
 `selectors.match_events_by_metric_sign()` for every configured specification,
-and uses the returned indices directly. It writes figures, not a matched-event
-data product. Its JSON console summary reports the resolved settings path and
-SHA-256 checksum for provenance.
+and uses the returned indices directly. It writes figures and a
+`matching_summary.json`, not a matched-event data product. The summary reports
+the Stage-2 input and matching-settings paths and SHA-256 checksums for
+provenance.
 
 This preserves the complete Stage-2 event universe and allows different plots
 to reproduce the same selection from one settings file. The accepted boundary
@@ -46,7 +47,7 @@ and algorithm are recorded in
 
 The implementation uses an SD caliper to remove inadmissible *pairs*, followed
 by optimal one-to-one assignment. It does not truncate, winsorize, or otherwise
-alter any event value. Let the grouping value for event \(e\) be
+alter any event value. Let the grouping value for event $e$ be
 
 $$
 g_e = I_{\mathrm{dyn,pre},e}.
@@ -59,13 +60,13 @@ $$
 \mathcal{P} = \{e : g_e > 0\}.
 $$
 
-Events with \(g_e=0\) are excluded. The script also rejects the input if
+Events with $g_e=0$ are excluded. The script also rejects the input if
 `I_dyn_pre` is non-finite or if either sign population is empty. Under the
-tracked settings, \(\mathcal{N}\) is the reference population and
-\(\mathcal{P}\) is the candidate population.
+tracked settings, $\mathcal{N}$ is the reference population and
+$\mathcal{P}$ is the candidate population.
 
-Suppose a specification contains \(K\) matching variables, with event value
-\(x_{e,k}\) for variable \(k\). A `timedelta64` matching variable, such as
+Suppose a specification contains $K$ matching variables, with event value
+$x_{e,k}$ for variable $k$. A `timedelta64` matching variable, such as
 duration, is first expressed as a floating-point number of days. For each
 variable, the selector calculates the sample variance separately over the
 complete negative and positive populations:
@@ -89,14 +90,14 @@ $$
 
 This scale is computed once, before matching, and is not recomputed as events
 are retained or excluded. Matching stops with an error if a variable has no
-finite positive pooled scale. For reference event \(i\) and candidate event
-\(j\), the standardized absolute difference on variable \(k\) is
+finite positive pooled scale. For reference event $i$ and candidate event
+$j$, the standardized absolute difference on variable $k$ is
 
 $$
 \delta_{ijk} = \frac{|x_{i,k}-x_{j,k}|}{s_k}.
 $$
 
-If the configured caliper for variable \(k\) is \(c_k\), pair \((i,j)\) is
+If the configured caliper for variable $k$ is $c_k$, pair $(i,j)$ is
 admissible exactly when
 
 $$
@@ -118,9 +119,9 @@ $$
 
 Every matching variable therefore has equal weight after SD standardization.
 For a one-variable specification, such as the primary `tas_anom_peak` match,
-\(d_{ij}=\delta_{ij1}\).
+$d_{ij}=\delta_{ij1}$.
 
-Let \(m_{ij}\in\{0,1\}\) indicate whether an admissible reference-candidate
+Let $m_{ij}\in\{0,1\}$ indicate whether an admissible reference-candidate
 pair is selected. Without-replacement matching imposes
 
 $$
@@ -136,7 +137,7 @@ $$
 M^* = \max_m \sum_{i,j}m_{ij},
 $$
 
-and, among assignments with \(M^*\) pairs, minimizes total distance:
+and, among assignments with $M^*$ pairs, minimizes total distance:
 
 $$
 m^* = \underset{m:\,\sum m_{ij}=M^*}{\arg\min}
@@ -144,17 +145,17 @@ m^* = \underset{m:\,\sum m_{ij}=M^*}{\arg\min}
 $$
 
 The code realizes those two priorities in one call to SciPy's linear-sum
-assignment solver. With \(n_R\) reference events and
-\(c_{\max}=\max_k c_k\), it sets
+assignment solver. With $n_R$ reference events and
+$c_{\max}=\max_k c_k$, it sets
 
 $$
 \Lambda=(n_R+1)(c_{\max}+1),
 $$
 
-assigns cost \(d_{ij}\) to an admissible real pair, cost \(2\Lambda\) to an
-inadmissible real pair, and appends \(n_R\) dummy candidate columns with cost
-\(\Lambda\). A reference event assigned to a dummy is unmatched. Because every
-admissible distance is at most \(c_{\max}\), the dummy penalty makes one extra
+assigns cost $d_{ij}$ to an admissible real pair, cost $2\Lambda$ to an
+inadmissible real pair, and appends $n_R$ dummy candidate columns with cost
+$\Lambda$. A reference event assigned to a dummy is unmatched. Because every
+admissible distance is at most $c_{\max}$, the dummy penalty makes one extra
 admissible real match preferable to any possible reduction in the summed real
 pair distances. The inadmissible-pair penalty and the availability of one dummy
 per reference event prevent inadmissible pairs from being returned.
@@ -165,7 +166,7 @@ returned indices still address the original Stage-2 table, and each event can
 appear in at most one returned pair.
 
 The SMD values reported for balance are diagnostics rather than assignment
-costs. For any audited variable \(y\), the script reports
+costs. For any audited variable $y$, the script reports
 
 $$
 \operatorname{SMD}(y) =
@@ -368,6 +369,15 @@ python scripts/Idyn_matching_exploration/explore_idyn_matching.py \
   --settings-path scripts/Idyn_matching_exploration/matching_settings.json \
   --output-dir results/Idyn_matching_exploration
 ```
+
+The tracked Venus production entrypoint is:
+
+```text
+schedulers/schedule_explore_idyn_matching.sh
+```
+
+It stages all five outputs, validates that they are nonempty, and only then
+replaces the four figures and `matching_summary.json` in the final directory.
 
 Edit a copied settings file and pass it with `--settings-path` when evaluating
 different matching variables or SD calipers. Use `--overwrite` only when

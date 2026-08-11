@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -90,6 +91,36 @@ def test_main_writes_four_nonempty_figures(monkeypatch, tmp_path):
     for path in exploration.output_paths(output_dir).values():
         assert path.is_file()
         assert path.stat().st_size > 0
+    summary_path = exploration.artifact_paths(output_dir)["summary"]
+    summary = json.loads(summary_path.read_text())
+    assert summary["candidate_events"] == 9
+    assert summary["negative_events"] == 4
+    assert summary["positive_events"] == 5
+    assert summary["input_path"] == str(input_path.resolve())
+    assert len(summary["input_sha256"]) == 64
+    assert summary["I_dyn_pre_window_lag_hours"] is None
+
+
+def test_validate_args_treats_summary_as_an_output(monkeypatch, tmp_path):
+    input_path = tmp_path / "features.nc"
+    output_dir = tmp_path / "plots"
+    make_event_features().to_netcdf(input_path, engine="h5netcdf")
+    output_dir.mkdir()
+    (output_dir / exploration.SUMMARY_FILENAME).write_text("{}")
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "explore_idyn_matching.py",
+            "--input-path",
+            str(input_path),
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    args = exploration.parse_args()
+    with np.testing.assert_raises(FileExistsError):
+        exploration.validate_args(args)
 
 
 def make_event_features() -> xr.Dataset:
