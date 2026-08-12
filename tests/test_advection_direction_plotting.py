@@ -95,6 +95,74 @@ def test_write_advection_direction_exploration_plot_writes_nonempty_png(tmp_path
     assert written.stat().st_size > 0
 
 
+def test_matched_plot_uses_positive_solid_and_negative_dashed_lines():
+    negative, positive = _make_matched_composites()
+
+    fig = advection_direction_plotting.plot_matched_advection_direction_exploration(
+        negative,
+        positive,
+    )
+    try:
+        assert len(fig.axes) == 2
+        for ax in fig.axes:
+            matched_lines = {
+                line.get_gid(): line
+                for line in ax.lines
+                if str(line.get_gid()).startswith("matched_")
+            }
+            assert len(matched_lines) == 10
+            assert all(
+                line.get_linestyle() == "-"
+                for gid, line in matched_lines.items()
+                if gid.startswith("matched_positive_")
+            )
+            assert all(
+                line.get_linestyle() == "--"
+                for gid, line in matched_lines.items()
+                if gid.startswith("matched_negative_")
+            )
+        assert [ax.get_ylabel() for ax in fig.axes] == [
+            "Δ [K hr-1]",
+            "Δ [K hr-1]",
+        ]
+        title = fig._suptitle.get_text()
+        assert "n=3 pairs" in title
+        assert "0.20 pooled SD" in title
+        for ax in fig.axes:
+            legend_labels = {text.get_text() for text in ax.get_legend().get_texts()}
+            assert r"Positive $I_{\mathrm{dyn,pre}}$" in legend_labels
+            assert r"Negative $I_{\mathrm{dyn,pre}}$" in legend_labels
+    finally:
+        plt.close(fig)
+
+
+def test_matched_plot_rejects_different_event_counts():
+    negative, positive = _make_matched_composites()
+    positive.attrs["n_events"] = 2
+
+    with np.testing.assert_raises_regex(ValueError, "same positive event count"):
+        advection_direction_plotting.plot_matched_advection_direction_exploration(
+            negative,
+            positive,
+        )
+
+
+def test_write_matched_advection_plot_writes_nonempty_png(tmp_path):
+    negative, positive = _make_matched_composites()
+    output = tmp_path / "matched_advection.png"
+
+    written = (
+        advection_direction_plotting.write_matched_advection_direction_exploration_plot(
+            negative,
+            positive,
+            output,
+        )
+    )
+
+    assert written == output.resolve()
+    assert written.stat().st_size > 0
+
+
 def _make_composite() -> xr.Dataset:
     lag = np.arange(-48, 49)
     phase = np.linspace(-np.pi, np.pi, lag.size)
@@ -124,3 +192,20 @@ def _make_composite() -> xr.Dataset:
             "post_days": 2,
         },
     )
+
+
+def _make_matched_composites() -> tuple[xr.Dataset, xr.Dataset]:
+    negative = _make_composite()
+    positive = _make_composite()
+    for name in positive.data_vars:
+        positive[name] = positive[name] + 0.01
+    shared_attrs = {
+        "data_representation": "climatological_anomaly",
+        "matching_label": "Peak anomaly",
+        "matching_variables": "tas_anom_peak",
+        "matching_caliper_sd": 0.2,
+        "n_events": 3,
+    }
+    negative.attrs.update(shared_attrs, matched_sign="negative")
+    positive.attrs.update(shared_attrs, matched_sign="positive")
+    return negative, positive

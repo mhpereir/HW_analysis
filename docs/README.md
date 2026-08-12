@@ -114,6 +114,7 @@ a figure.
 | Build Stage 1 | `scripts/build_stage1_harmonized_timeseries.py` |
 | Build Stage 2 | `scripts/event_features/build_stage2_event_features.py`, `scripts/event_features/build_stage2_baseline_features.py` |
 | Plot Stage 1 | `scripts/plot_*.py` |
+| Plot matched Stage-1 composites | `scripts/plot_advection_direction_exploration_matched_clim_anom.py` |
 | Plot Stage 2 | active plotting scripts in `scripts/event_features/` |
 | Prepare spatial ERA5 | `scripts/spatial_composites/build_era5_daily_spatial_data.sh`, `scripts/spatial_composites/build_era5_daily_doy_climatology.sh` |
 | Build and plot spatial composites | `scripts/spatial_composites/build_dyn_net_spatial_composites.py`, `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |

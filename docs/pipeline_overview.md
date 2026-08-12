@@ -60,7 +60,9 @@ Product Stage 1
   `-> temporal composites, top events, threshold, diurnal, and event summaries
 
 Product Stage 2: event-feature table + tracked matching settings
-  `-> in-memory I_dyn_pre sign matching -> matched-population diagnostics
+  |-> in-memory I_dyn_pre sign matching -> matched-population diagnostics
+  `-> matched event IDs + Stage 1 + regional hourly climatology
+        -> matched face-advection climatological-anomaly composite figure
 ```
 
 | Product stage | Durable artifact | Producer | Main consumers |
@@ -130,6 +132,7 @@ HW_analysis/
 |   |-- plot_composite_timeseries_all_clim_anom.py
 |   |-- plot_composite_timeseries_split_clim_anom.py
 |   |-- plot_advection_direction_exploration_clim_anom.py
+|   |-- plot_advection_direction_exploration_matched_clim_anom.py
 |   |-- event_features/
 |   |   |-- build_stage2_event_features.py
 |   |   |-- build_stage2_baseline_features.py

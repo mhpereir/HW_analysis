@@ -527,6 +527,60 @@ def selected_event_ids(
     return ids[ids > 0]
 
 
+def select_events_by_id(
+    event_table: xr.Dataset,
+    event_ids: Sequence[int] | np.ndarray,
+    *,
+    event_id_name: str = DEFAULT_EVENT_ID_NAME,
+    event_dim: str = DEFAULT_EVENT_DIM,
+) -> xr.Dataset:
+    """Select event rows by unique integer ID while preserving requested order.
+
+    Every requested ID must occur exactly once in ``event_table``. Failing on
+    missing IDs prevents a selection produced from one event table from being
+    silently applied to an incompatible event universe.
+    """
+    _validate_event_table(event_table, event_dim=event_dim)
+    requested = np.asarray(list(event_ids))
+    if requested.ndim != 1 or requested.size == 0:
+        raise ValueError("event_ids must contain at least one one-dimensional ID.")
+    if np.issubdtype(requested.dtype, np.bool_) or not np.issubdtype(
+        requested.dtype,
+        np.integer,
+    ):
+        raise TypeError("event_ids must contain only integer IDs.")
+    requested = requested.astype(np.int64, copy=False)
+    if np.unique(requested).size != requested.size:
+        raise ValueError("event_ids must be unique.")
+
+    available = _validated_event_ids(
+        event_table,
+        event_id_name=event_id_name,
+        event_dim=event_dim,
+    )
+    if not np.issubdtype(available.dtype, np.integer):
+        raise TypeError(f"Event IDs {event_id_name!r} must have integer dtype.")
+    lookup = {int(event_id): index for index, event_id in enumerate(available)}
+    missing = [int(event_id) for event_id in requested if int(event_id) not in lookup]
+    if missing:
+        values = ", ".join(str(event_id) for event_id in missing)
+        raise ValueError(f"event_table is missing requested event IDs: {values}.")
+
+    selected_indices = np.asarray(
+        [lookup[int(event_id)] for event_id in requested],
+        dtype=np.int64,
+    )
+    out = event_table.isel({event_dim: selected_indices})
+    out.attrs.update(
+        {
+            "selection_type": "event_id",
+            "selection_event_ids": ",".join(str(int(value)) for value in requested),
+            "n_selected_events": int(requested.size),
+        }
+    )
+    return out
+
+
 def event_id_mask(
     event_id: xr.DataArray,
     selected_ids: Sequence[int] | np.ndarray,

@@ -72,6 +72,30 @@ def test_select_events_by_season_rejects_missing_time_variable():
         selectors.select_events_by_season(event_table, [6, 7, 8])
 
 
+def test_select_events_by_id_preserves_requested_order_and_other_dimensions():
+    event_table = _make_event_table()
+
+    out = selectors.select_events_by_id(event_table, np.array([3, 1]))
+
+    np.testing.assert_array_equal(out["event_id"].values, [3, 1])
+    np.testing.assert_array_equal(
+        out["T_mean"].values,
+        event_table["T_mean"].values,
+    )
+    assert out.attrs["selection_type"] == "event_id"
+    assert out.attrs["selection_event_ids"] == "3,1"
+    assert out.attrs["n_selected_events"] == 2
+
+
+def test_select_events_by_id_rejects_missing_or_duplicate_ids():
+    event_table = _make_event_table()
+
+    with pytest.raises(ValueError, match="missing requested event IDs: 99"):
+        selectors.select_events_by_id(event_table, [1, 99])
+    with pytest.raises(ValueError, match="must be unique"):
+        selectors.select_events_by_id(event_table, [1, 1])
+
+
 def test_select_event_quantile_bin_supports_numeric_duration():
     event_table = _make_metric_event_table()
 

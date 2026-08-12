@@ -100,6 +100,13 @@ This decision does not establish one final scientific matching specification.
 The settings retain the single-variable and multivariable candidates needed to
 evaluate that choice explicitly.
 
+The matched face-advection climatological-anomaly figure is a separate
+consumer, not a replacement for the all-event face-advection figure. Its
+production scheduler explicitly selects the tracked `peak_anomaly_0p20`
+specification. The renderer uses component color and sign-population line style
+as independent encodings: positive `I_dyn_pre` is solid and negative
+`I_dyn_pre` is dashed.
+
 ## Validation
 
 - Synthetic selector tests must cover single- and multivariable calipers,
@@ -110,6 +117,9 @@ evaluate that choice explicitly.
 - Plot tests must verify that all figures are generated through the selector
   rather than a private matching implementation and that consumers read
   `I_dyn_pre` without reconstructing it.
+- Matched composite tests must verify exact Stage-2-to-Stage-1 event-ID and
+  peak-time alignment, equal positive and negative event counts, separate
+  output paths, and the solid-positive/dashed-negative line contract.
 - The production figure run must retain a machine-readable summary with exact
   Stage-2 input and settings checksums so documented pair counts and SMD values
   can be traced to their inputs.

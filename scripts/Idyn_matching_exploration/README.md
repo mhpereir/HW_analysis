@@ -38,6 +38,14 @@ and uses the returned indices directly. It writes figures and a
 the Stage-2 input and matching-settings paths and SHA-256 checksums for
 provenance.
 
+The separate matched face-advection consumer is
+`scripts/plot_advection_direction_exploration_matched_clim_anom.py`. It applies
+a named specification from the same settings file, validates the selected
+Stage-2 event IDs and peak times against Stage 1, and then builds separate
+positive and negative climatological-anomaly composites. Its new figure uses
+solid lines for positive `I_dyn_pre` and dashed lines for negative `I_dyn_pre`;
+the pre-existing all-event face-advection figure remains unchanged.
+
 This preserves the complete Stage-2 event universe and allows different plots
 to reproduce the same selection from one settings file. The accepted boundary
 and algorithm are recorded in

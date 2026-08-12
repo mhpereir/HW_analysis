@@ -45,6 +45,7 @@ results/plots_<plot_name>/
 | Stage 1 | all-event and split temporal composites | `scripts/plot_composite_timeseries_all.py`, `scripts/plot_composite_timeseries_split.py` |
 | Stage 1 plus regional hourly climatology | all-event and split climatological-anomaly composites | `scripts/plot_composite_timeseries_all_clim_anom.py`, `scripts/plot_composite_timeseries_split_clim_anom.py` |
 | Stage 1 plus regional hourly climatology | face-resolved advection climatological anomalies | `scripts/plot_advection_direction_exploration_clim_anom.py` |
+| Stage 1 plus regional hourly climatology, Stage 2 event features, and matching settings | matched face-resolved advection climatological anomalies | `scripts/plot_advection_direction_exploration_matched_clim_anom.py` |
 | Stage 1 | top-event traces | `scripts/plot_top_events.py` |
 | Stage 1 | diurnal, threshold, and event-summary diagnostics | `scripts/plot_diurnal_cycle.py`, `scripts/plot_threshold_timeseries.py`, `scripts/plot_event_summary.py` |
 | Stage 2 event features | feature grids, splits, and combined comparisons | `event_feature_grid_plot.py`, `plot_event_feature.py`, `plot_event_feature_split.py`, `plot_event_feature_split_combined.py` under `scripts/event_features/` |
@@ -67,6 +68,12 @@ figure entrypoints.
   reusable matching implementation in `src/selectors.py`. They may recompute
   lightweight event indices in memory, but must not carry a private assignment
   implementation or mutate the Stage-2 input.
+- The matched face-advection figure must leave the existing all-event figure
+  unchanged. It applies a named settings specification to the Stage-2 event
+  table, maps the returned event IDs to the authoritative Stage-1 event table,
+  and validates matching Stage-1 and Stage-2 peak timestamps before building
+  composites. Component identity remains color encoded. Positive `I_dyn_pre`
+  uses solid lines and negative `I_dyn_pre` uses dashed lines.
 - The production matching exploration runs through
   `schedulers/schedule_explore_idyn_matching.sh`. It publishes the four
   README-linked PNGs and a `matching_summary.json` containing the input and

@@ -19,6 +19,7 @@ scripts/plot_top_events.py
 scripts/plot_composite_timeseries_all_clim_anom.py
 scripts/plot_composite_timeseries_split_clim_anom.py
 scripts/plot_advection_direction_exploration_clim_anom.py
+scripts/plot_advection_direction_exploration_matched_clim_anom.py
 ```
 
 ## Expected Behavior
@@ -42,12 +43,21 @@ from the absolute Stage-1 product. Climatology subtraction does not redefine
 events. Absolute and climatological-anomaly figures use separate entrypoints
 and output paths.
 
+The matched face-advection variant obtains matched membership from the
+canonical Stage-2 event-feature table and tracked matching settings. It then
+selects those event IDs from the absolute Stage-1 event table and verifies that
+their Stage-1 and Stage-2 peak timestamps agree. Stage 1 remains authoritative
+for event windows and alignment; Stage 2 supplies only the configured matched
+membership. The positive and negative groups are composited separately with
+the same event count and lag window.
+
 The Venus scheduler wrappers are likewise one operation per PBS job:
 
 ```text
 schedulers/schedule_plot_composite_timeseries_all_clim_anom.sh
 schedulers/schedule_plot_composite_timeseries_split_clim_anom.sh
 schedulers/schedule_plot_advection_direction_exploration_clim_anom.sh
+schedulers/schedule_plot_advection_direction_exploration_matched_clim_anom.sh
 ```
 
 They require explicit Stage-1, climatology, and output paths plus a verified

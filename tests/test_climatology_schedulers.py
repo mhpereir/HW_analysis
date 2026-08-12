@@ -11,6 +11,9 @@ SCHEDULERS = (
     REPO_ROOT
     / "schedulers"
     / "schedule_plot_advection_direction_exploration_clim_anom.sh",
+    REPO_ROOT
+    / "schedulers"
+    / "schedule_plot_advection_direction_exploration_matched_clim_anom.sh",
 )
 
 
@@ -44,6 +47,25 @@ def test_anomaly_plot_schedulers_require_stage1_climatology_and_output():
         assert 'OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"' in text
         assert "--input-path \"${INPUT_PATH}\"" in text
         assert "--climatology-path \"${CLIMATOLOGY_PATH}\"" in text
+
+
+def test_matched_advection_scheduler_requires_stage2_settings_and_atomic_output():
+    text = SCHEDULERS[4].read_text()
+
+    assert 'EVENT_FEATURES_PATH="${EVENT_FEATURES_PATH:?EVENT_FEATURES_PATH is required}"' in text
+    required_settings = (
+        'MATCHING_SETTINGS_PATH="${MATCHING_SETTINGS_PATH:'
+        '?MATCHING_SETTINGS_PATH is required}"'
+    )
+    assert required_settings in text
+    assert 'MATCHING_SPECIFICATION="${MATCHING_SPECIFICATION:-peak_anomaly_0p20}"' in text
+    assert "plot_advection_direction_exploration_matched_clim_anom.py" in text
+    assert '--event-features-path "${EVENT_FEATURES_PATH}"' in text
+    assert '--matching-settings-path "${MATCHING_SETTINGS_PATH}"' in text
+    assert '--matching-specification "${MATCHING_SPECIFICATION}"' in text
+    assert 'export PYTHONWARNINGS=error' in text
+    assert 'mv "${STAGED_OUTPUT}" "${OUTPUT_PATH}"' in text
+    assert text.count('test ! -e "${OUTPUT_PATH}"') == 2
 
 
 def test_split_anomaly_scheduler_matches_absolute_production_split_matrix():
