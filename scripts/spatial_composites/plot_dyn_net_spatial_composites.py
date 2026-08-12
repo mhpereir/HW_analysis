@@ -146,6 +146,171 @@ def plot_spatial_composites(
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return a sign-by-lag publication figure."""
     validate_composite(ds)
+    return _render_spatial_composites(
+        ds,
+        plot_lags=plot_lags,
+        temperature_limit=temperature_limit,
+        height_contour_interval=height_contour_interval,
+        group_metric_label=r"$I_{dyn,net}$",
+        figure_title="Heatwave Spatial Composite Evolution Relative to Peak Day",
+        mean_variable="I_dyn_net_mean",
+    )
+
+
+def validate_matched_composite(
+    ds: xr.Dataset,
+    *,
+    expected_specification: str | None = None,
+) -> None:
+    """Validate matched membership, provenance, and spatial fields."""
+    validate_composite(ds)
+    expected_stage = "daily_matched_idyn_spatial_composites"
+    actual_stage = ds.attrs.get("pipeline_stage")
+    if actual_stage != expected_stage:
+        raise ValueError(
+            f"Expected pipeline_stage={expected_stage!r}; got {actual_stage!r}."
+        )
+
+    required_attrs = (
+        "matching_group_variable",
+        "matching_specification",
+        "matching_label",
+        "matching_variables",
+        "matching_caliper_sd",
+        "matching_pair_count",
+        "matching_source_negative_count",
+        "matching_source_positive_count",
+        "matching_source_zero_count",
+        "matching_unmatched_negative_count",
+        "matching_unmatched_positive_count",
+        "matching_settings_path",
+        "matching_settings_sha256",
+        "event_features_path",
+        "event_features_sha256",
+    )
+    missing_attrs = [name for name in required_attrs if name not in ds.attrs]
+    if missing_attrs:
+        raise ValueError(
+            "Matched composite is missing attributes: "
+            + ", ".join(missing_attrs)
+        )
+    if ds.attrs["matching_group_variable"] != "I_dyn_pre":
+        raise ValueError("Matched composite must use I_dyn_pre as its group variable.")
+    if expected_specification is not None:
+        actual = str(ds.attrs["matching_specification"])
+        if actual != expected_specification:
+            raise ValueError(
+                f"Expected matching specification {expected_specification!r}; "
+                f"got {actual!r}."
+            )
+
+    pair_count = int(ds.attrs["matching_pair_count"])
+    if pair_count <= 0:
+        raise ValueError("Matched composite must contain at least one pair.")
+    caliper = float(ds.attrs["matching_caliper_sd"])
+    if not np.isfinite(caliper) or caliper <= 0:
+        raise ValueError("Matched composite caliper must be finite and positive.")
+    counts = np.asarray(ds["event_count"].values, dtype=np.int64)
+    if not np.array_equal(counts, np.full(len(GROUPS), pair_count)):
+        raise ValueError(
+            "Matched composite sign counts must both equal matching_pair_count."
+        )
+    source_negative = int(ds.attrs["matching_source_negative_count"])
+    source_positive = int(ds.attrs["matching_source_positive_count"])
+    source_zero = int(ds.attrs["matching_source_zero_count"])
+    unmatched_negative = int(ds.attrs["matching_unmatched_negative_count"])
+    unmatched_positive = int(ds.attrs["matching_unmatched_positive_count"])
+    if min(source_negative, source_positive, source_zero) < 0:
+        raise ValueError("Matched source-population counts must be nonnegative.")
+    if unmatched_negative != source_negative - pair_count:
+        raise ValueError("Unmatched negative count is inconsistent.")
+    if unmatched_positive != source_positive - pair_count:
+        raise ValueError("Unmatched positive count is inconsistent.")
+    if min(unmatched_negative, unmatched_positive) < 0:
+        raise ValueError("Matched pair count exceeds a source sign population.")
+
+    required_variables = (
+        "I_dyn_pre_mean",
+        "event_id",
+        "I_dyn_pre",
+        "event_dyn_sign",
+        "matched_pair_id",
+        "matched_pair_distance",
+    )
+    missing = [name for name in required_variables if name not in ds]
+    if missing:
+        raise ValueError(
+            "Matched composite is missing audit variables: " + ", ".join(missing)
+        )
+    event_ids = np.asarray(ds["event_id"].values)
+    signs = np.asarray(ds["event_dyn_sign"].values, dtype=str)
+    pair_ids = np.asarray(ds["matched_pair_id"].values, dtype=np.int64)
+    distances = np.asarray(ds["matched_pair_distance"].values, dtype=float)
+    expected_events = 2 * pair_count
+    audit_arrays = (event_ids, signs, pair_ids, distances)
+    if any(values.size != expected_events for values in audit_arrays):
+        raise ValueError("Matched event audit variables have inconsistent lengths.")
+    if np.unique(event_ids).size != expected_events:
+        raise ValueError("Matched event IDs must be unique.")
+    if not np.isfinite(distances).all() or np.any(distances < 0):
+        raise ValueError("Matched pair distances must be finite and nonnegative.")
+    unique_pairs, pair_frequencies = np.unique(pair_ids, return_counts=True)
+    if unique_pairs.size != pair_count or not np.all(pair_frequencies == 2):
+        raise ValueError("Each matched pair ID must occur exactly twice.")
+    for pair_id in unique_pairs:
+        pair_mask = pair_ids == pair_id
+        if set(signs[pair_mask]) != set(GROUPS):
+            raise ValueError(
+                f"Matched pair {pair_id} must contain one event from each sign."
+            )
+        if not np.allclose(distances[pair_mask], distances[pair_mask][0]):
+            raise ValueError(
+                f"Matched pair {pair_id} has inconsistent distance values."
+            )
+
+
+def plot_matched_spatial_composites(
+    ds: xr.Dataset,
+    *,
+    plot_lags: Sequence[int] = DEFAULT_PLOT_LAGS,
+    temperature_limit: float | None = None,
+    height_contour_interval: float | None = None,
+    expected_specification: str | None = None,
+) -> plt.Figure:  # type: ignore[type-arg]
+    """Return the matched I_dyn_pre sign-by-lag publication figure."""
+    validate_matched_composite(
+        ds,
+        expected_specification=expected_specification,
+    )
+    pair_count = int(ds.attrs["matching_pair_count"])
+    label = str(ds.attrs["matching_label"])
+    caliper = float(ds.attrs["matching_caliper_sd"])
+    title = (
+        "Matched Heatwave Spatial Composite Evolution Relative to Peak Day\n"
+        f"{label}, {caliper:.2f} pooled SD (n = {pair_count} pairs)"
+    )
+    return _render_spatial_composites(
+        ds,
+        plot_lags=plot_lags,
+        temperature_limit=temperature_limit,
+        height_contour_interval=height_contour_interval,
+        group_metric_label=r"$I_{dyn,pre}$",
+        figure_title=title,
+        mean_variable="I_dyn_pre_mean",
+    )
+
+
+def _render_spatial_composites(
+    ds: xr.Dataset,
+    *,
+    plot_lags: Sequence[int],
+    temperature_limit: float | None,
+    height_contour_interval: float | None,
+    group_metric_label: str,
+    figure_title: str,
+    mean_variable: str,
+) -> plt.Figure:  # type: ignore[type-arg]
+    """Render validated spatial fields with caller-provided population labels."""
     plot_style.apply_theme()
     lags = select_plot_lags(ds, plot_lags)
     plot_ds = ds.sel({LAG_DIM: lags})
@@ -183,7 +348,7 @@ def plot_spatial_composites(
     for row, group in enumerate(GROUPS):
         group_panel = plot_ds.sel({GROUP_DIM: group})
         count = int(group_panel["event_count"].item())
-        dyn_mean = float(group_panel["I_dyn_net_mean"].item())
+        dyn_mean = float(group_panel[mean_variable].item())
         for column, lag in enumerate(lags):
             ax = axes[row, column]
             panel = group_panel.sel({LAG_DIM: lag})
@@ -221,7 +386,7 @@ def plot_spatial_composites(
                     -0.24,
                     0.5,
                     (
-                        f"{group.capitalize()} $I_{{dyn,net}}$\n"
+                        f"{group.capitalize()} {group_metric_label}\n"
                         f"n = {count}\nmean = {dyn_mean:.2f} K"
                     ),
                     transform=ax.transAxes,
@@ -241,7 +406,7 @@ def plot_spatial_composites(
         aspect=55,
     )
     colorbar.set_label("2 m temperature anomaly (K)")
-    fig.suptitle("Heatwave Spatial Composite Evolution Relative to Peak Day")
+    fig.suptitle(figure_title)
     return fig
 
 

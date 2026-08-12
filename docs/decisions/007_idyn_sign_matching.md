@@ -107,6 +107,16 @@ specification. The renderer uses component color and sign-population line style
 as independent encodings: positive `I_dyn_pre` is solid and negative
 `I_dyn_pre` is dashed.
 
+The matched spatial workflow is also a separate consumer. Because the existing
+spatial product stores group means rather than per-event spatial fields, the
+matched population must be selected before spatial averaging. A dedicated
+builder therefore recomputes `peak_anomaly_0p20` membership in memory from the
+canonical Stage-2 table, then writes a separate durable matched composite with
+the selected event IDs, pair IDs, pair distances, settings checksum, Stage-2
+checksum, and matching-method metadata. This is a derived physical composite,
+not a standalone matched-membership product. The unmatched spatial composite
+and plot remain unchanged.
+
 ## Validation
 
 - Synthetic selector tests must cover single- and multivariable calipers,
@@ -120,6 +130,10 @@ as independent encodings: positive `I_dyn_pre` is solid and negative
 - Matched composite tests must verify exact Stage-2-to-Stage-1 event-ID and
   peak-time alignment, equal positive and negative event counts, separate
   output paths, and the solid-positive/dashed-negative line contract.
+- Matched spatial tests must verify selector use, equal sign counts, retained
+  event and pair audit variables, matching provenance, a separate product
+  marker and paths, the requested lags, and a six-panel figure whose title and
+  row labels identify the 0.20 pooled-SD matched `I_dyn_pre` populations.
 - The production figure run must retain a machine-readable summary with exact
   Stage-2 input and settings checksums so documented pair counts and SMD values
   can be traced to their inputs.

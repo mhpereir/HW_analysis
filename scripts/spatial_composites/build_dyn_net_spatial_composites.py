@@ -264,17 +264,35 @@ def build_spatial_composites(
         )
 
     out["event_count"] = (GROUP_DIM, group_counts)
-    out["I_dyn_net_mean"] = (
+    out["I_dyn_pre_mean"] = (
         GROUP_DIM,
         np.array(
             [
-                float(events["I_dyn_net"].where(events["event_dyn_sign"] == group).mean())
+                float(
+                    events["I_dyn_pre"]
+                    .where(events["event_dyn_sign"] == group)
+                    .mean()
+                )
                 for group in GROUPS
             ]
         ),
     )
+    out["I_dyn_pre_mean"].attrs.update(
+        {
+            "units": "K",
+            "long_name": "group mean integrated pre-peak dynamical contribution",
+        }
+    )
+    out["I_dyn_net_mean"] = out["I_dyn_pre_mean"].copy(deep=False)
     out["I_dyn_net_mean"].attrs.update(
-        {"units": "K", "long_name": "group mean integrated net dynamical contribution"}
+        {
+            "units": "K",
+            "long_name": (
+                "compatibility alias for group mean integrated pre-peak "
+                "dynamical contribution"
+            ),
+            "source_variable": "I_dyn_pre_mean",
+        }
     )
     copy_event_audit_variables(out, events)
     out.attrs.update(
@@ -550,7 +568,16 @@ def require_same_grid(
 
 def copy_event_audit_variables(out: xr.Dataset, events: xr.Dataset) -> None:
     out.coords[EVENT_DIM] = events[EVENT_DIM]
-    for name in ("event_id", "peak_time", "I_dyn_net", "event_dyn_sign"):
+    required = (
+        "event_id",
+        "peak_time",
+        "I_dyn_pre",
+        "I_dyn_net",
+        "event_dyn_sign",
+    )
+    optional = ("matched_pair_id", "matched_pair_distance")
+    audit_names = required + tuple(name for name in optional if name in events)
+    for name in audit_names:
         out[name] = events[name]
         out[name].attrs = dict(events[name].attrs)
 

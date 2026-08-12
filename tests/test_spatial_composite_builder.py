@@ -68,6 +68,8 @@ def test_build_spatial_composites_uses_daily_data_and_calendar_climatology(tmp_p
     )
 
     np.testing.assert_array_equal(out["event_count"], [1, 1])
+    np.testing.assert_allclose(out["I_dyn_pre_mean"], [1.0, -1.0])
+    np.testing.assert_allclose(out["I_dyn_net_mean"], out["I_dyn_pre_mean"])
     np.testing.assert_allclose(out["t2m_anomaly"], 2.0, atol=1e-10)
     np.testing.assert_allclose(out["z500_anomaly"], 50.0, atol=1e-10)
     assert out["t2m_anomaly"].dims == (
@@ -88,6 +90,7 @@ def test_build_spatial_composites_uses_daily_data_and_calendar_climatology(tmp_p
             reopened["event_dyn_sign"].values,
             ["positive", "negative"],
         )
+        np.testing.assert_allclose(reopened["I_dyn_pre"], [1.0, -1.0])
         np.testing.assert_allclose(reopened["z500_anomaly"], 50.0, atol=1e-5)
 
 

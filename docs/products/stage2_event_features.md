@@ -165,6 +165,9 @@ that all three variables use the same row dimension and units.
   `scripts/Idyn_matching_exploration/`; and
 - `scripts/spatial_composites/build_dyn_net_spatial_composites.py`, which uses
   `peak_time` and `I_dyn_pre` to define dynamical-sign groups and lagged dates.
+- `scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py`,
+  which applies a tracked matching specification before defining the same
+  dynamical-sign spatial groups and lagged dates.
 
 ## Non-goals
 

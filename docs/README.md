@@ -74,8 +74,11 @@ raw hourly ERA5 T2m and Z500
   -> 366-day daily climatology
 
 Stage 2 event features + annual daily fields + daily climatology
-  -> lagged dynamical-sign spatial composite dataset
-  -> publication map figure
+  |-> lagged all-event dynamical-sign spatial composite dataset
+  |   `-> publication map figure
+  `-> tracked I_dyn_pre matching settings
+      -> lagged matched dynamical-sign spatial composite dataset
+      -> matched-population publication map figure
 ```
 
 The spatial path is an active workflow with its own durable intermediate and
@@ -118,6 +121,7 @@ a figure.
 | Plot Stage 2 | active plotting scripts in `scripts/event_features/` |
 | Prepare spatial ERA5 | `scripts/spatial_composites/build_era5_daily_spatial_data.sh`, `scripts/spatial_composites/build_era5_daily_doy_climatology.sh` |
 | Build and plot spatial composites | `scripts/spatial_composites/build_dyn_net_spatial_composites.py`, `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |
+| Build and plot matched spatial composites | `scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py`, `scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py` |
 | Run on Venus | matching scripts under `schedulers/` |
 
 Production inputs and results exist on Venus and remain outside Git. Local

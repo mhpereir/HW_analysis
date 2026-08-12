@@ -53,6 +53,7 @@ results/plots_<plot_name>/
 | Stage 2 event and baseline features | event-versus-baseline comparisons | `plot_adiabatic_advection_comparison_baseline.py`, `plot_adiabatic_diabatic_advection_baseline.py` under `scripts/event_features/` |
 | Stage 2 event features plus tracked settings | matched positive/negative `I_dyn` diagnostics | `scripts/Idyn_matching_exploration/explore_idyn_matching.py` |
 | Spatial composite product | sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |
+| Matched spatial composite product | matched positive/negative `I_dyn_pre` sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py` |
 
 Scripts under `scripts/event_features/old/` are legacy and are not active
 figure entrypoints.
@@ -74,6 +75,12 @@ figure entrypoints.
   and validates matching Stage-1 and Stage-2 peak timestamps before building
   composites. Component identity remains color encoded. Positive `I_dyn_pre`
   uses solid lines and negative `I_dyn_pre` uses dashed lines.
+- The matched spatial figure must consume a separate matched spatial-composite
+  product built from the canonical Stage-2 table and tracked settings. It must
+  not infer matched membership from an already averaged all-event spatial
+  product. Its title and row labels identify `I_dyn_pre`, the named matching
+  specification, its pooled-SD caliper, and the equal pair count. The existing
+  all-event spatial product and figure remain unchanged.
 - The production matching exploration runs through
   `schedulers/schedule_explore_idyn_matching.sh`. It publishes the four
   README-linked PNGs and a `matching_summary.json` containing the input and

@@ -80,8 +80,11 @@ raw hourly ERA5 T2m + Z500
   -> 366-day T2m/Z500 climatology
 
 annual daily fields + climatology + Stage 2 event features with I_dyn_pre
-  -> lagged positive/negative I_dyn_net spatial composites
-  -> sign-by-lag publication map
+  |-> lagged all-event positive/negative I_dyn_pre spatial composites
+  |   `-> all-event sign-by-lag publication map
+  `-> tracked matching settings + in-memory peak_anomaly_0p20 selection
+      -> lagged matched positive/negative I_dyn_pre spatial composites
+      -> matched sign-by-lag publication map
 ```
 
 | Durable artifact | Producer | Main consumer |
@@ -89,6 +92,7 @@ annual daily fields + climatology + Stage 2 event features with I_dyn_pre
 | `results/spatial_composites/daily/ERA5_daily_t2m_z500_<year>.nc` | `scripts/spatial_composites/build_era5_daily_spatial_data.sh` | climatology and composite builders |
 | `results/spatial_composites/climatology/era5_daily_doy_climatology_*.nc` | `scripts/spatial_composites/build_era5_daily_doy_climatology.sh` | spatial composite builder |
 | `results/spatial_composites/dyn_net_daily_spatial_composites_*.nc` | `scripts/spatial_composites/build_dyn_net_spatial_composites.py` | spatial composite plotter |
+| `results/spatial_composites/matched_dyn_pre_daily_spatial_composites_*.nc` | `scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py` | matched spatial composite plotter |
 
 Stages 3 and 4 are inactive legacy workflows. Their PCA and clustering
 implementations are retained under `scripts/event_features/old/` for historical
@@ -143,7 +147,9 @@ HW_analysis/
 |       |-- build_era5_daily_spatial_data.sh
 |       |-- build_era5_daily_doy_climatology.sh
 |       |-- build_dyn_net_spatial_composites.py
-|       `-- plot_dyn_net_spatial_composites.py
+|       |-- plot_dyn_net_spatial_composites.py
+|       |-- build_matched_dyn_pre_spatial_composites.py
+|       `-- plot_matched_dyn_pre_spatial_composites.py
 |-- src/
 |-- tests/
 `-- results/

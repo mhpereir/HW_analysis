@@ -10,7 +10,7 @@ This is an active workflow with three durable dataset layers:
 
 1. annual daily ERA5 T2m/Z500 files;
 2. a 366-day T2m/Z500 climatology; and
-3. a lagged dynamical-sign spatial composite product.
+3. lagged all-event or matched dynamical-sign spatial composite products.
 
 ## Data flow
 
@@ -23,11 +23,17 @@ hourly native-grid ERA5 T2m + Z500
        era5_daily_doy_climatology_t2m_z500_global_1940_2024.nc
 
 Stage 2 event-feature table + annual daily files + climatology
-  -> scripts/spatial_composites/build_dyn_net_spatial_composites.py
-  -> results/spatial_composites/
-       dyn_net_daily_spatial_composites_*.nc
-  -> scripts/spatial_composites/plot_dyn_net_spatial_composites.py
-  -> results/spatial_composites/*.png
+  |-> scripts/spatial_composites/build_dyn_net_spatial_composites.py
+  |   -> results/spatial_composites/
+  |        dyn_net_daily_spatial_composites_*.nc
+  |   -> scripts/spatial_composites/plot_dyn_net_spatial_composites.py
+  |   -> results/spatial_composites/*.png
+  `-> tracked matching settings
+      -> scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py
+      -> results/spatial_composites/
+           matched_dyn_pre_daily_spatial_composites_*.nc
+      -> scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py
+      -> results/spatial_composites/matched_dyn_pre_*.png
 ```
 
 ## Step 1: Annual daily ERA5 fields
@@ -115,12 +121,17 @@ Audit variables include:
 
 ```text
 event_count(dyn_sign)
+I_dyn_pre_mean(dyn_sign)
 I_dyn_net_mean(dyn_sign)
 event_id(event)
 peak_time(event)
+I_dyn_pre(event)
 I_dyn_net(event)
 event_dyn_sign(event)
 ```
+
+`I_dyn_pre_mean` and `I_dyn_pre` are canonical. The corresponding
+`I_dyn_net` names are retained as compatibility aliases in spatial products.
 
 The product marker is:
 
@@ -131,6 +142,36 @@ pipeline_stage = "daily_dyn_net_spatial_composites"
 Metadata also records source paths, lags, bounds, weighting, climatology
 matching, geopotential conversion, and the number of excluded zero-valued
 events.
+
+## Matched dynamical-sign composite product
+
+`build_matched_dyn_pre_spatial_composites.py` consumes the same Stage-2 event
+features, annual daily fields, and daily climatology, plus the tracked A2.8
+matching settings. It loads the named specification, calls
+`src.selectors.match_events_by_metric_sign()`, and selects membership before
+any spatial averaging. The production default is `peak_anomaly_0p20`, which
+matches on `tas_anom_peak` using a 0.20 pooled-standard-deviation caliper.
+
+The matched builder reuses the all-event field reduction, grid validation,
+climatology matching, and equal-event weighting. It writes a separate product
+with:
+
+```text
+pipeline_stage = "daily_matched_idyn_spatial_composites"
+```
+
+Both sign groups must contain the same nonzero number of events. In addition to
+the common spatial and event audit variables, the product records
+`matched_pair_id(event)` and `matched_pair_distance(event)`. Global attributes
+record the specification, family, variables, caliper, reference sign, pair
+count, source sign counts, unmatched sign counts, matching method, Stage-2 path
+and SHA-256, and settings path and SHA-256. The product is an
+analysis-specific spatial aggregate. It does not persist matched membership as
+a new Stage-2 table.
+
+This product cannot be reconstructed from the all-event spatial composite,
+because that product no longer contains per-event spatial fields. It must be
+built from the canonical Stage-2 table and the unchanged annual daily inputs.
 
 ## Plot
 
@@ -155,6 +196,17 @@ Cartopy Natural Earth data must be available in the production environment.
 Use `schedulers/schedule_plot_dyn_net_spatial_composites.sh` to regenerate only
 the figure from an existing validated composite product.
 
+`plot_matched_dyn_pre_spatial_composites.py` renders the same map variables,
+projection, three default display lags, contours, region outline, and shared
+color scale from the separate matched product. Its title reports the matching
+label, pooled-SD caliper, and pair count. Its two row labels identify positive
+and negative `I_dyn_pre` explicitly. It writes a distinct PNG and does not
+replace the all-event map.
+
+The commit-pinned production entrypoint is
+`schedulers/schedule_matched_dyn_pre_spatial_composites.sh`. It stages the
+matched NetCDF and PNG together and publishes them only after both validate.
+
 ## Validation
 
 Local synthetic coverage:
@@ -163,13 +215,18 @@ Local synthetic coverage:
 mamba activate dev_env
 python -m pytest -q \
   tests/test_spatial_composite_builder.py \
+  tests/test_matched_spatial_composite_builder.py \
   tests/test_spatial_composite_plot.py \
+  tests/test_matched_spatial_composite_plot.py \
   tests/test_spatial_composite_shell_scripts.py
 ```
 
 For production changes, also run the relevant PBS smoke workflow and validate
 input coverage, event counts, exact grids, finite anomalies, metadata, output
-files, the expected six map panels, and the rendered map.
+files, the expected six map panels, and the rendered map. Matched production
+validation additionally requires the accepted Stage-2 and settings checksums,
+the named `peak_anomaly_0p20` specification, equal 97-event sign groups, pair
+audit consistency, and no unmatched-output replacement.
 
 ## Boundaries
 
