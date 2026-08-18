@@ -72,8 +72,8 @@ I_dyn_pre = I_adiabatic_pre + I_advection_pre
 It uses the same inclusive `heat_budget_pre` window and metadata contract.
 Consumers must read this variable instead of rebuilding the sum.
 
-Extended mode adds the same land, cloud, PBL, and surface-energy features as
-the event-feature product.
+Extended mode adds the same land, cloud, and surface-energy features as the
+event-feature product.
 
 Season selection applies to `reference_time` only. Fixed windows use the
 complete Stage-1 time axis and may cross selected-season boundaries; see

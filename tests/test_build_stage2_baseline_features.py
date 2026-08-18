@@ -147,7 +147,6 @@ def test_build_baseline_adds_extended_features():
 
     assert out["I_nslr_pre"].min().item() == 679.0
     assert out["cloud_cover_mean_ant"].min().item() == 0.5
-    assert out["pbl_p_mean_ant"].min().item() == 90000.0
     assert "soil_moisture_change" in out
 
 
@@ -226,7 +225,6 @@ def _make_baseline_dataset(
     if add_extended:
         ds["soil_moisture"] = ("time", np.linspace(0.0, 1.0, time.size))
         ds["cloud_cover"] = ("time", np.full(time.size, 0.5))
-        ds["pbl_p_mean"] = ("time", np.full(time.size, 90000.0))
         ds["nslr_heating_rate_approx"] = ("time", np.full(time.size, 7.0))
         ds["nssr_heating_rate_approx"] = ("time", np.full(time.size, 8.0))
         ds["sshf_heating_rate_approx"] = ("time", np.full(time.size, 9.0))

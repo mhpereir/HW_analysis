@@ -127,34 +127,6 @@ def test_apply_regional_hourly_climatology_rejects_missing_key():
         )
 
 
-def test_pbl_mean_baseline_preserves_spatial_percentile_ordering():
-    source = _source_dataset(
-        ["1999-05-01T00:00", "2000-05-01T00:00"],
-        values=[1.0, 3.0],
-    )
-    source["pbl_p_mean"] = ("time", [80000.0, 82000.0])
-    source["pbl_p_p05"] = ("time", [76000.0, 78000.0])
-    source["pbl_p_p95"] = ("time", [84000.0, 86000.0])
-    variables = ("pbl_p_mean", "pbl_p_p05", "pbl_p_p95")
-    climate = climatology.build_regional_hourly_climatology(
-        source,
-        variables=variables,
-    )
-
-    anomalies = climatology.apply_regional_hourly_climatology(
-        source,
-        climate,
-        variables=variables,
-        baseline_variables={
-            "pbl_p_p05": "pbl_p_mean",
-            "pbl_p_p95": "pbl_p_mean",
-        },
-    )
-
-    assert np.all(anomalies["pbl_p_p05"] < anomalies["pbl_p_mean"])
-    assert np.all(anomalies["pbl_p_mean"] < anomalies["pbl_p_p95"])
-
-
 def test_face_anomalies_reconstruct_total_advection_anomaly():
     source = _source_dataset(
         ["1999-05-01T00:00", "2000-05-01T00:00"],

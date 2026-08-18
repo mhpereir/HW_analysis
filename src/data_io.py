@@ -267,7 +267,10 @@ def open_era5_pbl_p(
     years: Sequence[int] | None = None,
     chunks: ChunkSpec | None = None,
 ) -> xr.Dataset:
-    """Open local hourly ARCO PBL top pressure fields for one region."""
+    """Open ad hoc hourly ARCO PBL top-pressure fields for one region.
+
+    PBL fields are not inputs to the active Stage-1 production contract.
+    """
     pattern = f"{config.ERA5_PBL_P_ROOT}/{region}/ERA5_ARCO_pbl_p_*.nc"
     paths = _glob_required(pattern)
     paths = _filter_yearly_files(paths, years)

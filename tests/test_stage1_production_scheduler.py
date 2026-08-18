@@ -34,6 +34,8 @@ def test_stage1_scheduler_requires_global_cloud_cover_and_full_diagnostics():
     assert "--cloud-cover-root" in text
     assert "stage1_contract_version=2" in text
     assert "face_advection_contributions=enabled" in text
+    assert "pbl_diagnostics=excluded" in text
+    assert "pbl" not in text.lower().replace("pbl_diagnostics=excluded", "")
     assert "legacy-regional" not in text
 
 

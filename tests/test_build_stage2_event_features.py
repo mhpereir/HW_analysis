@@ -164,7 +164,6 @@ def test_build_extended_features_adds_optional_diagnostics():
     assert out["I_surface_energy_pre"].item() == 1067.0
     assert out["soil_moisture_mean_ant"].item() == pytest.approx(154.0 / 145.0)
     assert out["cloud_cover_mean_ant"].item() == 0.5
-    assert out["pbl_p_mean_ant"].item() == 90000.0
     assert out["soil_moisture_change"].item() == 9.0
     assert out["I_sshf_pre"].attrs["sign_convention"] == "native Stage-1/source signs retained"
 
@@ -324,7 +323,6 @@ def _make_feature_dataset(
         soil = np.where(time >= final_start, 10.0, 1.0)
         ds["soil_moisture"] = ("time", soil)
         ds["cloud_cover"] = ("time", np.full(time.size, 0.5))
-        ds["pbl_p_mean"] = ("time", np.full(time.size, 90000.0))
         ds["nslr_heating_rate_approx"] = ("time", np.full(time.size, 7.0))
         ds["nssr_heating_rate_approx"] = ("time", np.full(time.size, 8.0))
         ds["sshf_heating_rate_approx"] = ("time", np.full(time.size, 9.0))

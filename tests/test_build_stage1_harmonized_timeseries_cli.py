@@ -215,7 +215,7 @@ def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch
 
     def fake_load_full(args):
         calls.append(args)
-        return {"pbl_p": xr.Dataset()}
+        return {"nslr": xr.Dataset()}
 
     monkeypatch.setattr(stage1_builder, "load_full_diagnostic_inputs", fake_load_full)
 
@@ -240,22 +240,23 @@ def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch
     datasets = stage1_builder.load_era5_inputs(args)
 
     assert calls == [args]
-    assert "pbl_p" in datasets
+    assert "nslr" in datasets
+    assert "pbl_p" not in datasets
 
 
-def test_load_full_diagnostic_inputs_routes_region_only_to_pbl(monkeypatch):
+def test_load_full_diagnostic_inputs_does_not_open_pbl(monkeypatch):
     pbl_calls = []
     cloud_calls = []
 
-    def fake_pbl(**kwargs):
+    def forbidden_pbl(**kwargs):
         pbl_calls.append(kwargs)
-        return xr.Dataset()
+        raise AssertionError("Stage-1 full diagnostics must not open PBL inputs.")
 
     def fake_cloud(**kwargs):
         cloud_calls.append(kwargs)
         return xr.Dataset()
 
-    monkeypatch.setattr(stage1_builder.data_io, "open_era5_pbl_p", fake_pbl)
+    monkeypatch.setattr(stage1_builder.data_io, "open_era5_pbl_p", forbidden_pbl)
     monkeypatch.setattr(
         stage1_builder.data_io,
         "open_era5_surface_diagnostic",
@@ -275,12 +276,7 @@ def test_load_full_diagnostic_inputs_routes_region_only_to_pbl(monkeypatch):
     )
     stage1_builder.load_full_diagnostic_inputs(args)
 
-    assert pbl_calls == [
-        {
-            "region": "pnw_bartusek",
-            "years": [1940, 1941],
-        }
-    ]
+    assert pbl_calls == []
     assert cloud_calls == [
         {
             "years": [1940, 1941],

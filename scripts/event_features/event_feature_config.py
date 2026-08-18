@@ -67,7 +67,6 @@ DEFAULT_MEAN_FEATURES = {
 EXTENDED_MEAN_FEATURES = {
     "soil_moisture": "antecedent_state",
     "cloud_cover": "antecedent_state",
-    "pbl_p_mean": "antecedent_state",
 }
 
 EXTENDED_CHANGE_FEATURES = {
@@ -107,7 +106,6 @@ DYNAMICAL_COMPONENT_FEATURES = (
 EXTENDED_FEATURE_NAMES = {
     "soil_moisture": "soil_moisture_mean_ant",
     "cloud_cover": "cloud_cover_mean_ant",
-    "pbl_p_mean": "pbl_p_mean_ant",
     "nslr_heating_rate_approx": "I_nslr_pre",
     "nssr_heating_rate_approx": "I_nssr_pre",
     "sshf_heating_rate_approx": "I_sshf_pre",

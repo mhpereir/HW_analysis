@@ -18,10 +18,6 @@ from src import analysis_io, climatology, composites, plot_paths, plotting, sele
 
 PLOT_NAME = "composite_timeseries_all_clim_anom"
 DEFAULT_OUTPUT_FILENAME = "hw_all_events_composite_clim_anom.png"
-PBL_BASELINE_VARIABLES = {
-    "pbl_p_p05": "pbl_p_mean",
-    "pbl_p_p95": "pbl_p_mean",
-}
 
 
 def parse_args() -> argparse.Namespace:
@@ -77,7 +73,6 @@ def main() -> int:
             stage1,
             climate,
             variables=variables,
-            baseline_variables=PBL_BASELINE_VARIABLES,
         )
         event_table = stage1
         if args.season_months is not None:

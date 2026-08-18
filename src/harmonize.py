@@ -51,14 +51,9 @@ FULL_DIAGNOSTIC_SOURCE_VARIABLES: dict[str, str] = {
     "slhf": "slhf",
     "sshf": "sshf",
     "soil_moisture": "swvl1",
-    "pbl_p": "pbl_p",
     "cloud_cover": "total_cloud_cover",
 }
 SURFACE_ENERGY_VARIABLES: tuple[str, ...] = ("nslr", "nssr", "slhf", "sshf")
-PBL_QUANTILES: dict[str, float] = {
-    "pbl_p_p05": 0.05,
-    "pbl_p_p95": 0.95,
-}
 
 
 def build_regional_analysis_dataset(
@@ -336,14 +331,6 @@ def _prepare_full_diagnostic_variables(
                 }
             )
 
-    out.update(
-        _prepare_pbl_diagnostics(
-            full_diagnostics["pbl_p"],
-            hourly_time,
-            region=region,
-            time_dim=time_dim,
-        )
-    )
     out["cloud_cover"] = _prepare_cloud_cover(
         full_diagnostics["cloud_cover"],
         hourly_time,
@@ -368,52 +355,6 @@ def _prepare_full_diagnostic_variables(
     )
     out["surface_energy_heating_rate_approx"] = total
 
-    return out
-
-
-def _prepare_pbl_diagnostics(
-    ds: xr.Dataset,
-    hourly_time: xr.DataArray,
-    *,
-    region: str,
-    time_dim: str,
-) -> dict[str, xr.DataArray]:
-    """Return regional PBL mean and weighted percentile series."""
-    source_name = FULL_DIAGNOSTIC_SOURCE_VARIABLES["pbl_p"]
-    source = _require_dataset_variable(ds, source_name, dataset_name="pbl_p")
-
-    mean = preprocess.compute_region_mean(source, region).rename("pbl_p_mean")
-    mean = _align_hourly_series(mean, hourly_time, name="pbl_p_mean", time_dim=time_dim)
-    mean.attrs.update(
-        {
-            "source_dataset": "pbl_p",
-            "source_variable": source_name,
-            "native_time_resolution": "hourly",
-            "analysis_time_resolution": "hourly",
-            "alignment_method": "exact_time_selection",
-        }
-    )
-
-    quantiles = preprocess.compute_region_weighted_quantiles(
-        source,
-        region,
-        tuple(PBL_QUANTILES.values()),
-    )
-    out = {"pbl_p_mean": mean}
-    for output_name, q in PBL_QUANTILES.items():
-        da = quantiles.sel(quantile=q, drop=True).rename(output_name)
-        da = _align_hourly_series(da, hourly_time, name=output_name, time_dim=time_dim)
-        da.attrs.update(
-            {
-                "source_dataset": "pbl_p",
-                "source_variable": source_name,
-                "native_time_resolution": "hourly",
-                "analysis_time_resolution": "hourly",
-                "alignment_method": "exact_time_selection",
-                "weighted_quantile": q,
-            }
-        )
-        out[output_name] = da
     return out
 
 

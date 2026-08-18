@@ -153,7 +153,7 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
         plot_extended_variables=True,
     )
     try:
-        assert len(fig.axes) == 12
+        assert len(fig.axes) == 11
 
         assert set(_line_colors_by_label(fig.axes[4])) == {
             _display_label("advection")
@@ -165,13 +165,14 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
             _display_label("diabatic")
         }
 
-        pbl_axis = fig.axes[3]
-        assert pbl_axis.yaxis_inverted()
-        assert pbl_axis.get_ylabel() == "PBL [hPa]"
+        cloud_axis = fig.axes[3]
+        assert not cloud_axis.yaxis_inverted()
+        assert cloud_axis.get_ylabel() == "cloud cover fraction"
         np.testing.assert_allclose(
-            pbl_axis.lines[0].get_ydata(),
-            composite["pbl_p_mean"].values * 0.01,
+            cloud_axis.lines[0].get_ydata(),
+            composite["cloud_cover"].values,
         )
+        np.testing.assert_allclose(cloud_axis.get_ylim(), (0.0, 1.0))
 
         assert set(_line_colors_by_label(fig.axes[5])) == {
             _display_label("nslr_heating_rate_approx"),
@@ -182,7 +183,6 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
             _display_label("slhf_heating_rate_approx"),
         }
         assert fig.axes[9].get_ylabel() == "soil moisture [m3 m-3]"
-        assert fig.axes[11].get_ylabel() == "cloud cover fraction"
     finally:
         plt.close(fig)
 
@@ -214,7 +214,7 @@ def test_extended_anomaly_cloud_axis_is_not_bounded_to_fraction_range():
         plot_extended_variables=True,
     )
     try:
-        cloud_axis = fig.axes[11]
+        cloud_axis = fig.axes[3]
         assert cloud_axis.get_ylabel() == "Δcloud cover fraction"
         assert cloud_axis.get_ylim() != (0.0, 1.0)
     finally:
@@ -433,19 +433,20 @@ def test_plot_split_composite_timeseries_extended_layout_uses_optional_panels():
         plot_extended_variables=True,
     )
     try:
-        assert len(fig.axes) == 12
+        assert len(fig.axes) == 11
 
         assert plotting.VARIABLE_COLORS["advection"] in _non_marker_line_colors(fig.axes[4])
         assert plotting.VARIABLE_COLORS["adiabatic"] in _non_marker_line_colors(fig.axes[6])
         assert plotting.VARIABLE_COLORS["diabatic"] in _non_marker_line_colors(fig.axes[8])
 
-        pbl_axis = fig.axes[3]
-        assert pbl_axis.yaxis_inverted()
-        assert pbl_axis.get_ylabel() == "PBL [hPa]"
+        cloud_axis = fig.axes[3]
+        assert not cloud_axis.yaxis_inverted()
+        assert cloud_axis.get_ylabel() == "cloud cover fraction"
         np.testing.assert_allclose(
-            pbl_axis.lines[0].get_ydata(),
-            composite.isel(split_bin=0)["pbl_p_mean"].values * 0.01,
+            cloud_axis.lines[0].get_ydata(),
+            composite.isel(split_bin=0)["cloud_cover"].values,
         )
+        np.testing.assert_allclose(cloud_axis.get_ylim(), (0.0, 1.0))
 
         assert plotting.VARIABLE_COLORS["nslr_heating_rate_approx"] in (
             _non_marker_line_colors(fig.axes[5])
@@ -460,7 +461,6 @@ def test_plot_split_composite_timeseries_extended_layout_uses_optional_panels():
             _non_marker_line_colors(fig.axes[7])
         )
         assert fig.axes[9].get_ylabel() == "soil moisture [m3 m-3]"
-        assert fig.axes[11].get_ylabel() == "cloud cover fraction"
     finally:
         plt.close(fig)
 
@@ -650,7 +650,7 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
         plot_extended_variables=True,
     )
     try:
-        assert len(fig.axes) == 12
+        assert len(fig.axes) == 11
         assert set(_line_colors_by_label(fig.axes[4])) == {
             _display_label("advection")
         }
@@ -661,12 +661,14 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
             _display_label("diabatic")
         }
 
-        pbl_axis = fig.axes[3]
-        assert pbl_axis.yaxis_inverted()
+        cloud_axis = fig.axes[3]
+        assert not cloud_axis.yaxis_inverted()
+        assert cloud_axis.get_ylabel() == "cloud cover fraction"
         np.testing.assert_allclose(
-            pbl_axis.lines[0].get_ydata(),
-            event_window["pbl_p_mean"].values * 0.01,
+            cloud_axis.lines[0].get_ydata(),
+            event_window["cloud_cover"].values,
         )
+        np.testing.assert_allclose(cloud_axis.get_ylim(), (0.0, 1.0))
         assert set(_line_colors_by_label(fig.axes[5])) == {
             _display_label("nslr_heating_rate_approx"),
             _display_label("nssr_heating_rate_approx"),
@@ -676,7 +678,6 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
             _display_label("slhf_heating_rate_approx"),
         }
         assert fig.axes[9].get_ylabel() == "soil moisture [m3 m-3]"
-        assert fig.axes[11].get_ylabel() == "cloud cover fraction"
     finally:
         plt.close(fig)
 
@@ -706,9 +707,6 @@ def _make_composite() -> xr.Dataset:
         "diabatic": np.array([-1.0, -0.5, 1.0, 0.5, 0.0]),
         "lwa_a_region": np.array([2.0, 3.0, 6.0, 5.0, 4.0]),
         "lwa_c_region": np.array([6.0, 5.0, 2.0, 3.0, 4.0]),
-        "pbl_p_mean": np.array([90000.0, 88000.0, 85000.0, 87000.0, 89000.0]),
-        "pbl_p_p05": np.array([82000.0, 80000.0, 78000.0, 79000.0, 81000.0]),
-        "pbl_p_p95": np.array([95000.0, 94000.0, 92000.0, 93000.0, 94000.0]),
         "nslr_heating_rate_approx": np.array([-0.2, -0.1, -0.3, -0.4, -0.2]),
         "nssr_heating_rate_approx": np.array([0.0, 0.2, 0.6, 0.5, 0.1]),
         "sshf_heating_rate_approx": np.array([0.1, 0.2, 0.4, 0.3, 0.2]),
@@ -756,9 +754,6 @@ def _make_top_event_window() -> xr.Dataset:
         "diabatic": np.array([-1.0, -0.5, 1.0, 0.5, 0.0]),
         "lwa_a_region": np.array([2.0, 3.0, 6.0, 5.0, 4.0]),
         "lwa_c_region": np.array([6.0, 5.0, 2.0, 3.0, 4.0]),
-        "pbl_p_mean": np.array([90000.0, 88000.0, 85000.0, 87000.0, 89000.0]),
-        "pbl_p_p05": np.array([82000.0, 80000.0, 78000.0, 79000.0, 81000.0]),
-        "pbl_p_p95": np.array([95000.0, 94000.0, 92000.0, 93000.0, 94000.0]),
         "nslr_heating_rate_approx": np.array([-0.2, -0.1, -0.3, -0.4, -0.2]),
         "nssr_heating_rate_approx": np.array([0.0, 0.2, 0.6, 0.5, 0.1]),
         "sshf_heating_rate_approx": np.array([0.1, 0.2, 0.4, 0.3, 0.2]),
@@ -827,7 +822,7 @@ def _assert_extended_anomaly_axis_labels(fig) -> None:
         "ΔT_mean [K]",
         "ΔLWA [m hPa]",
         "Δ [K hr-1]",
-        "ΔPBL [hPa]",
+        "Δcloud cover fraction",
         "Δ [K hr-1]",
         "Δ [K hr-1]",
         "Δ [K hr-1]",
@@ -835,7 +830,6 @@ def _assert_extended_anomaly_axis_labels(fig) -> None:
         "Δ [K hr-1]",
         "Δsoil moisture [m3 m-3]",
         "Δvolume [m2 Pa]",
-        "Δcloud cover fraction",
     ]
 
 

@@ -24,7 +24,6 @@ import xarray as xr
 from src import analysis_io, config, data_io, events, harmonize
 
 FULL_DIAGNOSTIC_DATASET_KEYS: tuple[str, ...] = (
-    "pbl_p",
     "nslr",
     "nssr",
     "slhf",
@@ -118,8 +117,8 @@ def parse_args() -> argparse.Namespace:
         "--add-full-diagnostics",
         action="store_true",
         help=(
-            "Add optional local ARCO/ERA5 surface diagnostics, PBL statistics, "
-            "cloud cover, and approximate heating-rate variables."
+            "Add optional local ERA5 surface diagnostics, cloud cover, and "
+            "approximate heating-rate variables."
         ),
     )
     parser.add_argument(
@@ -231,10 +230,6 @@ def load_era5_inputs(args: argparse.Namespace) -> dict[str, object]:
 def load_full_diagnostic_inputs(args: argparse.Namespace) -> dict[str, xr.Dataset]:
     """Open optional local ARCO/ERA5 full-diagnostic inputs."""
     return {
-        "pbl_p": data_io.open_era5_pbl_p(
-            region=args.region,
-            years=args.analysis_years,
-        ),
         "nslr": data_io.open_era5_surface_diagnostic(
             "nslr",
             years=args.analysis_years,

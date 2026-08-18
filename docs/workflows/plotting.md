@@ -105,6 +105,23 @@ figure entrypoints.
   period in their title or metadata, include a zero reference where
   appropriate, and never overwrite their absolute-value counterparts.
 
+### Extended temporal-composite layout
+
+Extended all-event, split-event, climatological-anomaly, and top-event figures
+use a 5x2 panel grid. The left column contains temperature and volume, `dTdt`,
+advection, adiabatic heating, and diabatic heating. The right column contains:
+
+1. anticyclonic and cyclonic LWA;
+2. cloud cover;
+3. longwave and shortwave radiative heating;
+4. sensible and latent surface heating; and
+5. soil moisture.
+
+Cloud cover and soil moisture use separate axes. Absolute cloud cover is
+bounded to the physical fraction range from zero to one, while a
+climatological anomaly is not. PBL diagnostics and panels are inactive under
+[decision 008](../decisions/008_retire_pbl_diagnostics.md).
+
 ### Climatological-anomaly composite labels and surface-flux signs
 
 The all-event and split-event climatological-anomaly composite figures use the

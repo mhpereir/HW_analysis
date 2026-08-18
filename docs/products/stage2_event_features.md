@@ -111,7 +111,6 @@ Extended mode may add:
 soil_moisture_mean_ant(event)
 soil_moisture_change(event)
 cloud_cover_mean_ant(event)
-pbl_p_mean_ant(event)
 I_nslr_pre(event)
 I_nssr_pre(event)
 I_sshf_pre(event)

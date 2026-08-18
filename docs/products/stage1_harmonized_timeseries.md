@@ -33,7 +33,6 @@ stable save/open behavior and validates the product marker on read.
 - heatwave threshold products
 - LWA and LWA threshold products
 - Eulerian heat-budget diagnostics
-- PBL pressure diagnostics
 - optional surface radiation, turbulent flux, soil-moisture, and cloud-cover inputs
 
 ## Dimensions
@@ -86,9 +85,6 @@ When full diagnostics are available, the product may also include:
 ```text
 soil_moisture(time)
 cloud_cover(time)
-pbl_p_mean(time)
-pbl_p_p05(time)
-pbl_p_p95(time)
 nslr(time)
 nssr(time)
 sshf(time)
@@ -100,11 +96,11 @@ slhf_heating_rate_approx(time)
 surface_energy_heating_rate_approx(time)
 ```
 
-PBL diagnostics are loaded from region-keyed hourly source directories before
-regional mean and weighted-percentile reductions. Cloud cover is loaded from
-the global hourly ERA5 grid and reduced to the configured region with the same
-cosine-latitude weighted regional-mean procedure used by other gridded surface
-diagnostics.
+Cloud cover is loaded from the global hourly ERA5 grid and reduced to the
+configured region with the same cosine-latitude weighted regional-mean
+procedure used by other gridded surface diagnostics. PBL diagnostics are not
+part of the active Stage-1 contract; see
+[decision 008](../decisions/008_retire_pbl_diagnostics.md).
 
 Production builds use
 `schedulers/schedule_build_stage1_harmonized_timeseries.sh`. The scheduler

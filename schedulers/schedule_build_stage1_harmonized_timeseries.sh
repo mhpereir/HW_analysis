@@ -54,6 +54,7 @@ echo "[info] region=${REGION}"
 echo "[info] cloud_cover_source_layout=global-hourly-grid"
 echo "[info] cloud_cover_root=${CLOUD_COVER_ROOT}"
 echo "[info] stage1_contract_version=2"
+echo "[info] pbl_diagnostics=excluded"
 echo "[info] face_advection_contributions=enabled"
 echo "[info] output_path=${OUTPUT_PATH}"
 

@@ -15,6 +15,11 @@ SCHEDULERS = (
     / "schedulers"
     / "schedule_plot_advection_direction_exploration_matched_clim_anom.sh",
 )
+ABSOLUTE_PLOT_SCHEDULERS = (
+    REPO_ROOT / "schedulers" / "schedule_composite_timeseries_all.sh",
+    REPO_ROOT / "schedulers" / "schedule_composite_timeseries_split.sh",
+    REPO_ROOT / "schedulers" / "schedule_top_events.sh",
+)
 
 
 def test_climatology_schedulers_are_commit_verified_and_syntax_valid():
@@ -25,6 +30,37 @@ def test_climatology_schedulers_are_commit_verified_and_syntax_valid():
         assert "status --porcelain --untracked-files=normal" in text
         assert "mamba activate \"${VENUS_MAMBA_ENV:-dev_env}\"" in text
         subprocess.run(["bash", "-n", str(scheduler)], check=True)
+
+
+def test_absolute_plot_schedulers_are_commit_verified_and_syntax_valid():
+    for scheduler in ABSOLUTE_PLOT_SCHEDULERS:
+        text = scheduler.read_text()
+        assert 'PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"' in text
+        assert 'EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"' in text
+        assert 'INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"' in text
+        assert "status --porcelain --untracked-files=normal" in text
+        assert "mamba activate \"${VENUS_MAMBA_ENV:-dev_env}\"" in text
+        assert "/home/mhpereir/HW_analysis" not in text
+        subprocess.run(["bash", "-n", str(scheduler)], check=True)
+
+
+def test_absolute_plot_schedulers_require_explicit_non_overwriting_outputs():
+    all_text = ABSOLUTE_PLOT_SCHEDULERS[0].read_text()
+    split_text = ABSOLUTE_PLOT_SCHEDULERS[1].read_text()
+    top_text = ABSOLUTE_PLOT_SCHEDULERS[2].read_text()
+
+    assert 'OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"' in all_text
+    assert 'test ! -e "${OUTPUT_PATH}"' in all_text
+    assert 'test -s "${SMOOTHED_OUTPUT_PATH}"' in all_text
+
+    assert 'OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"' in split_text
+    assert 'for split_variable in "${split_variable_list[@]}" peak_time; do' in split_text
+    assert 'test ! -e "${derived_output_path}"' in split_text
+    assert split_text.count('test -s "${derived_output_path}"') == 2
+
+    assert 'OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR is required}"' in top_text
+    assert 'test ! -e "${OUTPUT_DIR}"' in top_text
+    assert 'test -d "${OUTPUT_DIR}"' in top_text
 
 
 def test_climatology_builder_requires_explicit_products():

@@ -64,7 +64,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--use-extended-variables",
         action="store_true",
-        help="Compute optional land, cloud, PBL, and surface-energy features.",
+        help="Compute optional land, cloud, and surface-energy features.",
     )
     parser.add_argument(
         "--allow-missing-extended",

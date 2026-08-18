@@ -31,9 +31,6 @@ COMPOSITE_VARIABLES: tuple[str, ...] = (
     "lwa_c_region",
 )
 EXTENDED_COMPOSITE_VARIABLES: tuple[str, ...] = COMPOSITE_VARIABLES + (
-    "pbl_p_mean",
-    "pbl_p_p05",
-    "pbl_p_p95",
     "nslr_heating_rate_approx",
     "nssr_heating_rate_approx",
     "sshf_heating_rate_approx",
@@ -50,9 +47,6 @@ SMOOTHED_VARIABLES: tuple[str, ...] = (
     "diabatic",
 )
 EXTENDED_SMOOTHED_VARIABLES: tuple[str, ...] = SMOOTHED_VARIABLES + (
-    "pbl_p_mean",
-    "pbl_p_p05",
-    "pbl_p_p95",
     "nslr_heating_rate_approx",
     "nssr_heating_rate_approx",
     "sshf_heating_rate_approx",

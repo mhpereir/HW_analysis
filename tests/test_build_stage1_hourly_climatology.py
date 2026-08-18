@@ -53,6 +53,10 @@ def test_require_canonical_source_accepts_all_standard_variables():
     builder.require_canonical_climatology_source(_canonical_source())
 
 
+def test_default_climatology_variables_exclude_pbl_diagnostics():
+    assert not any(name.startswith("pbl_p") for name in climatology.DEFAULT_VARIABLES)
+
+
 def test_climatology_variables_include_optional_bottom_face():
     ds = _canonical_source()
     ds["advection_bottom"] = ("time", [1.0])

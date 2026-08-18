@@ -258,9 +258,6 @@ def test_build_regional_analysis_dataset_adds_optional_full_diagnostics():
         "sshf",
         "soil_moisture",
         "cloud_cover",
-        "pbl_p_mean",
-        "pbl_p_p05",
-        "pbl_p_p95",
         "nslr_heating_rate_approx",
         "nssr_heating_rate_approx",
         "slhf_heating_rate_approx",
@@ -271,7 +268,7 @@ def test_build_regional_analysis_dataset_adds_optional_full_diagnostics():
     np.testing.assert_allclose(out["nssr"].values, [10.0, 20.0])
     np.testing.assert_allclose(out["soil_moisture"].values, [0.1, 0.2])
     np.testing.assert_allclose(out["cloud_cover"].values, [0.25, 0.5])
-    assert out["pbl_p_p05"].dims == ("time",)
+    assert not {"pbl_p_mean", "pbl_p_p05", "pbl_p_p95"} & set(out.data_vars)
     assert out["nssr"].attrs["source_variable"] == "ssr"
     assert out["nssr"].attrs["alignment_method"] == "exact_time_selection"
 
@@ -451,6 +448,5 @@ def _make_full_diagnostics(hourly_time: np.ndarray) -> dict[str, xr.Dataset]:
         "slhf": gridded("slhf", [-3.0, -4.0]),
         "sshf": gridded("sshf", [-5.0, -6.0]),
         "soil_moisture": gridded("swvl1", [0.1, 0.2]),
-        "pbl_p": gridded("pbl_p", [70000.0, 65000.0]),
         "cloud_cover": gridded("total_cloud_cover", [0.25, 0.5]),
     }

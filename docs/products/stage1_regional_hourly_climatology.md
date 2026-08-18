@@ -37,10 +37,8 @@ The `climatology_time` coordinate uses reference year 2000. The reference year
 is only an encoding of month, day, and hour; it is not a climatology year or a
 forecast timestamp. The product contains exactly the calendar-hour keys found
 in its Stage-1 input. For the current May-October 1940-2024 product, that is
-4,414 keys. Every non-PBL required variable has 85 source years per key. The
-upstream PBL product is incomplete, so the three PBL variables have 58-62
-finite source years per key. The stored count variables make this difference
-explicit.
+4,414 keys. Every required variable has 85 source years per key. The stored
+count variables make missing values explicit.
 
 ## Variables
 
@@ -64,9 +62,6 @@ adiabatic
 diabatic
 lwa_a_region
 lwa_c_region
-pbl_p_mean
-pbl_p_p05
-pbl_p_p95
 nslr_heating_rate_approx
 nssr_heating_rate_approx
 sshf_heating_rate_approx
@@ -116,11 +111,8 @@ and display smoothing. An ephemeral anomaly view may retain the source
 variable names for compatibility with shared composite and rendering code, but
 it must mark the dataset and variables explicitly as climatological anomalies.
 
-For the plotted PBL spatial envelope, `pbl_p_mean`, `pbl_p_p05`, and
-`pbl_p_p95` all subtract the matched `pbl_p_mean` climatology. This preserves
-the ordering and contemporaneous spatial width of the percentile band while
-placing it around the anomalous regional mean. The independently calculated
-PBL-percentile climatologies remain available for audit and future diagnostics.
+PBL variables are excluded from the active climatology contract under
+[decision 008](../decisions/008_retire_pbl_diagnostics.md).
 
 ## Required metadata
 
@@ -147,8 +139,7 @@ product path.
 - Every source timestamp maps to one climatology key.
 - No source year contains duplicate values for a calendar-hour key.
 - Counts are positive. The current production input has count 85 for every
-  non-PBL required variable and key, and counts of 58-62 for each PBL variable
-  and key because of upstream PBL missingness.
+  required variable and key.
 - Mean source anomaly at every key is zero within floating-point tolerance.
 - Heat-budget and face-reconstruction identities remain valid after anomaly
   subtraction.
