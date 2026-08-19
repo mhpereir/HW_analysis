@@ -16,6 +16,7 @@ TIME_START="${TIME_START:-1940}"
 TIME_END="${TIME_END:-2024}"
 QUANTILE="${QUANTILE:-90}"
 THRESHOLD_VARIABLE="${THRESHOLD_VARIABLE:-tas}"
+HEAT_BUDGET_ROOT="${HEAT_BUDGET_ROOT:-}"
 CLOUD_COVER_ROOT="${CLOUD_COVER_ROOT:-/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/cloud_cover}"
 LOG_DIR="${LOG_DIR:-/home/mhpereir/HW_analysis/logs}"
 VENUS_MAMBA_ENV="${VENUS_MAMBA_ENV:-dev_env}"
@@ -27,6 +28,15 @@ case "${THRESHOLD_VARIABLE}" in
         exit 2
         ;;
 esac
+
+HEAT_BUDGET_ARGS=()
+if [[ -n "${HEAT_BUDGET_ROOT}" ]]; then
+    if [[ ! -d "${HEAT_BUDGET_ROOT}" ]]; then
+        echo "[error] HEAT_BUDGET_ROOT is not a directory: ${HEAT_BUDGET_ROOT}" >&2
+        exit 2
+    fi
+    HEAT_BUDGET_ARGS=(--heat-budget-root "${HEAT_BUDGET_ROOT}")
+fi
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 if [[ "${actual_commit}" != "${EXPECTED_COMMIT}" ]]; then
@@ -61,6 +71,7 @@ echo "[info] expected_commit=${EXPECTED_COMMIT}"
 echo "[info] python=${PYTHON_EXECUTABLE}"
 echo "[info] region=${REGION}"
 echo "[info] threshold_variable=${THRESHOLD_VARIABLE}"
+echo "[info] heat_budget_root=${HEAT_BUDGET_ROOT:-configured-saved-results-default}"
 echo "[info] cloud_cover_source_layout=global-hourly-grid"
 echo "[info] cloud_cover_root=${CLOUD_COVER_ROOT}"
 echo "[info] stage1_contract_version=2"
@@ -77,6 +88,7 @@ echo "[info] output_path=${OUTPUT_PATH}"
     --top-boundary 700 \
     --start-year-ehb 1940 \
     --end-year-ehb 2025 \
+    "${HEAT_BUDGET_ARGS[@]}" \
     --threshold-variable "${THRESHOLD_VARIABLE}" \
     --add-full-diagnostics \
     --cloud-cover-source-layout "global-hourly-grid" \

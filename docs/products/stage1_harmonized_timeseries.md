@@ -106,8 +106,11 @@ Production builds use
 `schedulers/schedule_build_stage1_harmonized_timeseries.sh`. The scheduler
 requires an explicit region and output path, enables the complete diagnostic
 set, and selects the canonical `global-hourly-grid` cloud-cover layout
-explicitly. Production output paths must be run-specific so a rebuild can be
-validated before any existing Stage-1 product is promoted or replaced.
+explicitly. `HEAT_BUDGET_ROOT` may identify an explicit directory of annual
+`heat_budget_*.nc` files when an accepted EHB campaign has not been promoted to
+the configured saved-results hierarchy. Production output paths must be
+run-specific so a rebuild can be validated before any existing Stage-1 product
+is promoted or replaced.
 
 Surface-energy source signs are preserved. Approximate heating-rate variables
 use the pressure-coordinate control-volume approximation documented by the

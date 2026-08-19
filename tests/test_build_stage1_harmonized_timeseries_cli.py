@@ -199,6 +199,27 @@ def test_parse_args_accepts_custom_ehb_year_tokens(monkeypatch):
     assert args.heat_budget_root.parent.name == "pnw_bartusek_surface_700hPa_1940_2026"
 
 
+def test_parse_args_accepts_explicit_heat_budget_root(monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "build_stage1_harmonized_timeseries.py",
+            "--start-year",
+            "1940",
+            "--end-year",
+            "1941",
+            "--region",
+            "alaska",
+            "--heat-budget-root",
+            "/campaigns/alaska/annual",
+        ],
+    )
+
+    args = stage1_builder.parse_args()
+
+    assert args.heat_budget_root == Path("/campaigns/alaska/annual")
+
+
 def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch):
     calls = []
     heat_budget_calls = []

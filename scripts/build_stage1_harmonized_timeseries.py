@@ -79,6 +79,15 @@ def parse_args() -> argparse.Namespace:
         help="Last year token in the Eulerian heat-budget saved-results path.",
     )
     parser.add_argument(
+        "--heat-budget-root",
+        type=Path,
+        default=None,
+        help=(
+            "Optional explicit directory containing annual heat_budget_*.nc "
+            "files. Defaults to the configured saved-results path."
+        ),
+    )
+    parser.add_argument(
         "--quantile",
         default="90",
         help="Threshold quantile token, for example 95 or 97p5.",
@@ -178,13 +187,16 @@ def parse_args() -> argparse.Namespace:
     args.cloud_cover_root = args.cloud_cover_root.expanduser().resolve()
 
     args.analysis_years = list(range(args.start_year, args.end_year + 1))
-    args.heat_budget_root = data_io.era5_heat_budget_annual_root(
-        region=args.region,
-        bottom_boundary=args.bottom_boundary,
-        top_boundary=args.top_boundary,
-        start_year_ehb=args.start_year_ehb,
-        end_year_ehb=args.end_year_ehb,
-    )
+    if args.heat_budget_root is None:
+        args.heat_budget_root = data_io.era5_heat_budget_annual_root(
+            region=args.region,
+            bottom_boundary=args.bottom_boundary,
+            top_boundary=args.top_boundary,
+            start_year_ehb=args.start_year_ehb,
+            end_year_ehb=args.end_year_ehb,
+        )
+    else:
+        args.heat_budget_root = args.heat_budget_root.expanduser()
     if args.output_path is None:
         args.output_path = analysis_io.default_harmonized_timeseries_path(
             region=args.region,
