@@ -39,6 +39,15 @@ def test_stage1_scheduler_requires_global_cloud_cover_and_full_diagnostics():
     assert "legacy-regional" not in text
 
 
+def test_stage1_scheduler_supports_explicit_threshold_variable_selection():
+    text = SCHEDULER.read_text()
+
+    assert 'THRESHOLD_VARIABLE="${THRESHOLD_VARIABLE:-tas}"' in text
+    assert 'tas|lwa|lwa_a|lwa_c)' in text
+    assert 'threshold_variable=${THRESHOLD_VARIABLE}' in text
+    assert '--threshold-variable "${THRESHOLD_VARIABLE}"' in text
+
+
 def test_stage1_scheduler_declares_production_resources():
     text = SCHEDULER.read_text()
 

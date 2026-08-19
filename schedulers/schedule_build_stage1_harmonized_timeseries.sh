@@ -15,9 +15,18 @@ OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH must be supplied by the submission workf
 TIME_START="${TIME_START:-1940}"
 TIME_END="${TIME_END:-2024}"
 QUANTILE="${QUANTILE:-90}"
+THRESHOLD_VARIABLE="${THRESHOLD_VARIABLE:-tas}"
 CLOUD_COVER_ROOT="${CLOUD_COVER_ROOT:-/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/cloud_cover}"
 LOG_DIR="${LOG_DIR:-/home/mhpereir/HW_analysis/logs}"
 VENUS_MAMBA_ENV="${VENUS_MAMBA_ENV:-dev_env}"
+
+case "${THRESHOLD_VARIABLE}" in
+    tas|lwa|lwa_a|lwa_c) ;;
+    *)
+        echo "[error] unsupported THRESHOLD_VARIABLE: ${THRESHOLD_VARIABLE}" >&2
+        exit 2
+        ;;
+esac
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 if [[ "${actual_commit}" != "${EXPECTED_COMMIT}" ]]; then
@@ -51,6 +60,7 @@ echo "[info] project_root=${PROJECT_ROOT}"
 echo "[info] expected_commit=${EXPECTED_COMMIT}"
 echo "[info] python=${PYTHON_EXECUTABLE}"
 echo "[info] region=${REGION}"
+echo "[info] threshold_variable=${THRESHOLD_VARIABLE}"
 echo "[info] cloud_cover_source_layout=global-hourly-grid"
 echo "[info] cloud_cover_root=${CLOUD_COVER_ROOT}"
 echo "[info] stage1_contract_version=2"
@@ -67,7 +77,7 @@ echo "[info] output_path=${OUTPUT_PATH}"
     --top-boundary 700 \
     --start-year-ehb 1940 \
     --end-year-ehb 2025 \
-    --threshold-variable "tas" \
+    --threshold-variable "${THRESHOLD_VARIABLE}" \
     --add-full-diagnostics \
     --cloud-cover-source-layout "global-hourly-grid" \
     --cloud-cover-root "${CLOUD_COVER_ROOT}" \
