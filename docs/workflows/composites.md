@@ -63,13 +63,14 @@ schedulers/schedule_plot_advection_direction_exploration_matched_clim_anom.sh
 They require explicit Stage-1, climatology, and output paths plus a verified
 runtime commit. They do not build prerequisites inside plotting jobs.
 
-The production split-composite scheduler renders the complete split-population
-matrix used by `schedulers/schedule_composite_timeseries_split.sh`. For both
-absolute and climatological-anomaly composites, the default matrix is:
-
-- q0.90 splits for `duration`, `tas_anom_peak`, `tas_excess_integral`,
-  `tas_excess_peak`, and `tas_peak`; and
-- a `peak_time` year split beginning in 1982.
+The production split-composite schedulers render the same complete
+split-variable matrix. The five numeric split variables are `duration`,
+`tas_anom_peak`, `tas_excess_integral`, `tas_excess_peak`, and `tas_peak`.
+The absolute scheduler defaults to a q0.90 split for those variables, while
+the climatological-anomaly scheduler defaults to q0.75. Both schedulers also
+render a `peak_time` year split beginning in 1982. The quantile and year are
+runtime-configurable scheduler defaults; the complete variable matrix is the
+production default for every region.
 
 One split-scheduler invocation writes raw and 24-hour-smoothed figures for all
 six variants. Every output is derived from one explicit base output path by
@@ -78,6 +79,12 @@ all twelve derived paths before plotting and refuse partial overwrite. The
 climatological-anomaly scheduler must continue to take event membership and
 split thresholds from the absolute Stage-1 event table, while compositing the
 timestamp-level anomaly values.
+
+Both split schedulers accept the region, pressure boundaries, threshold
+definition, analysis years, lag window, smoothing window, and output/log paths
+as runtime configuration. This permits one exact deployed scheduler revision
+to render isolated output matrices for each accepted Stage-1 region without
+changing the tracked source between submissions.
 
 ## Outputs
 

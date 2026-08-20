@@ -13,6 +13,15 @@ EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"
 CLIMATOLOGY_PATH="${CLIMATOLOGY_PATH:?CLIMATOLOGY_PATH is required}"
 OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"
+REGION="${REGION:-pnw_bartusek}"
+BOTTOM_BOUNDARY="${BOTTOM_BOUNDARY:-surface}"
+TOP_BOUNDARY="${TOP_BOUNDARY:-700}"
+THRESHOLD_VARIABLE="${THRESHOLD_VARIABLE:-tas}"
+QUANTILE="${QUANTILE:-90}"
+TIME_START="${TIME_START:-1940}"
+TIME_END="${TIME_END:-2024}"
+WINDOW_DAYS="${WINDOW_DAYS:-7}"
+SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"
 SPLIT_QUANTILE="${SPLIT_QUANTILE:-0.75}"
 SPLIT_YEAR="${SPLIT_YEAR:-1982}"
 LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
@@ -69,6 +78,12 @@ echo "[info] python=$(command -v python)"
 echo "[info] input_path=${INPUT_PATH}"
 echo "[info] climatology_path=${CLIMATOLOGY_PATH}"
 echo "[info] output_base_path=${OUTPUT_PATH}"
+echo "[info] region=${REGION}"
+echo "[info] boundaries=${BOTTOM_BOUNDARY}-${TOP_BOUNDARY}hPa"
+echo "[info] threshold=${THRESHOLD_VARIABLE}_q${QUANTILE}"
+echo "[info] years=${TIME_START}-${TIME_END}"
+echo "[info] window_days=${WINDOW_DAYS}"
+echo "[info] smoothing_window=${SMOOTHING_WINDOW}"
 echo "[info] split_quantile=${SPLIT_QUANTILE}"
 echo "[info] split_year=${SPLIT_YEAR}"
 echo "[info] started=$(date -Is)"
@@ -77,17 +92,18 @@ cd "${PROJECT_ROOT}"
 for split_variable in "${split_variable_list[@]}"; do
   echo "[info] split_variable=${split_variable}"
   /usr/bin/time -v python scripts/plot_composite_timeseries_split_clim_anom.py \
-    --region pnw_bartusek \
-    --bottom-boundary surface \
-    --top-boundary 700 \
-    --threshold-variable tas \
-    --quantile 90 \
-    --start-year 1940 \
-    --end-year 2024 \
+    --region "${REGION}" \
+    --bottom-boundary "${BOTTOM_BOUNDARY}" \
+    --top-boundary "${TOP_BOUNDARY}" \
+    --threshold-variable "${THRESHOLD_VARIABLE}" \
+    --quantile "${QUANTILE}" \
+    --start-year "${TIME_START}" \
+    --end-year "${TIME_END}" \
     --input-path "${INPUT_PATH}" \
     --climatology-path "${CLIMATOLOGY_PATH}" \
     --output-path "${OUTPUT_PATH}" \
-    --window-days 7 \
+    --window-days "${WINDOW_DAYS}" \
+    --smoothing-window "${SMOOTHING_WINDOW}" \
     --split-variable "${split_variable}" \
     --split-quantiles "${SPLIT_QUANTILE}" \
     --season-months 6 7 8 \
@@ -100,17 +116,18 @@ done
 
 echo "[info] split_variable=peak_time"
 /usr/bin/time -v python scripts/plot_composite_timeseries_split_clim_anom.py \
-  --region pnw_bartusek \
-  --bottom-boundary surface \
-  --top-boundary 700 \
-  --threshold-variable tas \
-  --quantile 90 \
-  --start-year 1940 \
-  --end-year 2024 \
+  --region "${REGION}" \
+  --bottom-boundary "${BOTTOM_BOUNDARY}" \
+  --top-boundary "${TOP_BOUNDARY}" \
+  --threshold-variable "${THRESHOLD_VARIABLE}" \
+  --quantile "${QUANTILE}" \
+  --start-year "${TIME_START}" \
+  --end-year "${TIME_END}" \
   --input-path "${INPUT_PATH}" \
   --climatology-path "${CLIMATOLOGY_PATH}" \
   --output-path "${OUTPUT_PATH}" \
-  --window-days 7 \
+  --window-days "${WINDOW_DAYS}" \
+  --smoothing-window "${SMOOTHING_WINDOW}" \
   --split-variable peak_time \
   --split-years "${SPLIT_YEAR}" \
   --season-months 6 7 8 \

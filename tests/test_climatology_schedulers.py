@@ -123,6 +123,38 @@ def test_split_anomaly_scheduler_matches_absolute_production_split_matrix():
     assert '--split-years "${SPLIT_YEAR}"' in text
 
 
+def test_split_anomaly_scheduler_accepts_regional_plot_configuration():
+    text = SCHEDULERS[2].read_text()
+
+    expected_defaults = {
+        "REGION": "pnw_bartusek",
+        "BOTTOM_BOUNDARY": "surface",
+        "TOP_BOUNDARY": "700",
+        "THRESHOLD_VARIABLE": "tas",
+        "QUANTILE": "90",
+        "TIME_START": "1940",
+        "TIME_END": "2024",
+        "WINDOW_DAYS": "7",
+        "SMOOTHING_WINDOW": "24",
+    }
+    for variable, default in expected_defaults.items():
+        assert f'{variable}="${{{variable}:-{default}}}"' in text
+
+    expected_arguments = {
+        "region": "REGION",
+        "bottom-boundary": "BOTTOM_BOUNDARY",
+        "top-boundary": "TOP_BOUNDARY",
+        "threshold-variable": "THRESHOLD_VARIABLE",
+        "quantile": "QUANTILE",
+        "start-year": "TIME_START",
+        "end-year": "TIME_END",
+        "window-days": "WINDOW_DAYS",
+        "smoothing-window": "SMOOTHING_WINDOW",
+    }
+    for argument, variable in expected_arguments.items():
+        assert text.count(f'--{argument} "${{{variable}}}"') == 2
+
+
 def test_split_anomaly_scheduler_preflights_and_validates_all_outputs():
     text = SCHEDULERS[2].read_text()
 
