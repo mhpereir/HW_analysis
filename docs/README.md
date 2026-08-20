@@ -117,12 +117,13 @@ a figure.
 | Build Stage 1 | `scripts/build_stage1_harmonized_timeseries.py` |
 | Build Stage 2 | `scripts/event_features/build_stage2_event_features.py`, `scripts/event_features/build_stage2_baseline_features.py` |
 | Plot Stage 1 | `scripts/plot_*.py` |
+| Plot Stage 1 region inventory | `scripts/region_vis/plot_stage1_regions.py` |
 | Plot matched Stage-1 composites | `scripts/plot_advection_direction_exploration_matched_clim_anom.py` |
 | Plot Stage 2 | active plotting scripts in `scripts/event_features/` |
 | Prepare spatial ERA5 | `scripts/spatial_composites/build_era5_daily_spatial_data.sh`, `scripts/spatial_composites/build_era5_daily_doy_climatology.sh` |
 | Build and plot spatial composites | `scripts/spatial_composites/build_dyn_net_spatial_composites.py`, `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |
 | Build and plot matched spatial composites | `scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py`, `scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py` |
-| Run on Venus | matching scripts under `schedulers/` |
+| Run on Venus | matching scripts under `schedulers/`; the self-contained region-inventory diagnostic keeps its scheduler beside the plotter under `scripts/region_vis/` |
 
 Production inputs and results exist on Venus and remain outside Git. Local
 `dev_env` is for tests, compilation checks, and small synthetic prototypes.

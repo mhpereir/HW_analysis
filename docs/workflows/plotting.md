@@ -48,6 +48,7 @@ results/plots_<plot_name>/
 | Stage 1 plus regional hourly climatology, Stage 2 event features, and matching settings | matched face-resolved advection climatological anomalies | `scripts/plot_advection_direction_exploration_matched_clim_anom.py` |
 | Stage 1 | top-event traces | `scripts/plot_top_events.py` |
 | Stage 1 | diurnal, threshold, and event-summary diagnostics | `scripts/plot_diurnal_cycle.py`, `scripts/plot_threshold_timeseries.py`, `scripts/plot_event_summary.py` |
+| Stage 1 run inventory | Northern Hemisphere regional-domain overview | `scripts/region_vis/plot_stage1_regions.py` |
 | Stage 2 event features | feature grids, splits, and combined comparisons | `event_feature_grid_plot.py`, `plot_event_feature.py`, `plot_event_feature_split.py`, `plot_event_feature_split_combined.py` under `scripts/event_features/` |
 | Stage 2 event features | adiabatic, advection, and diabatic event diagnostics | `plot_adiabatic_advection_comparison.py`, `plot_adiabatic_diabatic_advection.py` under `scripts/event_features/` |
 | Stage 2 event and baseline features | event-versus-baseline comparisons | `plot_adiabatic_advection_comparison_baseline.py`, `plot_adiabatic_diabatic_advection_baseline.py` under `scripts/event_features/` |
@@ -61,6 +62,15 @@ figure entrypoints.
 ## Required behavior
 
 - Use the non-interactive Matplotlib `Agg` backend for batch rendering.
+- The regional-domain overview discovers unique regions from the Stage 1
+  products in a supplied run directory, verifies their product marker and
+  stored bounds against `src/config.py`, and draws unfilled, distinctly
+  colored domain boundaries on one Northern Hemisphere map. It is a read-only
+  inventory diagnostic: it creates no analysis product and does not change the
+  Stage 1 contract or existing consumers. The default run is
+  `bf232281_20260819`, but both input and output paths remain configurable.
+  Because this diagnostic is intentionally self-contained, its Venus OpenPBS
+  entrypoint is co-located under `scripts/region_vis/`.
 - Open Stage 1 through `src.analysis_io.open_harmonized_timeseries()` when its
   product contract is required.
 - Keep analysis and selection logic in reusable modules, not in visual styling
@@ -155,6 +165,7 @@ mamba activate dev_env
 python -m pytest -q \
   tests/test_plotting.py \
   tests/test_plot_*.py \
+  tests/test_region_vis.py \
   tests/test_spatial_composite_plot.py
 ```
 

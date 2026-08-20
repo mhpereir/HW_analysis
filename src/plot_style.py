@@ -97,6 +97,26 @@ FACE_COLORS = {
     "bottom": "#D55E00",
 }
 
+REGION_NAME_MAPPING = {
+    "alaska": "Alaska",
+    "central_china": "Central China",
+    "eastern_canada": "Eastern Canada",
+    "gulf_usa": "Gulf USA",
+    "pnw_bartusek": "Pacific Northwest (Bartusek)",
+    "pnw_hotz": "Pacific Northwest (Hotz)",
+    "western_eu": "Western Europe",
+}
+
+REGION_COLORS = {
+    "alaska": "#0072B2",
+    "central_china": "#D55E00",
+    "eastern_canada": "#009E73",
+    "gulf_usa": "#CC79A7",
+    "pnw_bartusek": "#E69F00",
+    "pnw_hotz": "#56B4E9",
+    "western_eu": "#6A5ACD",
+}
+
 STACKED_FIGURE_LAYOUTS = {
     ("single", 2): {
         "left": 0.18,

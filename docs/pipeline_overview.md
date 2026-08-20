@@ -117,6 +117,7 @@ products or plotting dependencies.
 | `src/plotting.py` | Plot prepared products without raw loading or event generation. |
 | `src/plot_style.py` | Shared names, colors, dimensions, axis formatting, legends, and figure export. |
 | `src/plot_paths.py` | Structured default output paths for Stage-1-based figures. |
+| `scripts/region_vis/` | Inventory a Stage-1 run and render its configured regional domains on a Northern Hemisphere map. |
 | `scripts/spatial_composites/` | Prepare daily ERA5 fields, build lagged spatial products, and render maps. |
 
 ## File And Directory Conventions
@@ -137,6 +138,9 @@ HW_analysis/
 |   |-- plot_composite_timeseries_split_clim_anom.py
 |   |-- plot_advection_direction_exploration_clim_anom.py
 |   |-- plot_advection_direction_exploration_matched_clim_anom.py
+|   |-- region_vis/
+|   |   |-- plot_stage1_regions.py
+|   |   `-- schedule_plot_stage1_regions.sh
 |   |-- event_features/
 |   |   |-- build_stage2_event_features.py
 |   |   |-- build_stage2_baseline_features.py
