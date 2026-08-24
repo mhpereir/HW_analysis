@@ -56,7 +56,10 @@ For each region and quantity, the figure shows:
 
 All fraction panels use a fixed `[-1, 1]` scale centered on zero. Positive
 fractions indicate heating and negative fractions indicate cooling. Region
-order is explicit and remains the same in every panel.
+rows are sorted north-to-south by the midpoint of each region's latitude
+bounds in the existing authoritative `src.config.REGIONS` definitions. Ties
+are resolved by region identifier. This order remains the same in every panel
+and does not add a new product or raw-data dependency.
 
 ## Rationale
 
@@ -90,8 +93,8 @@ regions in one figure must use matching window and integration semantics.
   stored `I_dyn_pre` use, identity mismatch, non-finite rows, and zero gross
   activity.
 - Plot tests must verify one row per region, common fraction limits, event and
-  clean-baseline interval layers, readable region labels, and the gross
-  activity panel.
+  clean-baseline interval layers, north-to-south mean-latitude ordering,
+  readable region labels, and the gross activity panel.
 - CLI tests must verify explicit region-to-event-to-baseline path mapping and
   non-overwriting output behavior.
 - A real-data draft must validate compatible Stage-2 metadata, finite summary

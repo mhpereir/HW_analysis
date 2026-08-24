@@ -104,9 +104,10 @@ figure entrypoints.
   [decision 009](../decisions/009_inter_region_budget_fractions.md). It uses
   only existing Stage-2 variables, selects clean baseline rows with
   `event_adjacent == 0`, and displays signed gross-activity-normalized
-  fractions on common regional axes. It retains gross budget activity as a
-  separate magnitude panel and does not replace the absolute-value regional
-  scatter diagnostics.
+  fractions on common regional axes. Region rows run north-to-south using the
+  midpoint of the authoritative configured latitude bounds. It retains gross
+  budget activity as a separate magnitude panel and does not replace the
+  absolute-value regional scatter diagnostics.
 - Use `plot_style.VARIABLE_NAME_MAPPING` and shared color dictionaries for
   existing variables.
 - Use `plot_style.publication_figsize()` and shared line-width constants.
