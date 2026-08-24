@@ -35,6 +35,7 @@ def test_plot_creates_four_axes_with_baseline_and_selected_event_layers():
         assert [
             text.get_text() for text in fig.axes[0].get_legend().get_texts()
         ] == ["Clean baseline days", "Events"]
+        assert fig.axes[0].get_legend()._loc == 1
         assert fig.axes[1].get_legend() is None
     finally:
         plot_diag.plt.close(fig)

@@ -33,6 +33,8 @@ def test_plot_creates_three_axes_with_background_and_foreground_collections():
         assert [
             text.get_text() for text in fig.axes[0].get_legend().get_texts()
         ] == ["Clean baseline days", "Events"]
+        assert fig.axes[0].get_legend()._loc == 1
+        assert all(ax.get_legend() is None for ax in fig.axes[1:])
     finally:
         plot_diag.plt.close(fig)
 

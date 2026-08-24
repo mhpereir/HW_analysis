@@ -338,7 +338,7 @@ def plot_one_tendency_panel(
     if show_legend:
         ax.legend(
             handles=[baseline_scatter, event_scatter],
-            loc="lower right",
+            loc="upper right",
             **plot_style.legend_kwargs(),
         )
     ax.text(

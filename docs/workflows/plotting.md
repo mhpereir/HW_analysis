@@ -104,6 +104,9 @@ figure entrypoints.
 - Use `plot_style.publication_figsize()` and shared line-width constants.
 - Use `plot_style.style_axis()` or `style_axes()` where appropriate.
 - Use `plot_style.legend_kwargs()` for standard legends.
+- Event-versus-clean-baseline figures place the shared "Clean baseline days"
+  and "Events" legend in the upper-right corner of the first panel. Later
+  panels do not repeat that legend.
 - Use shared numeric-axis helpers for reusable tick-spacing and formatting
   rules, including integer-only axes.
 - Use `plot_style.save_figure()` for ordinary Matplotlib figures.
