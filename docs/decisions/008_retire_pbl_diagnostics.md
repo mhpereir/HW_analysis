@@ -16,6 +16,13 @@ The standalone raw-data path configuration and `src.data_io.open_era5_pbl_p()`
 remain available for explicitly scoped ad hoc work. They are not production
 Stage-1 inputs and their availability must not gate an active pipeline run.
 
+The standalone PBL/700 hPa paper diagnostic documented in
+`docs/workflows/pbl_700hpa_justification.md` is the only active exception. It
+builds an isolated compact product directly from the retained loader and an
+accepted Stage-1 event table. This exception does not add PBL variables or a
+PBL dependency to Stage 1, Stage 2, regional climatologies, or standard
+composite figures.
+
 Extended 5x2 temporal figures retain their existing dimensions. Cloud cover
 moves into the former PBL panel, and soil moisture occupies the final panel on
 its own axis. Absolute cloud cover remains bounded to the physical fraction
@@ -44,8 +51,9 @@ remain readable. Updated consumers ignore those extra variables. Existing
 artifacts and figures are not overwritten; new products and plots are written
 to run-specific paths and omit PBL fields and panels.
 
-The raw PBL loader is retained for ad hoc use, but no active product builder,
-feature extractor, plotter, or PBS workflow may depend on it.
+The raw PBL loader is retained for ad hoc use and for the explicitly isolated
+PBL/700 hPa paper diagnostic. No other active product builder, feature
+extractor, plotter, or PBS workflow may depend on it.
 
 ## Validation
 

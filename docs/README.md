@@ -106,6 +106,7 @@ a figure.
 | Stage 2 baseline features | [Baseline-day contract](products/stage2_baseline_features.md) |
 | Temporal composites | [Composite workflow](workflows/composites.md) |
 | Spatial ERA5 preparation and composites | [Spatial composite workflow](workflows/spatial_composites.md) |
+| Standalone PBL/700 hPa paper diagnostic | [PBL top-pressure justification](workflows/pbl_700hpa_justification.md) |
 | Figure conventions and shared style | [Plotting workflow](workflows/plotting.md) |
 | Scientific defaults | [Decision records](decisions/) |
 | Inactive PCA and clustering material | [Legacy index](legacy/README.md) |

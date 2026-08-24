@@ -94,6 +94,19 @@ annual daily fields + climatology + Stage 2 event features with I_dyn_pre
 | `results/spatial_composites/dyn_net_daily_spatial_composites_*.nc` | `scripts/spatial_composites/build_dyn_net_spatial_composites.py` | spatial composite plotter |
 | `results/spatial_composites/matched_dyn_pre_daily_spatial_composites_*.nc` | `scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py` | matched spatial composite plotter |
 
+### Standalone PBL boundary diagnostic
+
+```text
+Stage 1 event table + accepted hourly regional PBL-top pressure
+  -> compact peak-aligned and heatwave-day PBL diagnostic product
+  -> two-panel 700 hPa justification figure
+```
+
+This paper diagnostic is isolated from the active Stage-1 and Stage-2
+dependency graph. It does not make PBL availability a prerequisite for any
+regional product or standard composite figure. See
+[PBL top-pressure justification](workflows/pbl_700hpa_justification.md).
+
 Stages 3 and 4 are inactive legacy workflows. Their PCA and clustering
 implementations are retained under `scripts/event_features/old/` for historical
 reference and possible future reactivation, but they are not active pipeline
@@ -119,6 +132,7 @@ products or plotting dependencies.
 | `src/plot_paths.py` | Structured default output paths for Stage-1-based figures. |
 | `scripts/region_vis/` | Inventory a Stage-1 run and render its configured regional domains on a Northern Hemisphere map. |
 | `scripts/spatial_composites/` | Prepare daily ERA5 fields, build lagged spatial products, and render maps. |
+| `scripts/pbl_justification/` | Build and render the isolated PBL top-pressure/700 hPa paper diagnostic. |
 
 ## File And Directory Conventions
 
@@ -184,6 +198,7 @@ specifications.
 
 - [Composites](workflows/composites.md)
 - [Spatial composites](workflows/spatial_composites.md)
+- [PBL top-pressure justification](workflows/pbl_700hpa_justification.md)
 - [Plotting and shared style](workflows/plotting.md)
 
 Diagnostic and plotting scripts are workflow consumers, so their names describe
