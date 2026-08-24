@@ -92,9 +92,10 @@ Stage 1 remains unchanged. Stage-2 event and baseline products gain the
 canonical `I_dyn_pre` variable, so existing generated Stage-2 files must be
 rebuilt before updated consumers run. Matching-aware figures consume the
 rebuilt event product plus the tracked A2.8 settings. The stored equation is
-unchanged, but restoring the canonical 96-hour integration window can change
+unchanged, but changing the canonical integration window can change
 its magnitude, sign, and resulting matched membership relative to preliminary
-72-hour diagnostics. Those diagnostics must therefore be regenerated.
+or historical Stage-2 diagnostics. Those diagnostics must therefore be
+regenerated whenever they adopt a rebuilt Stage-2 table.
 
 This decision does not establish one final scientific matching specification.
 The settings retain the single-variable and multivariable candidates needed to
@@ -137,5 +138,6 @@ and plot remain unchanged.
 - The production figure run must retain a machine-readable summary with exact
   Stage-2 input and settings checksums so documented pair counts and SMD values
   can be traced to their inputs.
-- A representative 96-hour PNW Bartusek Stage-2 run must refresh the documented
-  pair counts and SMD diagnostics before A2.8 is completed.
+- A representative 48-hour PNW Bartusek Stage-2 run must refresh the documented
+  pair counts and SMD diagnostics before any matching result derived from a
+  48-hour product is accepted.

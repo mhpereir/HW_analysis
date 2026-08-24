@@ -2,12 +2,15 @@
 
 ## Status
 
-Accepted current default.
+Superseded for `heat_budget_pre` and `lwa_pre_peak` by
+[decision 009](009_stage2_48_hour_integration.md). The other fixed windows
+remain current.
 
 ## Decision
 
-Event features use fixed timestamp windows relative to each event `peak_time`.
-Timestamp slices are inclusive.
+This record established fixed timestamp windows relative to each event
+`peak_time`. Timestamp slices are inclusive. Its original integration windows
+are retained below for historical provenance.
 
 ```text
 heat_budget_pre      = (-96, 0) hours
@@ -24,7 +27,7 @@ Fixed windows make the Stage-2 feature table reproducible and easy to compare
 across events. Centering on `peak_time` keeps the feature product aligned with
 the event summaries in Stage 1.
 
-The current `lwa_pre_peak=(-96,0)` contract matches
+The original `lwa_pre_peak=(-96,0)` contract matched
 `scripts/event_features/event_feature_config.py` and captures the four days
 leading into and including the peak timestamp.
 

@@ -47,6 +47,9 @@ event-adjacent rows are retained.
 The product uses the same inclusive fixed-window definitions and source
 variables as the Stage-2 event-feature product. Default output includes:
 
+See [decision 009](../decisions/009_stage2_48_hour_integration.md) for the
+active 48-hour integration windows and inclusive endpoint convention.
+
 ```text
 I_dTdt_pre(baseline_day)
 I_advection_pre(baseline_day)

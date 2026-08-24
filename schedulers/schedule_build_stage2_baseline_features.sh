@@ -35,6 +35,7 @@ actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
 test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
 test -s "${INPUT_PATH}"
+test ! -e "${OUTPUT_PATH}"
 test ! -e "${STAGED_OUTPUT_PATH}"
 
 mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
@@ -67,6 +68,7 @@ cd "${PROJECT_ROOT}"
     --season-months 6 7 8
 
 test -s "${STAGED_OUTPUT_PATH}"
-mv -f -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"
+mv --no-clobber -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"
+test ! -e "${STAGED_OUTPUT_PATH}"
 test -s "${OUTPUT_PATH}"
 echo "[info] finished=$(date -Is)"

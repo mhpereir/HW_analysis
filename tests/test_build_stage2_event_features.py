@@ -10,8 +10,8 @@ from HW_analysis.scripts.event_features import event_feature_config as feature_c
 
 
 def test_config_uses_expected_default_windows():
-    assert feature_config.WINDOWS["heat_budget_pre"] == (-96, 0)
-    assert feature_config.WINDOWS["lwa_pre_peak"] == (-96, 0)
+    assert feature_config.WINDOWS["heat_budget_pre"] == (-48, 0)
+    assert feature_config.WINDOWS["lwa_pre_peak"] == (-48, 0)
     assert feature_config.WINDOWS["antecedent_state"] == (-168, -24)
 
 
@@ -87,16 +87,16 @@ def test_build_default_features_uses_inclusive_windows_and_derived_tas_anom():
 
     assert out.sizes["event"] == 1
     np.testing.assert_array_equal(out["event_id"].values, [1])
-    assert out["n_samples_heat_budget_pre"].item() == 97
-    assert out["n_samples_lwa_pre_peak"].item() == 97
+    assert out["n_samples_heat_budget_pre"].item() == 49
+    assert out["n_samples_lwa_pre_peak"].item() == 49
     assert out["n_samples_antecedent_state"].item() == 145
-    assert out["I_dTdt_pre"].item() == 97.0
-    assert out["I_advection_pre"].item() == 194.0
-    assert out["I_adiabatic_pre"].item() == 291.0
-    assert out["I_dyn_pre"].item() == 485.0
-    assert out["I_diabatic_pre"].item() == 388.0
-    assert out["I_lwa_a_pre_peak"].item() == 485.0
-    assert out["I_lwa_c_pre_peak"].item() == 582.0
+    assert out["I_dTdt_pre"].item() == 49.0
+    assert out["I_advection_pre"].item() == 98.0
+    assert out["I_adiabatic_pre"].item() == 147.0
+    assert out["I_dyn_pre"].item() == 245.0
+    assert out["I_diabatic_pre"].item() == 196.0
+    assert out["I_lwa_a_pre_peak"].item() == 245.0
+    assert out["I_lwa_c_pre_peak"].item() == 294.0
     assert out["T_anom_mean_ant"].item() == 10.0
     assert out["days_from_solstice"].item() == -11.0
     assert out.attrs["all_seasons"] == 1
@@ -110,7 +110,7 @@ def test_build_default_features_uses_inclusive_windows_and_derived_tas_anom():
         "formula": "I_adiabatic_pre + I_advection_pre",
         "operation": "sum",
         "window_name": "heat_budget_pre",
-        "window_lag_hours": "-96,0",
+        "window_lag_hours": "-48,0",
         "window_endpoint_inclusion": "inclusive",
         "integral_method": "hourly_sum_assuming_1h_spacing",
         "units": "K",
@@ -157,11 +157,11 @@ def test_build_extended_features_adds_optional_diagnostics():
         use_extended_variables=True,
     )
 
-    assert out["I_nslr_pre"].item() == 679.0
-    assert out["I_nssr_pre"].item() == 776.0
-    assert out["I_sshf_pre"].item() == 873.0
-    assert out["I_slhf_pre"].item() == 970.0
-    assert out["I_surface_energy_pre"].item() == 1067.0
+    assert out["I_nslr_pre"].item() == 343.0
+    assert out["I_nssr_pre"].item() == 392.0
+    assert out["I_sshf_pre"].item() == 441.0
+    assert out["I_slhf_pre"].item() == 490.0
+    assert out["I_surface_energy_pre"].item() == 539.0
     assert out["soil_moisture_mean_ant"].item() == pytest.approx(154.0 / 145.0)
     assert out["cloud_cover_mean_ant"].item() == 0.5
     assert out["soil_moisture_change"].item() == 9.0

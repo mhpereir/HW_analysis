@@ -48,14 +48,14 @@ Timestamp slices are inclusive. Current defaults are:
 
 | Window | Lags relative to `peak_time` |
 | --- | --- |
-| `heat_budget_pre` | `(-96, 0)` hours |
-| `lwa_pre_peak` | `(-96, 0)` hours |
+| `heat_budget_pre` | `(-48, 0)` hours |
+| `lwa_pre_peak` | `(-48, 0)` hours |
 | `antecedent_state` | `(-168, -24)` hours |
 | `antecedent_change` | `(-168, 0)` hours |
 | `near_peak` | `(-24, 24)` hours |
 | `decay` | `(0, 72)` hours |
 
-See [decision 001](../decisions/001_event_feature_windows.md).
+See [decision 009](../decisions/009_stage2_48_hour_integration.md).
 
 ## Default Variables
 
