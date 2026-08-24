@@ -129,17 +129,18 @@ use a 5x2 panel grid. The left column contains temperature and volume, `dTdt`,
 advection, adiabatic heating, and diabatic heating. The right column contains:
 
 1. anticyclonic and cyclonic LWA;
-2. cloud cover;
+2. soil moisture and cloud cover on independent y-axes;
 3. longwave and shortwave radiative heating;
-4. sensible and latent surface heating; and
-5. soil moisture.
+4. sensible surface heating; and
+5. latent surface heating.
 
-Cloud cover and soil moisture use separate axes. Absolute cloud cover is
-bounded to the physical fraction range from zero to one, while a
-climatological anomaly is not. PBL diagnostics and panels are inactive under
+Soil moisture uses the left y-axis and cloud cover uses the right y-axis in
+their shared panel. Absolute cloud cover is bounded to the physical fraction
+range from zero to one, while a climatological anomaly is not. PBL diagnostics
+and panels are inactive under
 [decision 008](../decisions/008_retire_pbl_diagnostics.md).
 
-### Climatological-anomaly composite labels and surface-flux signs
+### Composite labels and surface-flux signs
 
 The all-event and split-event climatological-anomaly composite figures use the
 symbol `Δ` in panel-axis labels instead of spelling out `anomaly`. Place `Δ`
@@ -150,18 +151,17 @@ example `Δ [K hr-1]`. Figure titles continue to identify the
 climatological-anomaly representation explicitly.
 
 ERA5 sensible and latent surface heat fluxes use the source convention that
-positive values are directed toward the surface. In the all-event and
-split-event climatological-anomaly composite figures, render
-`sshf_heating_rate_approx` and `slhf_heating_rate_approx` with the opposite
-sign, so positive plotted anomalies denote heat transfer into the atmosphere
-and can be compared directly with the atmospheric diabatic-heating sign. Apply
-the same sign reversal to the composite mean and its event-percentile bounds.
+positive values are directed toward the surface. In every extended temporal
+figure, render `sshf_heating_rate_approx` and `slhf_heating_rate_approx` with
+the opposite sign, so positive plotted values denote heat transfer into the
+atmosphere and can be compared directly with the atmospheric diabatic-heating
+sign. Apply the same sign reversal to composite means, event-percentile bounds,
+top-event traces, and their reference composites.
 
 This is a display transform only. It must not mutate Stage 1, the climatology
-companion, the assembled composite dataset, absolute-value figures, or
-top-event figures. Synthetic plotting tests must verify the `Δ` labels, the
-reversed anomaly traces and bounds, and retention of native signs in absolute
-composites.
+companion, or any assembled composite or top-event dataset. Synthetic plotting
+tests must verify the `Δ` labels, the reversed absolute and anomaly traces and
+bounds, top-event and reference signs, and source-data immutability.
 
 ## Validation
 

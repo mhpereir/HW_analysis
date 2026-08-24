@@ -16,11 +16,20 @@ The standalone raw-data path configuration and `src.data_io.open_era5_pbl_p()`
 remain available for explicitly scoped ad hoc work. They are not production
 Stage-1 inputs and their availability must not gate an active pipeline run.
 
-Extended 5x2 temporal figures retain their existing dimensions. Cloud cover
-moves into the former PBL panel, and soil moisture occupies the final panel on
-its own axis. Absolute cloud cover remains bounded to the physical fraction
-range from zero to one. Climatological cloud-cover anomalies are not bounded to
-that range.
+Extended 5x2 temporal figures retain their existing dimensions. The right-hand
+column contains LWA; soil moisture and cloud cover on independent twin y-axes;
+longwave and shortwave surface radiative heating together; sensible surface
+heating; and latent surface heating. Absolute cloud cover remains bounded to
+the physical fraction range from zero to one. Climatological cloud-cover
+anomalies are not bounded to that range.
+
+ERA5 sensible and latent surface heat fluxes use a source convention that is
+positive toward the surface. Every extended temporal figure displays their
+heating-rate approximations with the opposite sign, so positive plotted values
+denote heat transfer into the atmosphere. This display transform applies to
+absolute and climatological-anomaly composites, split composites, top-event
+traces, reference composites, and event-percentile bounds without modifying
+the underlying datasets.
 
 ## Rationale
 
@@ -30,8 +39,10 @@ Stage-1 production. Removing it simplifies the active data dependency graph and
 allows every region to proceed once its heat-budget and remaining ERA5-family
 inputs are available.
 
-Separate soil-moisture and cloud-cover panels also remove the final figure's
-twin-axis comparison between variables with unrelated units and ranges.
+Combining soil moisture and cloud cover on independent y-axes preserves both
+environmental traces in one panel and leaves separate panels for sensible and
+latent surface heating. Those turbulent flux components can then be compared
+without sharing a scale or legend with one another.
 
 ## Compatibility
 
@@ -44,6 +55,10 @@ remain readable. Updated consumers ignore those extra variables. Existing
 artifacts and figures are not overwritten; new products and plots are written
 to run-specific paths and omit PBL fields and panels.
 
+The atmospheric surface-flux sign is a plotting convention only. Stage-1,
+climatology, composite, and Stage-2 products retain their source-sign values and
+metadata.
+
 The raw PBL loader is retained for ad hoc use, but no active product builder,
 feature extractor, plotter, or PBS workflow may depend on it.
 
@@ -55,6 +70,10 @@ feature extractor, plotter, or PBS workflow may depend on it.
   count variable.
 - New extended Stage-2 event and baseline products omit `pbl_p_mean_ant`.
 - Extended all-event, split-event, climatological-anomaly, and top-event plots
-  preserve the 5x2 layout with separate cloud-cover and soil-moisture panels.
+  preserve the 5x2 layout with the documented right-column panel order and a
+  twin-axis soil-moisture/cloud-cover panel.
+- Absolute and climatological-anomaly plots reverse sensible and latent source
+  signs for means, event-percentile bounds, event traces, and references while
+  leaving source datasets unchanged.
 - A representative Venus run verifies that PBL input availability is not
   inspected or required.
