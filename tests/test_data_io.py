@@ -1,7 +1,6 @@
 import numpy as np
-import xarray as xr
 import pytest
-
+import xarray as xr
 from HW_analysis.src import data_io
 
 
@@ -53,7 +52,9 @@ def test_filter_yearly_files_raises_when_one_requested_year_is_missing():
 
 
 def test_glob_required_raises_with_pattern():
-    with pytest.raises(FileNotFoundError, match=r"No files matched pattern: /tmp/missing_\*"):
+    with pytest.raises(
+        FileNotFoundError, match=r"No files matched pattern: /tmp/missing_\*"
+    ):
         data_io._glob_required("/tmp/missing_*")
 
 
@@ -151,7 +152,9 @@ def test_open_era5_lwa_filters_requested_years(monkeypatch):
     ds = xr.Dataset(
         data_vars={"LWA": (("time", "lat", "lon"), np.ones((3, 1, 1)))},
         coords={
-            "time": np.array(["1940-05-01", "1941-05-01", "1942-05-01"], dtype="datetime64[D]"),
+            "time": np.array(
+                ["1940-05-01", "1941-05-01", "1942-05-01"], dtype="datetime64[D]"
+            ),
             "lat": [50.0],
             "lon": [240.0],
         },
@@ -159,7 +162,9 @@ def test_open_era5_lwa_filters_requested_years(monkeypatch):
     ds["LWA_a"] = ds["LWA"].copy()
     ds["LWA_c"] = ds["LWA"].copy()
 
-    monkeypatch.setattr(data_io, "_glob_required", lambda pattern: ["/data/LWA_day_ERA5_2deg.500.nc"])
+    monkeypatch.setattr(
+        data_io, "_glob_required", lambda pattern: ["/data/LWA_day_ERA5_2deg.500.nc"]
+    )
     monkeypatch.setattr(data_io, "_open_single_dataset", lambda path, *, chunks: ds)
 
     out = data_io.open_era5_lwa(years=[1941])
@@ -187,13 +192,17 @@ def test_open_era5_lwa_threshold_builds_current_path(monkeypatch):
     out = data_io.open_era5_lwa_threshold(region="pnw_bartusek", quantile=95)
 
     assert "/pnw_bartusek/ERA5/q95/" in captured["pattern"]
-    assert captured["pattern"].endswith("ERA5_LWAthresh_block_1970_2014_q95_pnw_bartusek.500.nc")
+    assert captured["pattern"].endswith(
+        "ERA5_LWAthresh_block_1970_2014_q95_pnw_bartusek.500.nc"
+    )
     assert "dayofyear" in out.coords
 
 
 def test_open_era5_hw_threshold_rejects_unsupported_methods():
     with pytest.raises(ValueError, match="Only 'evolving' is implemented"):
-        data_io.open_era5_hw_threshold(region="pnw_bartusek", quantile=95, method="block")
+        data_io.open_era5_hw_threshold(
+            region="pnw_bartusek", quantile=95, method="block"
+        )
 
 
 def test_open_era5_hw_threshold_builds_evolving_path(monkeypatch):
@@ -231,7 +240,9 @@ def test_open_era5_hw_threshold_filters_requested_years(monkeypatch):
         coords={"year": [1940, 1941, 1942], "dayofyear": [1]},
     )
 
-    monkeypatch.setattr(data_io, "_glob_required", lambda pattern: ["/data/hw_thresh.nc"])
+    monkeypatch.setattr(
+        data_io, "_glob_required", lambda pattern: ["/data/hw_thresh.nc"]
+    )
     monkeypatch.setattr(data_io, "_open_single_dataset", lambda path, *, chunks: ds)
 
     out = data_io.open_era5_hw_threshold(
@@ -282,7 +293,14 @@ def test_open_era5_heat_budget_filters_requested_years(monkeypatch):
     assert captured["paths"] == ["/data/heat_budget_1940.nc"]
     assert captured["combine"] == "by_coords"
     assert captured["chunks"] == data_io.DEFAULT_HEAT_BUDGET_CHUNKS
-    assert {"dT_dt", "adiabatic_term", "diabatic_term", "T_domain_avg", "domain_volume", "advection_term"} <= set(out.data_vars)
+    assert {
+        "dT_dt",
+        "adiabatic_term",
+        "diabatic_term",
+        "T_domain_avg",
+        "domain_volume",
+        "advection_term",
+    } <= set(out.data_vars)
     assert "time" in out.coords
 
 
@@ -407,6 +425,35 @@ def test_open_era5_pbl_p_builds_expected_regional_path(monkeypatch):
     assert "pbl_p" in out.data_vars
 
 
+def test_open_era5_pbl_p_accepts_explicit_current_output_root(monkeypatch, tmp_path):
+    captured = {}
+    ds = xr.Dataset(
+        data_vars={"pbl_p": (("time", "lat", "lon"), [[[1.0]]])},
+        coords={"time": [0], "lat": [50.0], "lon": [-120.0]},
+    )
+
+    def fake_glob_required(pattern):
+        captured["pattern"] = pattern
+        return [str(tmp_path / "ERA5_ARCO_pbl_p_1940.nc")]
+
+    monkeypatch.setattr(data_io, "_glob_required", fake_glob_required)
+    monkeypatch.setattr(
+        data_io,
+        "_open_multiple_datasets",
+        lambda paths, *, combine, chunks: ds,
+    )
+
+    data_io.open_era5_pbl_p(
+        region="pnw_bartusek",
+        years=[1940],
+        root=tmp_path / "outputs",
+    )
+
+    assert captured["pattern"] == str(
+        tmp_path / "outputs/pnw_bartusek/ERA5_ARCO_pbl_p_*.nc"
+    )
+
+
 def test_open_era5_total_cloud_cover_uses_global_hourly_files(monkeypatch):
     captured = {}
     ds = xr.Dataset(
@@ -435,9 +482,7 @@ def test_open_era5_total_cloud_cover_uses_global_hourly_files(monkeypatch):
 
     out = data_io.open_era5_total_cloud_cover(years=[1940])
 
-    assert captured["pattern"].endswith(
-        "/cloud_cover/cloud_cover_hour_ERA5_*.nc"
-    )
+    assert captured["pattern"].endswith("/cloud_cover/cloud_cover_hour_ERA5_*.nc")
     assert captured["paths"] == ["/data/cloud_cover_hour_ERA5_1940.nc"]
     assert captured["chunks"] == data_io.DEFAULT_GLOBAL_HOURLY_CHUNKS
     assert {"time", "lat", "lon"} <= set(out.coords)
