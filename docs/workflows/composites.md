@@ -61,7 +61,10 @@ schedulers/schedule_plot_advection_direction_exploration_matched_clim_anom.sh
 ```
 
 They require explicit Stage-1, climatology, and output paths plus a verified
-runtime commit. They do not build prerequisites inside plotting jobs.
+runtime commit. The two all-event schedulers and the two split-event schedulers
+accept the same regional, boundary, threshold, year, lag-window, smoothing, and
+output/log configuration at submission time. They do not build prerequisites
+inside plotting jobs.
 
 The production split-composite schedulers render the same complete
 split-variable matrix. The five numeric split variables are `duration`,

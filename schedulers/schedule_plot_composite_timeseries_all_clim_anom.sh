@@ -13,7 +13,17 @@ EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"
 CLIMATOLOGY_PATH="${CLIMATOLOGY_PATH:?CLIMATOLOGY_PATH is required}"
 OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"
+REGION="${REGION:-pnw_bartusek}"
+BOTTOM_BOUNDARY="${BOTTOM_BOUNDARY:-surface}"
+TOP_BOUNDARY="${TOP_BOUNDARY:-700}"
+THRESHOLD_VARIABLE="${THRESHOLD_VARIABLE:-tas}"
+QUANTILE="${QUANTILE:-90}"
+TIME_START="${TIME_START:-1940}"
+TIME_END="${TIME_END:-2024}"
+WINDOW_DAYS="${WINDOW_DAYS:-7}"
+SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"
 LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+SMOOTHED_OUTPUT_PATH="${OUTPUT_PATH%.*}_smoothed.${OUTPUT_PATH##*.}"
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
@@ -21,6 +31,7 @@ test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)
 test -s "${INPUT_PATH}"
 test -s "${CLIMATOLOGY_PATH}"
 test ! -e "${OUTPUT_PATH}"
+test ! -e "${SMOOTHED_OUTPUT_PATH}"
 
 mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
 LOGFILE="${LOG_DIR}/${PBS_JOBID}_plot_composite_all_clim_anom.log"
@@ -42,25 +53,32 @@ echo "[info] python=$(command -v python)"
 echo "[info] input_path=${INPUT_PATH}"
 echo "[info] climatology_path=${CLIMATOLOGY_PATH}"
 echo "[info] output_path=${OUTPUT_PATH}"
+echo "[info] region=${REGION}"
+echo "[info] boundaries=${BOTTOM_BOUNDARY}-${TOP_BOUNDARY}hPa"
+echo "[info] threshold=${THRESHOLD_VARIABLE}_q${QUANTILE}"
+echo "[info] years=${TIME_START}-${TIME_END}"
+echo "[info] window_days=${WINDOW_DAYS}"
+echo "[info] smoothing_window=${SMOOTHING_WINDOW}"
 echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v python scripts/plot_composite_timeseries_all_clim_anom.py \
-  --region pnw_bartusek \
-  --bottom-boundary surface \
-  --top-boundary 700 \
-  --threshold-variable tas \
-  --quantile 90 \
-  --start-year 1940 \
-  --end-year 2024 \
+  --region "${REGION}" \
+  --bottom-boundary "${BOTTOM_BOUNDARY}" \
+  --top-boundary "${TOP_BOUNDARY}" \
+  --threshold-variable "${THRESHOLD_VARIABLE}" \
+  --quantile "${QUANTILE}" \
+  --start-year "${TIME_START}" \
+  --end-year "${TIME_END}" \
   --input-path "${INPUT_PATH}" \
   --climatology-path "${CLIMATOLOGY_PATH}" \
   --output-path "${OUTPUT_PATH}" \
-  --window-days 7 \
+  --window-days "${WINDOW_DAYS}" \
+  --smoothing-window "${SMOOTHING_WINDOW}" \
   --season-months 6 7 8 \
   --require-full-event \
   --plot-extended-variables
 
 test -s "${OUTPUT_PATH}"
-test -s "${OUTPUT_PATH%.png}_smoothed.png"
+test -s "${SMOOTHED_OUTPUT_PATH}"
 echo "[info] finished=$(date -Is)"

@@ -155,6 +155,43 @@ def test_split_anomaly_scheduler_accepts_regional_plot_configuration():
         assert text.count(f'--{argument} "${{{variable}}}"') == 2
 
 
+def test_all_anomaly_scheduler_accepts_regional_plot_configuration():
+    text = SCHEDULERS[1].read_text()
+
+    expected_defaults = {
+        "REGION": "pnw_bartusek",
+        "BOTTOM_BOUNDARY": "surface",
+        "TOP_BOUNDARY": "700",
+        "THRESHOLD_VARIABLE": "tas",
+        "QUANTILE": "90",
+        "TIME_START": "1940",
+        "TIME_END": "2024",
+        "WINDOW_DAYS": "7",
+        "SMOOTHING_WINDOW": "24",
+    }
+    for variable, default in expected_defaults.items():
+        assert f'{variable}="${{{variable}:-{default}}}"' in text
+
+    expected_arguments = {
+        "region": "REGION",
+        "bottom-boundary": "BOTTOM_BOUNDARY",
+        "top-boundary": "TOP_BOUNDARY",
+        "threshold-variable": "THRESHOLD_VARIABLE",
+        "quantile": "QUANTILE",
+        "start-year": "TIME_START",
+        "end-year": "TIME_END",
+        "window-days": "WINDOW_DAYS",
+        "smoothing-window": "SMOOTHING_WINDOW",
+    }
+    for argument, variable in expected_arguments.items():
+        assert f'--{argument} "${{{variable}}}"' in text
+
+    assert 'test ! -e "${OUTPUT_PATH}"' in text
+    assert 'test ! -e "${SMOOTHED_OUTPUT_PATH}"' in text
+    assert 'test -s "${OUTPUT_PATH}"' in text
+    assert 'test -s "${SMOOTHED_OUTPUT_PATH}"' in text
+
+
 def test_split_anomaly_scheduler_preflights_and_validates_all_outputs():
     text = SCHEDULERS[2].read_text()
 
