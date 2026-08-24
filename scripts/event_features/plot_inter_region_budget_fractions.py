@@ -335,7 +335,14 @@ def plot_inter_region_budget_fractions(
         sharey=True,
         figsize=plot_style.publication_figsize("full", aspect=0.56),
         gridspec_kw={"width_ratios": (1.0, 1.0, 1.0, 1.0, 1.15)},
-        constrained_layout=True,
+        constrained_layout=False,
+    )
+    figure.subplots_adjust(
+        left=0.17,
+        right=0.985,
+        bottom=0.17,
+        top=0.78,
+        wspace=0.24,
     )
     axes = np.asarray(axes)
     y_positions = np.arange(len(summaries), dtype=float)
@@ -355,8 +362,9 @@ def plot_inter_region_budget_fractions(
             zorder=0,
         )
         axis.set_xlim(-1.05, 1.05)
-        axis.set_xticks((-1.0, -0.5, 0.0, 0.5, 1.0))
+        axis.set_xticks((-1.0, 0.0, 1.0))
         axis.xaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=0))
+        plot_style.use_default_numeric_formatter(axis.xaxis)
         axis.set_title(panel_title, color=color)
         axis.set_xlabel("Signed fraction")
         plot_style.style_axis(axis)
@@ -384,7 +392,7 @@ def plot_inter_region_budget_fractions(
         required_values=(0.0,),
     )
     if activity_limits is not None:
-        activity_axis.set_xlim(*activity_limits)
+        activity_axis.set_xlim(0.0, activity_limits[1])
     activity_axis.set_title("Gross activity", color=plot_style.COLORS["mass"])
     activity_axis.set_xlabel("K")
     plot_style.style_axis(activity_axis)
@@ -393,16 +401,19 @@ def plot_inter_region_budget_fractions(
     axes[0].set_yticks(y_positions, labels=display_names)
     axes[0].invert_yaxis()
     axes[0].set_ylabel("Region")
-    figure.suptitle(title)
+    for axis in axes:
+        plot_style.use_default_numeric_formatter(axis.yaxis)
+    figure.suptitle(title, y=0.965)
     figure.legend(
         handles=population_legend_handles(),
-        loc="outside upper center",
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.91),
         ncols=2,
         **plot_style.legend_kwargs(frameon=False),
     )
     figure.text(
         0.5,
-        0.005,
+        0.025,
         (
             "Dots are medians; thick intervals are P25-P75; thin intervals "
             "are P10-P90. Positive fractions heat and negative fractions cool."

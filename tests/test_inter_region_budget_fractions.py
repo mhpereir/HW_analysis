@@ -152,11 +152,16 @@ def test_plot_has_common_fraction_axes_and_all_region_labels():
         labels = [label.get_text() for label in figure.axes[0].get_yticklabels()]
         assert labels == ["Alaska", "Central China"]
         assert figure.axes[0].get_ylim()[0] > figure.axes[0].get_ylim()[1]
-        assert figure.axes[4].get_xlim()[0] < 0.0 < figure.axes[4].get_xlim()[1]
+        assert figure.axes[4].get_xlim()[0] == 0.0
+        assert figure.axes[4].get_xlim()[1] > 0.0
         assert [text.get_text() for text in figure.legends[0].get_texts()] == [
             "Heatwave events",
             "Clean baseline days",
         ]
+        plot_diag.plot_style.format_numeric_axes(figure)
+        assert [
+            label.get_text() for label in figure.axes[0].get_yticklabels()
+        ] == ["Alaska", "Central China"]
     finally:
         plt.close(figure)
 
