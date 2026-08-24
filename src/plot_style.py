@@ -49,7 +49,7 @@ VARIABLE_NAME_MAPPING = {
     "nslr_heating_rate_approx": "Longwave Radiation",
     "nssr_heating_rate_approx": "Shortwave Radiation",
     "sshf_heating_rate_approx": "Sensible Heating",
-    "slhf_heating_rate_approx": "Latent heat flux",
+    "slhf_heating_rate_approx": "Latent Heating",
     "soil_moisture": "Soil Moisture",
     "cloud_cover": "Cloud Cover",
 }

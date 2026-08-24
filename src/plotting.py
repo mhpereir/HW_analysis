@@ -73,7 +73,7 @@ SPLIT_EXTENDED_PLOT_VARIABLES: tuple[str, ...] = (
     "soil_moisture",
     "cloud_cover",
 )
-ATMOSPHERIC_SIGN_ANOMALY_VARIABLES = frozenset(
+ATMOSPHERIC_SIGN_DISPLAY_VARIABLES = frozenset(
     {
         "sshf_heating_rate_approx",
         "slhf_heating_rate_approx",
@@ -99,12 +99,9 @@ def _anomaly_axis_label(ds: xr.Dataset, absolute_label: str) -> str:
     return absolute_label
 
 
-def _composite_display_scale(ds: xr.Dataset, name: str) -> float:
+def _display_scale(name: str) -> float:
     """Return the plotting scale needed for the documented display convention."""
-    if (
-        _is_climatological_anomaly(ds)
-        and name in ATMOSPHERIC_SIGN_ANOMALY_VARIABLES
-    ):
+    if name in ATMOSPHERIC_SIGN_DISPLAY_VARIABLES:
         return -1.0
     return 1.0
 
@@ -339,32 +336,24 @@ def _plot_extended_composite_timeseries(composite: xr.Dataset) -> Figure:
     _plot_composite_variable_panel(left[4], composite, "diabatic", ylabel="[K hr-1]")
 
     _plot_lwa_panel(right[0], composite)
-    _plot_composite_variable_panel(
-        right[1],
-        composite,
-        "cloud_cover",
-        ylabel="cloud cover fraction",
-        zero_reference=_is_climatological_anomaly(composite),
-        absolute_ylim=(0.0, 1.0),
-    )
+    _plot_soil_moisture_cloud_panel(right[1], composite)
     _plot_composite_multi_variable_panel(
         right[2],
         composite,
         ("nslr_heating_rate_approx", "nssr_heating_rate_approx"),
         ylabel="[K hr-1]",
     )
-    _plot_composite_multi_variable_panel(
+    _plot_composite_variable_panel(
         right[3],
         composite,
-        ("sshf_heating_rate_approx", "slhf_heating_rate_approx"),
+        "sshf_heating_rate_approx",
         ylabel="[K hr-1]",
     )
     _plot_composite_variable_panel(
         right[4],
         composite,
-        "soil_moisture",
-        ylabel="soil moisture [m3 m-3]",
-        zero_reference=_is_climatological_anomaly(composite),
+        "slhf_heating_rate_approx",
+        ylabel="[K hr-1]",
     )
 
     for ax in axes.ravel():
@@ -422,32 +411,24 @@ def _plot_extended_split_composite_timeseries(composite: xr.Dataset) -> Figure:
     _plot_split_single_variable_panel(left[4], composite, "diabatic", ylabel="[K hr-1]")
 
     _plot_split_lwa_panel(right[0], composite)
-    _plot_split_single_variable_panel(
-        right[1],
-        composite,
-        "cloud_cover",
-        ylabel="cloud cover fraction",
-        zero_reference=_is_climatological_anomaly(composite),
-        absolute_ylim=(0.0, 1.0),
-    )
+    _plot_split_soil_moisture_cloud_panel(right[1], composite)
     _plot_split_multi_variable_panel(
         right[2],
         composite,
         ("nslr_heating_rate_approx", "nssr_heating_rate_approx"),
         ylabel="[K hr-1]",
     )
-    _plot_split_multi_variable_panel(
+    _plot_split_single_variable_panel(
         right[3],
         composite,
-        ("sshf_heating_rate_approx", "slhf_heating_rate_approx"),
+        "sshf_heating_rate_approx",
         ylabel="[K hr-1]",
     )
     _plot_split_single_variable_panel(
         right[4],
         composite,
-        "soil_moisture",
-        ylabel="soil moisture [m3 m-3]",
-        zero_reference=_is_climatological_anomaly(composite),
+        "slhf_heating_rate_approx",
+        ylabel="[K hr-1]",
     )
 
     for ax in axes.ravel():
@@ -544,15 +525,11 @@ def _plot_extended_top_event_timeseries(
         event,
         reference_composite=reference_composite,
     )
-    _plot_top_event_single_variable_panel(
+    _plot_top_event_soil_moisture_cloud_panel(
         right[1],
         event_window,
         event,
-        "cloud_cover",
-        ylabel="cloud cover fraction",
         reference_composite=reference_composite,
-        zero_reference=False,
-        absolute_ylim=(0.0, 1.0),
     )
     _plot_top_event_multi_variable_panel(
         right[2],
@@ -562,11 +539,11 @@ def _plot_extended_top_event_timeseries(
         ylabel="[K hr-1]",
         reference_composite=reference_composite,
     )
-    _plot_top_event_multi_variable_panel(
+    _plot_top_event_single_variable_panel(
         right[3],
         event_window,
         event,
-        ("sshf_heating_rate_approx", "slhf_heating_rate_approx"),
+        "sshf_heating_rate_approx",
         ylabel="[K hr-1]",
         reference_composite=reference_composite,
     )
@@ -574,10 +551,9 @@ def _plot_extended_top_event_timeseries(
         right[4],
         event_window,
         event,
-        "soil_moisture",
-        ylabel="soil moisture [m3 m-3]",
+        "slhf_heating_rate_approx",
+        ylabel="[K hr-1]",
         reference_composite=reference_composite,
-        zero_reference=False,
     )
 
     for ax in axes.ravel():
@@ -939,7 +915,7 @@ def _plot_single_variable_panel(
 ) -> None:
     """Plot one composite variable."""
     color = VARIABLE_COLORS[name]
-    scale = _composite_display_scale(ds, name)
+    scale = _display_scale(name)
     ax.plot(
         ds["lag_hour"].values,
         ds[name].values * scale,
@@ -970,7 +946,7 @@ def _plot_composite_variable_panel(
 ) -> None:
     """Plot one composite variable using its configured color."""
     color = VARIABLE_COLORS[name]
-    scale = _composite_display_scale(ds, name)
+    scale = _display_scale(name)
     ax.plot(
         ds["lag_hour"].values,
         ds[name].values * scale,
@@ -1003,7 +979,7 @@ def _plot_composite_multi_variable_panel(
     """Plot multiple composite variables on one axis."""
     for name in names:
         color = VARIABLE_COLORS[name]
-        scale = _composite_display_scale(ds, name)
+        scale = _display_scale(name)
         ax.plot(
             ds["lag_hour"].values,
             ds[name].values * scale,
@@ -1036,6 +1012,7 @@ def _plot_top_event_single_variable_panel(
 ) -> None:
     """Plot one top-event variable with optional all-event reference."""
     color = VARIABLE_COLORS[name]
+    scale = _display_scale(name)
     _plot_line(
         ax,
         event_window["time"].values,
@@ -1043,6 +1020,7 @@ def _plot_top_event_single_variable_panel(
         name,
         color=color,
         linestyle="--",
+        scale=scale,
     )
     if reference_composite is not None:
         _plot_top_event_reference(
@@ -1072,6 +1050,7 @@ def _plot_top_event_multi_variable_panel(
     """Plot top-event variables with optional all-event reference."""
     for name in names:
         color = VARIABLE_COLORS[name]
+        scale = _display_scale(name)
         _plot_line(
             ax,
             event_window["time"].values,
@@ -1079,6 +1058,7 @@ def _plot_top_event_multi_variable_panel(
             name,
             color=color,
             linestyle="--",
+            scale=scale,
         )
         if reference_composite is not None:
             _plot_top_event_reference(
@@ -1103,7 +1083,7 @@ def _plot_split_single_variable_panel(
     absolute_ylim: tuple[float, float] | None = None,
 ) -> None:
     """Plot one split-bin composite variable."""
-    scale = _composite_display_scale(ds, name)
+    scale = _display_scale(name)
     _plot_split_lines(
         ax,
         ds["lag_hour"].values,
@@ -1129,7 +1109,7 @@ def _plot_split_multi_variable_panel(
 ) -> None:
     """Plot multiple split-bin composite variables on one axis."""
     for name in names:
-        scale = _composite_display_scale(ds, name)
+        scale = _display_scale(name)
         _plot_split_lines(
             ax,
             ds["lag_hour"].values,
@@ -1298,6 +1278,157 @@ def _plot_split_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
     ax.add_artist(variable_legend)
 
 
+def _plot_soil_moisture_cloud_panel(ax: Axes, ds: xr.Dataset) -> None:
+    """Plot soil moisture and cloud cover with independent y axes."""
+    lag = ds["lag_hour"].values
+    soil_name = "soil_moisture"
+    cloud_name = "cloud_cover"
+    soil_color = VARIABLE_COLORS[soil_name]
+    cloud_color = VARIABLE_COLORS[cloud_name]
+
+    ax.plot(
+        lag,
+        ds[soil_name].values,
+        color=soil_color,
+        label=_variable_label(soil_name),
+    )
+    _plot_event_percentile_band(ax, lag, ds, soil_name, color=soil_color)
+    ax.set_ylabel(
+        _anomaly_axis_label(ds, "soil moisture [m3 m-3]"),
+        color=soil_color,
+    )
+    ax.tick_params(axis="y", labelcolor=soil_color)
+
+    ax_cloud = ax.twinx()
+    ax_cloud.plot(
+        lag,
+        ds[cloud_name].values,
+        color=cloud_color,
+        label=_variable_label(cloud_name),
+    )
+    _plot_event_percentile_band(ax_cloud, lag, ds, cloud_name, color=cloud_color)
+    ax_cloud.set_ylabel(
+        _anomaly_axis_label(ds, "cloud cover fraction"),
+        color=cloud_color,
+    )
+    ax_cloud.tick_params(axis="y", labelcolor=cloud_color)
+    if _is_climatological_anomaly(ds):
+        plot_style.zero_line(ax)
+        plot_style.zero_line(ax_cloud)
+    else:
+        ax_cloud.set_ylim(0.0, 1.0)
+
+    lines, labels = ax.get_legend_handles_labels()
+    cloud_lines, cloud_labels = ax_cloud.get_legend_handles_labels()
+    ax.legend(lines + cloud_lines, labels + cloud_labels, loc="upper left")
+
+
+def _plot_split_soil_moisture_cloud_panel(ax: Axes, ds: xr.Dataset) -> None:
+    """Plot split-bin soil moisture and cloud cover with independent y axes."""
+    lag = ds["lag_hour"].values
+    soil_name = "soil_moisture"
+    cloud_name = "cloud_cover"
+    soil_color = VARIABLE_COLORS[soil_name]
+    cloud_color = VARIABLE_COLORS[cloud_name]
+
+    _plot_split_lines(ax, lag, ds, soil_name, color=soil_color)
+    ax.set_ylabel(
+        _anomaly_axis_label(ds, "soil moisture [m3 m-3]"),
+        color=soil_color,
+    )
+    ax.tick_params(axis="y", labelcolor=soil_color)
+
+    ax_cloud = ax.twinx()
+    _plot_split_lines(ax_cloud, lag, ds, cloud_name, color=cloud_color)
+    ax_cloud.set_ylabel(
+        _anomaly_axis_label(ds, "cloud cover fraction"),
+        color=cloud_color,
+    )
+    ax_cloud.tick_params(axis="y", labelcolor=cloud_color)
+    if _is_climatological_anomaly(ds):
+        plot_style.zero_line(ax)
+        plot_style.zero_line(ax_cloud)
+    else:
+        ax_cloud.set_ylim(0.0, 1.0)
+
+    ax.legend(
+        handles=[
+            _variable_legend_handle(soil_name),
+            _variable_legend_handle(cloud_name),
+        ],
+        loc="upper left",
+    )
+
+
+def _plot_top_event_soil_moisture_cloud_panel(
+    ax: Axes,
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    *,
+    reference_composite: xr.Dataset | None,
+) -> None:
+    """Plot top-event soil moisture and cloud cover with independent y axes."""
+    time = event_window["time"].values
+    soil_name = "soil_moisture"
+    cloud_name = "cloud_cover"
+    soil_color = VARIABLE_COLORS[soil_name]
+    cloud_color = VARIABLE_COLORS[cloud_name]
+
+    _plot_line(
+        ax,
+        time,
+        event_window,
+        soil_name,
+        color=soil_color,
+        linestyle="--",
+    )
+    if reference_composite is not None:
+        _plot_top_event_reference(
+            ax,
+            event,
+            reference_composite,
+            soil_name,
+            color=soil_color,
+        )
+    ax.set_ylabel(
+        _anomaly_axis_label(event_window, "soil moisture [m3 m-3]"),
+        color=soil_color,
+    )
+    ax.tick_params(axis="y", labelcolor=soil_color)
+
+    ax_cloud = ax.twinx()
+    _plot_line(
+        ax_cloud,
+        time,
+        event_window,
+        cloud_name,
+        color=cloud_color,
+        linestyle="--",
+    )
+    if reference_composite is not None:
+        _plot_top_event_reference(
+            ax_cloud,
+            event,
+            reference_composite,
+            cloud_name,
+            color=cloud_color,
+        )
+    ax_cloud.set_ylabel(
+        _anomaly_axis_label(event_window, "cloud cover fraction"),
+        color=cloud_color,
+    )
+    ax_cloud.tick_params(axis="y", labelcolor=cloud_color)
+    if _is_climatological_anomaly(event_window):
+        plot_style.zero_line(ax)
+        plot_style.zero_line(ax_cloud)
+    else:
+        ax_cloud.set_ylim(0.0, 1.0)
+
+    lines, labels = ax.get_legend_handles_labels()
+    cloud_lines, cloud_labels = ax_cloud.get_legend_handles_labels()
+    ax.legend(lines + cloud_lines, labels + cloud_labels, loc="upper left")
+
+
 def _plot_split_lines(
     ax: Axes,
     lag: np.ndarray,
@@ -1406,6 +1537,7 @@ def _plot_top_event_reference(
 ) -> None:
     """Plot an all-event composite reference aligned to one event peak."""
     time = _reference_composite_time(event, reference_composite)
+    scale = _display_scale(name)
     _plot_line(
         ax,
         time,
@@ -1414,8 +1546,16 @@ def _plot_top_event_reference(
         color=color,
         linewidth=plot_style.LINE_WIDTH_PT,
         label="_all_event_average",
+        scale=scale,
     )
-    _plot_event_percentile_band(ax, time, reference_composite, name, color=color)
+    _plot_event_percentile_band(
+        ax,
+        time,
+        reference_composite,
+        name,
+        color=color,
+        scale=scale,
+    )
 
 
 def _add_iqr_legend(ax: Axes) -> None:
