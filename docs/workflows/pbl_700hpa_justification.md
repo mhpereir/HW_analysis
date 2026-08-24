@@ -68,6 +68,11 @@ The two-panel paper figure contains:
    geographic labels, and the configured PNW Bartusek domain outlined by a red
    rectangle.
 
+Pressure ticks are displayed directly in hPa without scientific-notation
+scaling. The time-series legend and map color bar occupy dedicated strips below
+their panels so neither obscures data, and the color-bar label must remain
+fully visible in the saved artifact.
+
 The map extent extends 2.5 degrees beyond every configured domain edge. The PBL
 field is shown only where source data exist. The surrounding margin provides
 geographic context and must not be filled by interpolation or extrapolation.

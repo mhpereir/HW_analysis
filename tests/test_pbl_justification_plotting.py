@@ -12,8 +12,9 @@ def test_plot_product_shows_reference_envelope_and_domain_rectangle():
 
     figure = pbl_justification_plotting.plot_product(product)
 
-    time_ax, map_ax = figure.axes[:2]
+    time_ax, map_ax, legend_ax, colorbar_ax = figure.axes
     assert time_ax.yaxis_inverted()
+    assert time_ax.yaxis._plot_style_use_default_numeric_formatter
     assert any(
         np.allclose(np.asarray(line.get_ydata(), dtype=float), 700.0)
         for line in time_ax.lines
@@ -30,6 +31,15 @@ def test_plot_product_shows_reference_envelope_and_domain_rectangle():
     )
     extent = map_ax.get_extent(crs=map_ax.projection)
     assert extent == pytest.approx((-132.5, -107.5, 37.5, 62.5))
+    assert time_ax.get_legend() is None
+    assert not legend_ax.axison
+    assert [text.get_text() for text in legend_ax.get_legend().get_texts()] == [
+        "Spatial 5th-95th percentile",
+        "Area-weighted mean",
+        "700 hPa analysis top",
+    ]
+    assert colorbar_ax.xaxis._plot_style_use_default_numeric_formatter
+    assert colorbar_ax.get_xlabel() == ("PBL-top pressure (hPa)\nLower = deeper PBL")
     plt.close(figure)
 
 

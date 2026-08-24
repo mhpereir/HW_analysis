@@ -35,13 +35,32 @@ def plot_product(
         raise ValueError("map_margin_degrees must be finite and positive.")
 
     plot_style.apply_theme()
-    fig = plt.figure(figsize=plot_style.publication_figsize("full", aspect=0.43))
-    grid = fig.add_gridspec(1, 2, width_ratios=(1.08, 1.0), wspace=0.22)
+    fig = plt.figure(
+        figsize=plot_style.publication_figsize("full", aspect=0.48),
+        layout="constrained",
+    )
+    grid = fig.add_gridspec(
+        2,
+        2,
+        width_ratios=(1.08, 1.0),
+        height_ratios=(1.0, 0.09),
+        hspace=0.08,
+        wspace=0.12,
+    )
     time_ax = fig.add_subplot(grid[0, 0])
     map_ax = fig.add_subplot(grid[0, 1], projection=ccrs.PlateCarree())
+    legend_ax = fig.add_subplot(grid[1, 0])
+    colorbar_ax = fig.add_subplot(grid[1, 1])
 
     _plot_time_series(time_ax, ds)
-    _plot_map(fig, map_ax, ds, margin=map_margin_degrees)
+    _add_time_series_legend(legend_ax, time_ax)
+    _plot_map(
+        fig,
+        map_ax,
+        ds,
+        margin=map_margin_degrees,
+        colorbar_ax=colorbar_ax,
+    )
     time_ax.text(
         0.01,
         0.99,
@@ -111,13 +130,25 @@ def _plot_time_series(ax, ds: xr.Dataset) -> None:
     )
     _set_pressure_limits(ax, p05, p95, float(ds.attrs["upper_boundary_reference_hpa"]))
     ax.set_xlabel("Days relative to heatwave peak")
-    ax.set_ylabel("PBL-top pressure (hPa)\nLower pressure indicates a deeper PBL")
+    ax.set_ylabel("PBL-top pressure (hPa)\nLower = deeper PBL")
     ax.set_title(
         "Peak-aligned regional PBL depth\n"
         f"{int(ds[pbl_justification.SELECTED_EVENT_COUNT_NAME].item())} heatwave events"
     )
     plot_style.style_axis(ax)
-    plot_style.inside_legend(ax, *ax.get_legend_handles_labels(), loc="lower center")
+    plot_style.use_default_numeric_formatter(ax.yaxis)
+
+
+def _add_time_series_legend(legend_ax, time_ax) -> None:
+    handles, labels = time_ax.get_legend_handles_labels()
+    legend_ax.axis("off")
+    legend_ax.legend(
+        handles,
+        labels,
+        loc="center",
+        ncol=len(labels),
+        **plot_style.legend_kwargs(),
+    )
 
 
 def _set_pressure_limits(
@@ -129,7 +160,14 @@ def _set_pressure_limits(
     ax.set_ylim(high + padding, low - padding)
 
 
-def _plot_map(fig: plt.Figure, ax, ds: xr.Dataset, *, margin: float) -> None:
+def _plot_map(
+    fig: plt.Figure,
+    ax,
+    ds: xr.Dataset,
+    *,
+    margin: float,
+    colorbar_ax,
+) -> None:
     region = str(ds.attrs["region"])
     lat_bounds, lon_bounds = config.REGIONS[region]
     lat_min, lat_max = sorted((float(lat_bounds.start), float(lat_bounds.stop)))
@@ -196,7 +234,6 @@ def _plot_map(fig: plt.Figure, ax, ds: xr.Dataset, *, margin: float) -> None:
         "Mean daily maximum PBL depth\n"
         f"{int(ds[pbl_justification.SELECTED_DAY_COUNT_NAME].item())} heatwave days"
     )
-    colorbar = fig.colorbar(
-        mesh, ax=ax, orientation="horizontal", pad=0.09, fraction=0.07
-    )
-    colorbar.set_label("PBL-top pressure (hPa), lower values indicate deeper PBL")
+    colorbar = fig.colorbar(mesh, cax=colorbar_ax, orientation="horizontal")
+    colorbar.set_label("PBL-top pressure (hPa)\nLower = deeper PBL")
+    plot_style.use_default_numeric_formatter(colorbar.ax.xaxis)
