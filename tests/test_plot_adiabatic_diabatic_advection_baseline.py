@@ -115,7 +115,13 @@ def test_nonfinite_values_are_filtered_independently_and_limits_use_both_tables(
         )
         np.testing.assert_allclose(advection_events[:, 0], np.array([-3.0, 10.0]))
         for ax in fig.axes:
-            np.testing.assert_allclose(ax.get_xlim(), np.array([-3.0, 10.0]))
+            np.testing.assert_allclose(ax.get_xlim(), np.array([-3.65, 10.65]))
+        np.testing.assert_allclose(fig.axes[0].get_ylim(), np.array([-0.55, 11.55]))
+        np.testing.assert_allclose(fig.axes[1].get_ylim(), np.array([-9.65, 4.65]))
+        np.testing.assert_allclose(fig.axes[2].get_ylim(), np.array([-0.35, 7.35]))
+        for ax in fig.axes:
+            assert ax.get_xlim()[0] < 0.0 < ax.get_xlim()[1]
+            assert ax.get_ylim()[0] < 0.0 < ax.get_ylim()[1]
     finally:
         plot_diag.plt.close(fig)
 

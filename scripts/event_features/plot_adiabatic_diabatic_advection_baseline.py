@@ -355,6 +355,7 @@ def plot_one_tendency_panel(
         bbox={"facecolor": "white", "edgecolor": "0.8", "alpha": 0.85},
     )
     plot_style.style_axis(ax)
+    set_y_data_limits(ax, reference_y)
 
 
 def validate_feature_variables(
@@ -435,19 +436,19 @@ def source_variable_names(variable: str) -> tuple[str, ...]:
 
 
 def set_shared_x_data_limits(axes: np.ndarray, x_values: np.ndarray) -> None:
-    """Limit shared x-axes to the finite combined x-data extent."""
-    finite = np.asarray(x_values, dtype=float)
-    finite = finite[np.isfinite(finite)]
-    if finite.size == 0:
+    """Pad shared x-axes around plotted data and the zero reference."""
+    limits = plot_style.padded_data_limits(x_values, required_values=(0.0,))
+    if limits is None:
         return
-    xmin = float(np.nanmin(finite))
-    xmax = float(np.nanmax(finite))
-    if xmin == xmax:
-        padding = 0.5 if xmin == 0.0 else abs(xmin) * 0.05
-        xmin -= padding
-        xmax += padding
     for ax in axes:
-        ax.set_xlim(xmin, xmax)
+        ax.set_xlim(*limits)
+
+
+def set_y_data_limits(ax: Axes, y_values: np.ndarray) -> None:
+    """Pad one y-axis around plotted data and the zero reference."""
+    limits = plot_style.padded_data_limits(y_values, required_values=(0.0,))
+    if limits is not None:
+        ax.set_ylim(*limits)
 
 
 def variable_label(variable: str) -> str:

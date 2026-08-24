@@ -30,6 +30,7 @@ DPI = 300
 AXIS_TICK_DECIMALS = 2
 AXIS_SCALE_LOW_THRESHOLD = 1e-2
 AXIS_SCALE_HIGH_THRESHOLD = 1e3
+DATA_RANGE_PADDING_FRACTION = 0.05
 
 SINGLE_PANEL_ASPECT = 0.6
 TWO_PANEL_STACK_ASPECT = 0.55
@@ -235,6 +236,35 @@ def style_axis(ax, *, grid: bool = True) -> None:
 def style_axes(axes: Iterable) -> None:
     for ax in axes:
         style_axis(ax)
+
+
+def padded_data_limits(
+    values: np.ndarray,
+    *,
+    padding_fraction: float = DATA_RANGE_PADDING_FRACTION,
+    required_values: Iterable[float] = (),
+) -> tuple[float, float] | None:
+    """Return padded finite data limits that also contain required values."""
+    if not np.isfinite(padding_fraction) or padding_fraction <= 0.0:
+        raise ValueError("padding_fraction must be finite and greater than zero.")
+
+    finite = np.asarray(values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return None
+
+    required = np.asarray(tuple(required_values), dtype=float)
+    required = required[np.isfinite(required)]
+    if required.size:
+        finite = np.concatenate((finite, required))
+
+    lower = float(np.min(finite))
+    upper = float(np.max(finite))
+    span = upper - lower
+    if span == 0.0:
+        span = max(abs(lower), 1.0)
+    padding = span * padding_fraction
+    return lower - padding, upper + padding
 
 
 class FixedDecimalScaleFormatter(Formatter):

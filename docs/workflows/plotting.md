@@ -107,6 +107,10 @@ figure entrypoints.
 - Event-versus-clean-baseline figures place the shared "Clean baseline days"
   and "Events" legend in the upper-right corner of the first panel. Later
   panels do not repeat that legend.
+- Event-versus-clean-baseline figures pad each finite plotted data range by 5%
+  on both sides while keeping zero reference lines inside the padded range.
+  Shared x-axes use the combined plotted x-data, while each panel derives its
+  y-range from its own clean-baseline and event points.
 - Use shared numeric-axis helpers for reusable tick-spacing and formatting
   rules, including integer-only axes.
 - Use `plot_style.save_figure()` for ordinary Matplotlib figures.

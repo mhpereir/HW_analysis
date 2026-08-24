@@ -120,11 +120,38 @@ def test_nonfinite_values_are_filtered_per_layer_and_limits_use_plotted_points()
             np.array([50.0, 7.0]),
         )
         for ax in fig.axes[:2]:
-            np.testing.assert_allclose(ax.get_xlim(), np.array([-20.0, 10.0]))
+            np.testing.assert_allclose(ax.get_xlim(), np.array([-21.5, 11.5]))
         for ax in fig.axes[2:]:
-            np.testing.assert_allclose(ax.get_xlim(), np.array([-1.0, 12.0]))
+            np.testing.assert_allclose(ax.get_xlim(), np.array([-1.65, 12.65]))
+        np.testing.assert_allclose(fig.axes[0].get_ylim(), np.array([-9.7, 5.7]))
+        np.testing.assert_allclose(fig.axes[1].get_ylim(), np.array([-1.65, 12.65]))
+        np.testing.assert_allclose(fig.axes[2].get_ylim(), np.array([-3.4, 5.4]))
+        np.testing.assert_allclose(fig.axes[3].get_ylim(), np.array([-2.5, 52.5]))
+        for ax in fig.axes:
+            assert ax.get_xlim()[0] < 0.0 < ax.get_xlim()[1]
+            assert ax.get_ylim()[0] < 0.0 < ax.get_ylim()[1]
     finally:
         plot_diag.plt.close(fig)
+
+
+@pytest.mark.parametrize(
+    ("values", "required_values", "expected"),
+    [
+        (np.array([np.nan, -2.0, 8.0]), (), (-2.5, 8.5)),
+        (np.array([4.0, 4.0]), (), (3.8, 4.2)),
+        (np.array([0.0]), (), (-0.05, 0.05)),
+        (np.array([2.0, 8.0]), (0.0,), (-0.4, 8.4)),
+        (np.array([-8.0, -2.0]), (0.0,), (-8.4, 0.4)),
+    ],
+)
+def test_padded_data_limits(values, required_values, expected):
+    np.testing.assert_allclose(
+        plot_diag.plot_style.padded_data_limits(
+            values,
+            required_values=required_values,
+        ),
+        expected,
+    )
 
 
 def test_negative_one_reference_line_uses_combined_plotted_populations():
