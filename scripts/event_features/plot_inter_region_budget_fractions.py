@@ -25,7 +25,7 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.ticker import PercentFormatter
 
-from src import diagnostics, plot_style
+from src import config, diagnostics, plot_style
 
 
 EVENT_DIM = "event"
@@ -299,6 +299,42 @@ def validate_compatible_regional_summaries(
             )
 
 
+def configured_mean_latitude(region: str) -> float:
+    """Return the midpoint of one configured regional latitude interval."""
+    try:
+        latitude_bounds = config.REGIONS[region][0]
+    except KeyError as error:
+        raise ValueError(
+            f"Region {region!r} has no configured latitude bounds."
+        ) from error
+
+    endpoints = np.asarray(
+        (latitude_bounds.start, latitude_bounds.stop),
+        dtype=float,
+    )
+    if not np.all(np.isfinite(endpoints)) or endpoints[0] == endpoints[1]:
+        raise ValueError(
+            f"Region {region!r} has invalid latitude bounds: "
+            f"{latitude_bounds.start!r}, {latitude_bounds.stop!r}."
+        )
+    return float(np.mean(endpoints))
+
+
+def sort_summaries_north_to_south(
+    summaries: Sequence[RegionalBudgetSummary],
+) -> tuple[RegionalBudgetSummary, ...]:
+    """Sort summaries by decreasing configured mean latitude."""
+    return tuple(
+        sorted(
+            summaries,
+            key=lambda summary: (
+                -configured_mean_latitude(summary.region),
+                summary.region,
+            ),
+        )
+    )
+
+
 def write_inter_region_budget_figure(
     summaries: Sequence[RegionalBudgetSummary],
     output_path: str | Path,
@@ -325,6 +361,7 @@ def plot_inter_region_budget_fractions(
 ) -> Figure:
     """Return the common-axis regional fraction and activity figure."""
     validate_compatible_regional_summaries(summaries)
+    summaries = sort_summaries_north_to_south(summaries)
     region_names = [summary.region for summary in summaries]
     if len(region_names) != len(set(region_names)):
         raise ValueError("Regional summaries must contain unique region names.")

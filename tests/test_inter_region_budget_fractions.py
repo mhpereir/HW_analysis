@@ -166,6 +166,41 @@ def test_plot_has_common_fraction_axes_and_all_region_labels():
         plt.close(figure)
 
 
+def test_plot_sorts_regions_north_to_south_by_configured_mean_latitude():
+    input_order = (
+        "central_china",
+        "gulf_usa",
+        "eastern_canada",
+        "western_eu",
+        "pnw_bartusek",
+        "pnw_hotz",
+        "alaska",
+    )
+    summaries = tuple(
+        plot_diag.prepare_regional_budget_summary(
+            region,
+            _make_event_table(),
+            _make_baseline_table(),
+        )
+        for region in input_order
+    )
+
+    figure = plot_diag.plot_inter_region_budget_fractions(summaries)
+    try:
+        labels = [label.get_text() for label in figure.axes[0].get_yticklabels()]
+        assert labels == [
+            "Alaska",
+            "Pacific Northwest (Hotz)",
+            "Pacific Northwest (Bartusek)",
+            "Western Europe",
+            "Eastern Canada",
+            "Gulf USA",
+            "Central China",
+        ]
+    finally:
+        plt.close(figure)
+
+
 def test_region_input_normalization_preserves_order_and_rejects_duplicates(tmp_path):
     normalized = plot_diag.normalize_region_inputs(
         [
