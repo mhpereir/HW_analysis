@@ -160,6 +160,7 @@ that all three variables use the same row dimension and units.
 
 - event-feature plots and split diagnostics under `scripts/event_features/`;
 - event-versus-baseline comparison plots;
+- signed inter-region heat-budget fraction diagnostics;
 - settings-driven in-memory event matching under
   `scripts/Idyn_matching_exploration/`; and
 - `scripts/spatial_composites/build_dyn_net_spatial_composites.py`, which uses

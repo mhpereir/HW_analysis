@@ -52,6 +52,7 @@ results/plots_<plot_name>/
 | Stage 2 event features | feature grids, splits, and combined comparisons | `event_feature_grid_plot.py`, `plot_event_feature.py`, `plot_event_feature_split.py`, `plot_event_feature_split_combined.py` under `scripts/event_features/` |
 | Stage 2 event features | adiabatic, advection, and diabatic event diagnostics | `plot_adiabatic_advection_comparison.py`, `plot_adiabatic_diabatic_advection.py` under `scripts/event_features/` |
 | Stage 2 event and baseline features | event-versus-baseline comparisons | `plot_adiabatic_advection_comparison_baseline.py`, `plot_adiabatic_diabatic_advection_baseline.py` under `scripts/event_features/` |
+| Multiple regional Stage 2 event and baseline features | signed inter-region heat-budget fractions | `plot_inter_region_budget_fractions.py` under `scripts/event_features/` |
 | Stage 2 event features plus tracked settings | matched positive/negative `I_dyn` diagnostics | `scripts/Idyn_matching_exploration/explore_idyn_matching.py` |
 | Spatial composite product | sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |
 | Matched spatial composite product | matched positive/negative `I_dyn_pre` sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py` |
@@ -99,6 +100,13 @@ figure entrypoints.
 - Event, baseline, matching, and spatial-composite consumers must read the
   canonical Stage-2 `I_dyn_pre` variable. They must not reconstruct it from
   `I_adiabatic_pre` and `I_advection_pre`.
+- The inter-region heat-budget diagnostic follows
+  [decision 009](../decisions/009_inter_region_budget_fractions.md). It uses
+  only existing Stage-2 variables, selects clean baseline rows with
+  `event_adjacent == 0`, and displays signed gross-activity-normalized
+  fractions on common regional axes. It retains gross budget activity as a
+  separate magnitude panel and does not replace the absolute-value regional
+  scatter diagnostics.
 - Use `plot_style.VARIABLE_NAME_MAPPING` and shared color dictionaries for
   existing variables.
 - Use `plot_style.publication_figsize()` and shared line-width constants.

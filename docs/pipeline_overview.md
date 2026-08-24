@@ -197,6 +197,7 @@ the diagnostic they make rather than a product stage they produce.
 - [006: regional hourly climatology baseline](decisions/006_regional_hourly_climatology.md)
 - [007: in-memory I_dyn sign matching](decisions/007_idyn_sign_matching.md)
 - [008: retire PBL diagnostics from active products](decisions/008_retire_pbl_diagnostics.md)
+- [009: inter-region heat-budget fractions](decisions/009_inter_region_budget_fractions.md)
 
 PCA and clustering decisions are indexed under
 [legacy documentation](legacy/README.md).

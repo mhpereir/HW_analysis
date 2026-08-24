@@ -130,6 +130,7 @@ that all three variables use the `baseline_day` dimension and consistent units.
 ## Downstream Consumers
 
 - event-versus-baseline adiabatic and advection comparison plots; and
+- signed inter-region heat-budget fraction diagnostics; and
 - exploratory fixed-window feature diagnostics.
 
 The baseline product is not an input to the current spatial-composite builder.
