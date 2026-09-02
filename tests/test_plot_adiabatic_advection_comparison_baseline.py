@@ -28,7 +28,7 @@ def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
             plot_diag.variable_label(plot_diag.X_VARIABLE),
             plot_diag.NET_DYNAMICAL_LABEL,
         ]
-        np.testing.assert_allclose(fig.get_size_inches(), np.array([6.0, 9.0]))
+        np.testing.assert_allclose(fig.get_size_inches(), np.array([7.5, 9.0]))
         assert plot_axes[0].get_legend() is not None
         assert plot_axes[1].get_legend() is None
         assert fig.axes[-1].get_ylabel() == "Peak TAS Anomaly (K)"
@@ -78,6 +78,7 @@ def test_plot_creates_four_panels_with_baseline_and_colored_event_layers():
         _make_event_table(),
     )
     try:
+        np.testing.assert_allclose(fig.get_size_inches(), np.array([12.0, 6.6]))
         assert len(fig.axes) == 5
         plot_axes = fig.axes[:4]
         assert [ax.get_title() for ax in plot_axes] == [

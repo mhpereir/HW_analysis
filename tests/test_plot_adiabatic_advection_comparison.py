@@ -26,7 +26,7 @@ def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
             plot_diag.variable_label(plot_diag.X_VARIABLE),
             plot_diag.NET_DYNAMICAL_LABEL,
         ]
-        np.testing.assert_allclose(fig.get_size_inches(), np.array([6.0, 9.0]))
+        np.testing.assert_allclose(fig.get_size_inches(), np.array([7.5, 9.0]))
         np.testing.assert_allclose(
             np.asarray(plot_axes[0].collections[0].get_offsets())[:, 0],
             features["I_adiabatic_pre"].values,
@@ -85,6 +85,7 @@ def test_panels_use_expected_x_and_y_values():
 
     fig = plot_diag.plot_tendency_scatter(features)
     try:
+        np.testing.assert_allclose(fig.get_size_inches(), np.array([12.0, 6.6]))
         top_offsets = np.asarray(fig.axes[0].collections[0].get_offsets())
         middle_offsets = np.asarray(fig.axes[1].collections[0].get_offsets())
         temperature_offsets = np.asarray(fig.axes[2].collections[0].get_offsets())

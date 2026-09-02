@@ -394,10 +394,7 @@ def plot_presentation_tendency_scatter(
     fig, axes = plt.subplots(
         nrows=2,
         ncols=1,
-        figsize=plot_style.publication_figsize(
-            "single",
-            aspect=plot_style.TWO_PANEL_COLUMN_ASPECT,
-        ),
+        figsize=plot_style.two_panel_presentation_figsize(),
         constrained_layout=True,
     )
     axes = np.atleast_1d(axes)

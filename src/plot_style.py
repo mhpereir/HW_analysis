@@ -39,6 +39,7 @@ EVENT_SEVERITY_COLOR_MAP = "gist_heat_r"
 SINGLE_PANEL_ASPECT = 0.6
 TWO_PANEL_STACK_ASPECT = 0.55
 TWO_PANEL_COLUMN_ASPECT = 1.5
+PRESENTATION_TWO_PANEL_WIDTH_SCALE = 1.25
 THREE_PANEL_STACK_ASPECT = 0.62
 SQUARE_PANEL_ASPECT = 0.95
 
@@ -197,6 +198,15 @@ def publication_figsize(
     }
     figure_width = widths[width]
     return figure_width, figure_width * aspect
+
+
+def two_panel_presentation_figsize() -> tuple[float, float]:
+    """Return the widened two-row presentation canvas dimensions."""
+    figure_width, figure_height = publication_figsize(
+        "single",
+        aspect=TWO_PANEL_COLUMN_ASPECT,
+    )
+    return figure_width * PRESENTATION_TWO_PANEL_WIDTH_SCALE, figure_height
 
 
 def date_locator_formatter() -> tuple[

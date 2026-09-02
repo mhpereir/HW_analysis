@@ -125,8 +125,11 @@ figure entrypoints.
   colorbar, and baseline-versus-event layering retain their full-layout
   meanings. When no output path is supplied, presentation figures use a
   distinct `_presentation.png` filename so they cannot overwrite the default
-  four-panel product. Synthetic plot tests must confirm both layouts and their
-  CLI routing.
+  four-panel product. The presentation canvas is 7.5 inches wide by 9 inches
+  high, widening the original single-column canvas by 25% without changing its
+  height so the scatter panels and shared colorbar have more horizontal space.
+  Synthetic plot tests must confirm both layouts, presentation dimensions, and
+  their CLI routing.
 - Event-versus-clean-baseline figures pad each finite plotted data range by 5%
   on both sides while keeping zero reference lines inside the padded range.
   Shared x-axes use the combined plotted x-data, while each panel derives its
