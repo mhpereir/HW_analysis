@@ -20,6 +20,8 @@ from matplotlib.ticker import (
 
 SINGLE_COLUMN_WIDTH_IN = 6
 FULL_TWO_COLUMN_WIDTH_IN = 12
+PRESENTATION_WIDTH_IN = 13.333
+PRESENTATION_HEIGHT_IN = 7.5
 
 PAPER_FONT_SIZE_PT = 14
 LEGEND_FONT_SIZE_PT = 9
@@ -207,6 +209,11 @@ def two_panel_presentation_figsize() -> tuple[float, float]:
         aspect=TWO_PANEL_COLUMN_ASPECT,
     )
     return figure_width * PRESENTATION_TWO_PANEL_WIDTH_SCALE, figure_height
+
+
+def presentation_figsize() -> tuple[float, float]:
+    """Return a widescreen 16:9 figure size suitable for slide decks."""
+    return PRESENTATION_WIDTH_IN, PRESENTATION_HEIGHT_IN
 
 
 def date_locator_formatter() -> tuple[

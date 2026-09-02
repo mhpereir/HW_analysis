@@ -6,7 +6,6 @@ import argparse
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -15,9 +14,12 @@ if str(REPO_ROOT) not in sys.path:
 from scripts import plot_composite_timeseries_all as absolute_plot
 from src import analysis_io, climatology, composites, plot_paths, plotting, selectors
 
-
 PLOT_NAME = "composite_timeseries_all_clim_anom"
 DEFAULT_OUTPUT_FILENAME = "hw_all_events_composite_clim_anom.png"
+PRESENTATION_PLOT_NAME = f"{PLOT_NAME}_presentation"
+PRESENTATION_DEFAULT_OUTPUT_FILENAME = (
+    "hw_all_events_composite_clim_anom_presentation.png"
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,7 +30,9 @@ def parse_args() -> argparse.Namespace:
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument("--climatology-path", type=Path, default=None)
     parser.add_argument("--output-path", type=Path, default=None)
-    parser.add_argument("--window-days", type=int, default=absolute_plot.DEFAULT_WINDOW_DAYS)
+    parser.add_argument(
+        "--window-days", type=int, default=absolute_plot.DEFAULT_WINDOW_DAYS
+    )
     parser.add_argument(
         "--smoothing-window",
         type=int,
@@ -37,11 +41,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--season-months", type=int, nargs="+", default=None)
     parser.add_argument("--require-full-event", action="store_true")
     parser.add_argument("--plot-extended-variables", action="store_true")
+    parser.add_argument(
+        "--layout",
+        choices=plotting.COMPOSITE_LAYOUTS,
+        default=plotting.PAPER_COMPOSITE_LAYOUT,
+    )
+    parsed = parser.parse_args()
+    plot_name, default_output_filename = _default_plot_destination(parsed.layout)
     args = plot_paths.finalize_stage1_plot_paths(
-        parser.parse_args(),
+        parsed,
         parser,
-        plot_name=PLOT_NAME,
-        default_output_filename=DEFAULT_OUTPUT_FILENAME,
+        plot_name=plot_name,
+        default_output_filename=default_output_filename,
     )
     if args.climatology_path is None:
         args.climatology_path = analysis_io.default_regional_hourly_climatology_path(
@@ -68,7 +79,10 @@ def main() -> int:
     stage1 = analysis_io.open_harmonized_timeseries(args.input_path)
     climate = analysis_io.open_regional_hourly_climatology(args.climatology_path)
     try:
-        variables = absolute_plot._composite_variables(args.plot_extended_variables)
+        variables = absolute_plot._composite_variables(
+            args.plot_extended_variables,
+            args.layout,
+        )
         anomaly_source = climatology.apply_regional_hourly_climatology(
             stage1,
             climate,
@@ -102,9 +116,11 @@ def main() -> int:
             smoothed_output_path=_smoothed_output_path(args.output_path),
             smoothing_window=args.smoothing_window,
             smoothed_variables=absolute_plot._smoothed_variables(
-                args.plot_extended_variables
+                args.plot_extended_variables,
+                args.layout,
             ),
             plot_extended_variables=args.plot_extended_variables,
+            layout=args.layout,
         )
         print("Wrote HW all-event climatological-anomaly figures:")
         for path in written:
@@ -117,6 +133,13 @@ def main() -> int:
 
 def _smoothed_output_path(output_path: Path) -> Path:
     return output_path.with_name(f"{output_path.stem}_smoothed{output_path.suffix}")
+
+
+def _default_plot_destination(layout: str) -> tuple[str, str]:
+    """Return the output namespace and filename for one figure layout."""
+    if layout == plotting.PRESENTATION_COMPOSITE_LAYOUT:
+        return PRESENTATION_PLOT_NAME, PRESENTATION_DEFAULT_OUTPUT_FILENAME
+    return PLOT_NAME, DEFAULT_OUTPUT_FILENAME
 
 
 def _require_new_outputs(output_path: Path) -> None:

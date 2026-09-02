@@ -43,6 +43,31 @@ from the absolute Stage-1 product. Climatology subtraction does not redefine
 events. Absolute and climatological-anomaly figures use separate entrypoints
 and output paths.
 
+Each of the four temporal-composite entrypoints supports two figure layouts.
+The default `paper` layout preserves the existing compact or extended figure.
+Passing `--layout presentation` selects the documented six-panel, 16:9 slide
+layout and writes to a separate `*_presentation` output namespace by default.
+The presentation option changes only variable selection and rendering. It
+does not change event membership, composite reductions, anomaly construction,
+percentile semantics, or smoothing.
+
+Across all presentation temporal plots, the left column is ordered as
+anticyclonic and cyclonic LWA, temperature, then temperature tendency. The
+right column remains advection, adiabatic heating, then diabatic heating.
+
+The top-event entrypoint supports the same `paper` and `presentation` layout
+choices. Its presentation view preserves top-event ranking, absolute-time
+event windows, event-boundary and peak markers, the all-event mean and IQR
+reference, and raw plus 24-hour-smoothed output semantics. It changes only the
+variables and panel arrangement used for rendering. Presentation top-event
+figures use a separate `top_events_presentation` output namespace and include
+`presentation` in their default filenames.
+
+The five temporal plotting Venus schedulers expose the same choice through
+`PLOT_LAYOUT`. Its default is `paper`, which retains the extended ten-panel
+production figures. Set `PLOT_LAYOUT=presentation` to pass the six-panel
+layout without the mutually exclusive extended-panel flag.
+
 The matched face-advection variant obtains matched membership from the
 canonical Stage-2 event-feature table and tracked matching settings. It then
 selects those event IDs from the absolute Stage-1 event table and verifies that

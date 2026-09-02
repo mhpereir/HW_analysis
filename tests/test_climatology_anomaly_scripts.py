@@ -1,8 +1,6 @@
 import xarray as xr
-
 from HW_analysis.scripts import plot_composite_timeseries_all_clim_anom as all_plot
 from HW_analysis.scripts import plot_composite_timeseries_split_clim_anom as split_plot
-
 
 RUN_ARGS = [
     "--region",
@@ -28,9 +26,7 @@ def test_all_event_anomalies_are_applied_before_event_stacking(
 ):
     stage1 = xr.Dataset()
     climate = xr.Dataset()
-    anomaly_source = xr.Dataset(
-        attrs={"data_representation": "climatological_anomaly"}
-    )
+    anomaly_source = xr.Dataset(attrs={"data_representation": "climatological_anomaly"})
     composite = xr.Dataset()
     captured = {}
     output = tmp_path / "all.png"
@@ -46,9 +42,13 @@ def test_all_event_anomalies_are_applied_before_event_stacking(
             str(tmp_path / "climate.nc"),
             "--output-path",
             str(output),
+            "--layout",
+            "presentation",
         ],
     )
-    monkeypatch.setattr(all_plot.analysis_io, "open_harmonized_timeseries", lambda _: stage1)
+    monkeypatch.setattr(
+        all_plot.analysis_io, "open_harmonized_timeseries", lambda _: stage1
+    )
     monkeypatch.setattr(
         all_plot.analysis_io,
         "open_regional_hourly_climatology",
@@ -66,16 +66,23 @@ def test_all_event_anomalies_are_applied_before_event_stacking(
         captured["event_table"] = kwargs["event_table"]
         return composite
 
-    monkeypatch.setattr(all_plot.climatology, "apply_regional_hourly_climatology", fake_apply)
+    monkeypatch.setattr(
+        all_plot.climatology, "apply_regional_hourly_climatology", fake_apply
+    )
     monkeypatch.setattr(
         all_plot.composites,
         "all_event_peak_aligned_composite",
         fake_composite,
     )
+
+    def fake_write(ds, path, **kwargs):
+        captured["plot_kwargs"] = kwargs
+        return [path, kwargs["smoothed_output_path"]]
+
     monkeypatch.setattr(
         all_plot.plotting,
         "write_composite_timeseries_outputs",
-        lambda ds, path, **kwargs: [path, kwargs["smoothed_output_path"]],
+        fake_write,
     )
 
     assert all_plot.main() == 0
@@ -83,6 +90,10 @@ def test_all_event_anomalies_are_applied_before_event_stacking(
     assert captured["climate"] is climate
     assert captured["composite_input"] is anomaly_source
     assert captured["event_table"] is stage1
+    assert captured["apply_kwargs"]["variables"] == (
+        all_plot.absolute_plot.PRESENTATION_COMPOSITE_VARIABLES
+    )
+    assert captured["plot_kwargs"]["layout"] == "presentation"
     assert composite.attrs["data_representation"] == "climatological_anomaly"
 
 
@@ -92,9 +103,7 @@ def test_split_anomalies_use_absolute_stage1_for_bin_membership(
 ):
     stage1 = xr.Dataset()
     climate = xr.Dataset()
-    anomaly_source = xr.Dataset(
-        attrs={"data_representation": "climatological_anomaly"}
-    )
+    anomaly_source = xr.Dataset(attrs={"data_representation": "climatological_anomaly"})
     composite = xr.Dataset()
     captured = {}
     output = tmp_path / "split.png"
@@ -114,6 +123,8 @@ def test_split_anomalies_use_absolute_stage1_for_bin_membership(
             "duration",
             "--split-quantiles",
             "0.75",
+            "--layout",
+            "presentation",
         ],
     )
     monkeypatch.setattr(
@@ -126,10 +137,15 @@ def test_split_anomalies_use_absolute_stage1_for_bin_membership(
         "open_regional_hourly_climatology",
         lambda _: climate,
     )
+
+    def fake_apply(*args, **kwargs):
+        captured["apply_kwargs"] = kwargs
+        return anomaly_source
+
     monkeypatch.setattr(
         split_plot.climatology,
         "apply_regional_hourly_climatology",
-        lambda *args, **kwargs: anomaly_source,
+        fake_apply,
     )
 
     def fake_split(ds, **kwargs):
@@ -142,16 +158,66 @@ def test_split_anomalies_use_absolute_stage1_for_bin_membership(
         "build_split_quantile_composite",
         fake_split,
     )
+
+    def fake_write(ds, path, **kwargs):
+        captured["plot_kwargs"] = kwargs
+        return [path, kwargs["smoothed_output_path"]]
+
     monkeypatch.setattr(
         split_plot.plotting,
         "write_split_composite_timeseries_outputs",
-        lambda ds, path, **kwargs: [path, kwargs["smoothed_output_path"]],
+        fake_write,
     )
 
     assert split_plot.main() == 0
     assert captured["composite_input"] is anomaly_source
     assert captured["event_table"] is stage1
+    assert captured["apply_kwargs"]["variables"] == (
+        split_plot.absolute_plot.PRESENTATION_COMPOSITE_VARIABLES
+    )
+    assert captured["plot_kwargs"]["layout"] == "presentation"
     assert composite.attrs["data_representation"] == "climatological_anomaly"
+
+
+def test_anomaly_presentation_layout_uses_separate_default_paths(monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "plot_composite_timeseries_all_clim_anom.py",
+            *RUN_ARGS,
+            "--layout",
+            "presentation",
+        ],
+    )
+    all_args = all_plot.parse_args()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "plot_composite_timeseries_split_clim_anom.py",
+            *RUN_ARGS,
+            "--split-variable",
+            "duration",
+            "--split-quantiles",
+            "0.75",
+            "--layout",
+            "presentation",
+        ],
+    )
+    split_args = split_plot.parse_args()
+
+    assert all_args.output_path.name == (
+        "hw_all_events_composite_clim_anom_presentation.png"
+    )
+    assert all_args.output_path.parts[-5] == (
+        "plots_composite_timeseries_all_clim_anom_presentation"
+    )
+    assert split_args.output_path.name == (
+        "hw_events_composite_clim_anom_presentation.png"
+    )
+    assert split_args.output_path.parts[-5] == (
+        "plots_composite_timeseries_split_clim_anom_presentation"
+    )
 
 
 def test_anomaly_plot_workflows_refuse_existing_outputs(tmp_path):

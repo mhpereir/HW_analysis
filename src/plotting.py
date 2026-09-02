@@ -40,7 +40,19 @@ LOWER_EVENT_PERCENTILE = 0.25
 UPPER_EVENT_PERCENTILE = 0.75
 SPLIT_BIN_DIM = "split_bin"
 SPLIT_LINE_STYLES = ("-", "--", ":", "-.")
+PAPER_COMPOSITE_LAYOUT = "paper"
+PRESENTATION_COMPOSITE_LAYOUT = "presentation"
+COMPOSITE_LAYOUTS = (PAPER_COMPOSITE_LAYOUT, PRESENTATION_COMPOSITE_LAYOUT)
 VARIABLE_COLORS = plot_style.VARIABLE_COLORS
+PRESENTATION_PLOT_VARIABLES: tuple[str, ...] = (
+    "lwa_a_region",
+    "lwa_c_region",
+    "T_mean",
+    "dTdt",
+    "advection",
+    "adiabatic",
+    "diabatic",
+)
 EXTENDED_PLOT_VARIABLES: tuple[str, ...] = (
     "T_mean",
     "volume",
@@ -110,8 +122,12 @@ def plot_composite_timeseries(
     composite: xr.Dataset,
     *,
     plot_extended_variables: bool = False,
+    layout: str = PAPER_COMPOSITE_LAYOUT,
 ) -> Figure:
     """Return a composite time-series figure."""
+    _validate_composite_layout(layout, plot_extended_variables)
+    if layout == PRESENTATION_COMPOSITE_LAYOUT:
+        return _plot_presentation_composite_timeseries(composite)
     if plot_extended_variables:
         return _plot_extended_composite_timeseries(composite)
 
@@ -162,10 +178,14 @@ def plot_split_composite_timeseries(
     composite: xr.Dataset,
     *,
     plot_extended_variables: bool = False,
+    layout: str = PAPER_COMPOSITE_LAYOUT,
 ) -> Figure:
     """Return a figure for split-bin event-mean composites."""
     if SPLIT_BIN_DIM not in composite.dims:
         raise ValueError(f"split composite is missing dimension {SPLIT_BIN_DIM!r}.")
+    _validate_composite_layout(layout, plot_extended_variables)
+    if layout == PRESENTATION_COMPOSITE_LAYOUT:
+        return _plot_presentation_split_composite_timeseries(composite)
     if plot_extended_variables:
         return _plot_extended_split_composite_timeseries(composite)
 
@@ -213,24 +233,163 @@ def plot_split_composite_timeseries(
     return fig
 
 
+def _plot_presentation_composite_timeseries(composite: xr.Dataset) -> Figure:
+    """Return a widescreen 3x2 event-mean composite for presentations."""
+    _require_dataset_variables(
+        composite,
+        PRESENTATION_PLOT_VARIABLES,
+        dataset_label="composite",
+        plot_label="Presentation plot",
+    )
+
+    fig, axes = plt.subplots(
+        nrows=3,
+        ncols=2,
+        figsize=plot_style.presentation_figsize(),
+        sharex=True,
+        constrained_layout=True,
+    )
+    left = axes[:, 0]
+    right = axes[:, 1]
+
+    _plot_lwa_panel(left[0], composite)
+    _add_iqr_to_existing_legend(left[0])
+    _plot_composite_variable_panel(
+        left[1],
+        composite,
+        "T_mean",
+        ylabel="T_mean [K]",
+        zero_reference=False,
+    )
+    _plot_composite_variable_panel(left[2], composite, "dTdt", ylabel="[K hr-1]")
+
+    _plot_composite_variable_panel(right[0], composite, "advection", ylabel="[K hr-1]")
+    _plot_composite_variable_panel(right[1], composite, "adiabatic", ylabel="[K hr-1]")
+    _plot_composite_variable_panel(right[2], composite, "diabatic", ylabel="[K hr-1]")
+
+    for ax in axes.ravel():
+        ax.axvline(
+            0,
+            color=plot_style.COLORS["zero"],
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+            linestyle="--",
+            alpha=0.8,
+        )
+
+    n_events = int(composite.attrs.get("n_events", 0))
+    pre_days = int(composite.attrs.get("pre_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
+    post_days = int(composite.attrs.get("post_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
+    smoothing_window = composite.attrs.get("smoothing_window")
+    smoothing_label = (
+        f", {int(smoothing_window)}-hour running mean"
+        if smoothing_window is not None
+        else ""
+    )
+    fig.suptitle(
+        f"HW event-mean{_representation_title_fragment(composite)} composite "
+        f"centered on peak tas "
+        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
+    )
+    left[-1].set_xlabel("Lag from event peak (hours)")
+    right[-1].set_xlabel("Lag from event peak (hours)")
+    _style_axes(axes.ravel())
+    _use_default_lag_xaxis_formatter(fig)
+    return fig
+
+
+def _plot_presentation_split_composite_timeseries(composite: xr.Dataset) -> Figure:
+    """Return a widescreen 3x2 split-bin composite for presentations."""
+    _require_dataset_variables(
+        composite,
+        PRESENTATION_PLOT_VARIABLES,
+        dataset_label="split composite",
+        plot_label="Presentation plot",
+    )
+
+    fig, axes = plt.subplots(
+        nrows=3,
+        ncols=2,
+        figsize=plot_style.presentation_figsize(),
+        sharex=True,
+        constrained_layout=True,
+    )
+    left = axes[:, 0]
+    right = axes[:, 1]
+
+    _plot_split_lwa_panel(left[0], composite)
+    _add_split_style_legend(left[0], _split_bin_labels(composite))
+    _plot_split_single_variable_panel(
+        left[1],
+        composite,
+        "T_mean",
+        ylabel="T_mean [K]",
+        zero_reference=False,
+    )
+    _plot_split_single_variable_panel(left[2], composite, "dTdt", ylabel="[K hr-1]")
+
+    _plot_split_single_variable_panel(
+        right[0], composite, "advection", ylabel="[K hr-1]"
+    )
+    _plot_split_single_variable_panel(
+        right[1], composite, "adiabatic", ylabel="[K hr-1]"
+    )
+    _plot_split_single_variable_panel(
+        right[2], composite, "diabatic", ylabel="[K hr-1]"
+    )
+
+    for ax in axes.ravel():
+        ax.axvline(
+            0,
+            color=plot_style.COLORS["zero"],
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+            linestyle="--",
+            alpha=0.8,
+        )
+
+    n_events = _split_total_events(composite)
+    pre_days = int(composite.attrs.get("pre_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
+    post_days = int(composite.attrs.get("post_days", DEFAULT_COMPOSITE_WINDOW_DAYS))
+    smoothing_window = composite.attrs.get("smoothing_window")
+    smoothing_label = (
+        f", {int(smoothing_window)}-hour running mean"
+        if smoothing_window is not None
+        else ""
+    )
+    split_variable = composite.attrs.get("split_variable", "event metric")
+    fig.suptitle(
+        f"HW event-mean{_representation_title_fragment(composite)} composites "
+        f"split by {split_variable} "
+        f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
+    )
+    left[-1].set_xlabel("Lag from event peak (hours)")
+    right[-1].set_xlabel("Lag from event peak (hours)")
+    _style_axes(axes.ravel())
+    _use_default_lag_xaxis_formatter(fig)
+    return fig
+
+
 def plot_top_event_timeseries(
     event_window: xr.Dataset,
     event: xr.Dataset,
     *,
     reference_composite: xr.Dataset | None = None,
     plot_extended_variables: bool = False,
+    layout: str = PAPER_COMPOSITE_LAYOUT,
 ) -> Figure:
     """Return an absolute-time figure for one selected event."""
+    _validate_composite_layout(layout, plot_extended_variables)
+    if layout == PRESENTATION_COMPOSITE_LAYOUT:
+        return _plot_presentation_top_event_timeseries(
+            event_window,
+            event,
+            reference_composite=reference_composite,
+        )
     if plot_extended_variables:
         return _plot_extended_top_event_timeseries(
             event_window,
             event,
             reference_composite=reference_composite,
         )
-
-    peak_time = _event_time_value(event, "peak_time")
-    start_time = _event_time_value(event, "start_time")
-    end_time = _event_time_value(event, "end_time")
 
     fig, axes = plt.subplots(
         nrows=4,
@@ -268,41 +427,8 @@ def plot_top_event_timeseries(
         reference_composite=reference_composite,
     )
 
-    for ax in axes:
-        ax.axvline(
-            start_time,
-            color=plot_style.FACE_COLORS["top"],
-            linewidth=plot_style.LINE_WIDTH_PT,
-            linestyle=":",
-            alpha=0.9,
-        )
-        ax.axvline(
-            end_time,
-            color=plot_style.FACE_COLORS["top"],
-            linewidth=plot_style.LINE_WIDTH_PT,
-            linestyle=":",
-            alpha=0.9,
-        )
-        ax.axvline(
-            peak_time,
-            color=plot_style.COLORS["zero"],
-            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
-            linestyle="--",
-            alpha=0.8,
-        )
-
-    event_id = int(event["event_id"].item())
-    rank = int(event["selection_rank"].item()) if "selection_rank" in event else event_id
-    peak_value = float(event["tas_peak"].item()) if "tas_peak" in event else np.nan
-    smoothing_window = event_window.attrs.get("smoothing_window")
-    smoothing_label = (
-        f", {int(smoothing_window)}-hour running mean"
-        if smoothing_window is not None
-        else ""
-    )
-    fig.suptitle(
-        f"Rank {rank} HW event {event_id}: peak tas={peak_value:.2f}{smoothing_label}"
-    )
+    _mark_top_event_times(axes, event)
+    _set_top_event_title(fig, event_window, event)
     ax3.set_xlabel("Time")
 
     _format_datetime_xaxis(axes)
@@ -406,8 +532,12 @@ def _plot_extended_split_composite_timeseries(composite: xr.Dataset) -> Figure:
 
     _plot_split_temperature_volume_panel(left[0], composite)
     _plot_split_single_variable_panel(left[1], composite, "dTdt", ylabel="[K hr-1]")
-    _plot_split_single_variable_panel(left[2], composite, "advection", ylabel="[K hr-1]")
-    _plot_split_single_variable_panel(left[3], composite, "adiabatic", ylabel="[K hr-1]")
+    _plot_split_single_variable_panel(
+        left[2], composite, "advection", ylabel="[K hr-1]"
+    )
+    _plot_split_single_variable_panel(
+        left[3], composite, "adiabatic", ylabel="[K hr-1]"
+    )
     _plot_split_single_variable_panel(left[4], composite, "diabatic", ylabel="[K hr-1]")
 
     _plot_split_lwa_panel(right[0], composite)
@@ -481,10 +611,6 @@ def _plot_extended_top_event_timeseries(
             dataset_label="reference composite",
         )
 
-    peak_time = _event_time_value(event, "peak_time")
-    start_time = _event_time_value(event, "start_time")
-    end_time = _event_time_value(event, "end_time")
-
     fig, axes = plt.subplots(
         nrows=5,
         ncols=2,
@@ -556,7 +682,103 @@ def _plot_extended_top_event_timeseries(
         reference_composite=reference_composite,
     )
 
-    for ax in axes.ravel():
+    _mark_top_event_times(axes.ravel(), event)
+    _set_top_event_title(fig, event_window, event)
+    left[-1].set_xlabel("Time")
+    right[-1].set_xlabel("Time")
+    _format_datetime_xaxis(axes.ravel())
+    _style_axes(axes.ravel())
+    return fig
+
+
+def _plot_presentation_top_event_timeseries(
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    *,
+    reference_composite: xr.Dataset | None,
+) -> Figure:
+    """Return a widescreen 3x2 top-event figure for presentations."""
+    _require_dataset_variables(
+        event_window,
+        PRESENTATION_PLOT_VARIABLES,
+        dataset_label="event window",
+        plot_label="Presentation plot",
+    )
+    if reference_composite is not None:
+        _require_dataset_variables(
+            reference_composite,
+            PRESENTATION_PLOT_VARIABLES,
+            dataset_label="reference composite",
+            plot_label="Presentation plot",
+        )
+
+    fig, axes = plt.subplots(
+        nrows=3,
+        ncols=2,
+        figsize=plot_style.presentation_figsize(),
+        sharex=True,
+        constrained_layout=True,
+    )
+    left = axes[:, 0]
+    right = axes[:, 1]
+
+    _plot_top_event_lwa_panel(
+        left[0],
+        event_window,
+        event,
+        reference_composite=reference_composite,
+    )
+    variable_legend = left[0].get_legend()
+    if variable_legend is not None and reference_composite is not None:
+        left[0].add_artist(variable_legend)
+        _add_top_event_reference_legend(left[0])
+    _plot_top_event_single_variable_panel(
+        left[1],
+        event_window,
+        event,
+        "T_mean",
+        ylabel="T_mean [K]",
+        reference_composite=reference_composite,
+        zero_reference=False,
+    )
+    _plot_top_event_single_variable_panel(
+        left[2],
+        event_window,
+        event,
+        "dTdt",
+        ylabel="[K hr-1]",
+        reference_composite=reference_composite,
+    )
+
+    for ax, name in zip(
+        right,
+        ("advection", "adiabatic", "diabatic"),
+        strict=True,
+    ):
+        _plot_top_event_single_variable_panel(
+            ax,
+            event_window,
+            event,
+            name,
+            ylabel="[K hr-1]",
+            reference_composite=reference_composite,
+        )
+
+    _mark_top_event_times(axes.ravel(), event)
+    _set_top_event_title(fig, event_window, event)
+    left[-1].set_xlabel("Time")
+    right[-1].set_xlabel("Time")
+    _format_datetime_xaxis(axes.ravel())
+    _style_axes(axes.ravel())
+    return fig
+
+
+def _mark_top_event_times(axes: Sequence[Axes], event: xr.Dataset) -> None:
+    """Mark one event's start, end, and peak on every supplied axis."""
+    peak_time = _event_time_value(event, "peak_time")
+    start_time = _event_time_value(event, "start_time")
+    end_time = _event_time_value(event, "end_time")
+    for ax in axes:
         ax.axvline(
             start_time,
             color=plot_style.FACE_COLORS["top"],
@@ -579,8 +801,17 @@ def _plot_extended_top_event_timeseries(
             alpha=0.8,
         )
 
+
+def _set_top_event_title(
+    fig: Figure,
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+) -> None:
+    """Set the shared title for one top-event figure layout."""
     event_id = int(event["event_id"].item())
-    rank = int(event["selection_rank"].item()) if "selection_rank" in event else event_id
+    rank = (
+        int(event["selection_rank"].item()) if "selection_rank" in event else event_id
+    )
     peak_value = float(event["tas_peak"].item()) if "tas_peak" in event else np.nan
     smoothing_window = event_window.attrs.get("smoothing_window")
     smoothing_label = (
@@ -591,11 +822,6 @@ def _plot_extended_top_event_timeseries(
     fig.suptitle(
         f"Rank {rank} HW event {event_id}: peak tas={peak_value:.2f}{smoothing_label}"
     )
-    left[-1].set_xlabel("Time")
-    right[-1].set_xlabel("Time")
-    _format_datetime_xaxis(axes.ravel())
-    _style_axes(axes.ravel())
-    return fig
 
 
 def _plot_line(
@@ -635,11 +861,15 @@ def smooth_composite_for_display(
     out = composite.copy(deep=False)
     variable_names = _display_smoothing_variable_names(composite, variables)
     for name in variable_names:
-        out[name] = composite[name].rolling(
-            {lag_dim: smoothing_window},
-            center=True,
-            min_periods=smoothing_window,
-        ).mean()
+        out[name] = (
+            composite[name]
+            .rolling(
+                {lag_dim: smoothing_window},
+                center=True,
+                min_periods=smoothing_window,
+            )
+            .mean()
+        )
     out.attrs.update(composite.attrs)
     out.attrs["smoothing_window"] = int(smoothing_window)
     out.attrs["smoothing_applied_to"] = ", ".join(variable_names)
@@ -652,7 +882,7 @@ def _format_datetime_xaxis(axes: Sequence[Axes]) -> None:
 
 
 def _style_axes(axes: Sequence[Axes]) -> None:
-    flat_axes = tuple(np.ravel(axes)) # type: ignore
+    flat_axes = tuple(np.ravel(axes))  # type: ignore
     plot_style.style_axes(flat_axes)
     if flat_axes:
         _show_all_spines(flat_axes[0].figure)
@@ -676,6 +906,7 @@ def write_composite_timeseries_plot(
     output_path: Path,
     *,
     plot_extended_variables: bool = False,
+    layout: str = PAPER_COMPOSITE_LAYOUT,
 ) -> Path:
     """Write a composite time-series figure."""
     output_path = output_path.expanduser().resolve()
@@ -683,6 +914,7 @@ def write_composite_timeseries_plot(
     fig = plot_composite_timeseries(
         composite,
         plot_extended_variables=plot_extended_variables,
+        layout=layout,
     )
     plot_style.save_figure(fig, output_path)
     plt.close(fig)
@@ -694,6 +926,7 @@ def write_split_composite_timeseries_plot(
     output_path: Path,
     *,
     plot_extended_variables: bool = False,
+    layout: str = PAPER_COMPOSITE_LAYOUT,
 ) -> Path:
     """Write a split composite time-series figure."""
     output_path = output_path.expanduser().resolve()
@@ -701,6 +934,7 @@ def write_split_composite_timeseries_plot(
     fig = plot_split_composite_timeseries(
         composite,
         plot_extended_variables=plot_extended_variables,
+        layout=layout,
     )
     plot_style.save_figure(fig, output_path)
     plt.close(fig)
@@ -715,6 +949,7 @@ def write_composite_timeseries_outputs(
     smoothing_window: int,
     smoothed_variables: Sequence[str],
     plot_extended_variables: bool = False,
+    layout: str = PAPER_COMPOSITE_LAYOUT,
 ) -> list[Path]:
     """Write raw and display-smoothed composite time-series figures."""
     written = [
@@ -722,6 +957,7 @@ def write_composite_timeseries_outputs(
             composite,
             output_path,
             plot_extended_variables=plot_extended_variables,
+            layout=layout,
         )
     ]
     smoothed = smooth_composite_for_display(
@@ -734,6 +970,7 @@ def write_composite_timeseries_outputs(
             smoothed,
             smoothed_output_path,
             plot_extended_variables=plot_extended_variables,
+            layout=layout,
         )
     )
     return written
@@ -747,6 +984,7 @@ def write_split_composite_timeseries_outputs(
     smoothing_window: int,
     smoothed_variables: Sequence[str],
     plot_extended_variables: bool = False,
+    layout: str = PAPER_COMPOSITE_LAYOUT,
 ) -> list[Path]:
     """Write raw and display-smoothed split composite time-series figures."""
     written = [
@@ -754,6 +992,7 @@ def write_split_composite_timeseries_outputs(
             composite,
             output_path,
             plot_extended_variables=plot_extended_variables,
+            layout=layout,
         )
     ]
     smoothed = smooth_composite_for_display(
@@ -766,6 +1005,7 @@ def write_split_composite_timeseries_outputs(
             smoothed,
             smoothed_output_path,
             plot_extended_variables=plot_extended_variables,
+            layout=layout,
         )
     )
     return written
@@ -1270,8 +1510,7 @@ def _plot_split_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
     ax.set_ylabel(_anomaly_axis_label(ds, "LWA [m hPa]"))
     variable_legend = ax.legend(
         handles=[
-            _variable_legend_handle(name)
-            for name in ("lwa_a_region", "lwa_c_region")
+            _variable_legend_handle(name) for name in ("lwa_a_region", "lwa_c_region")
         ],
         loc="upper left",
     )
@@ -1564,6 +1803,14 @@ def _add_iqr_legend(ax: Axes) -> None:
     ax.legend(handles=[handle], loc="upper right")
 
 
+def _add_iqr_to_existing_legend(ax: Axes) -> None:
+    """Add the IQR key to an existing single-axis variable legend."""
+    handles, labels = ax.get_legend_handles_labels()
+    handles.append(Patch(facecolor="0.5", edgecolor="none", alpha=0.18))
+    labels.append("IQR")
+    ax.legend(handles=handles, labels=labels, loc="upper left")
+
+
 def _add_top_event_reference_legend(ax: Axes) -> None:
     """Add a single legend for top-event reference line and IQR shading."""
     handles = [
@@ -1691,13 +1938,25 @@ def _require_dataset_variables(
     names: Sequence[str],
     *,
     dataset_label: str,
+    plot_label: str = "Extended plot",
 ) -> None:
     """Raise a clear error when an extended plot input is missing variables."""
     missing = [name for name in names if name not in ds]
     if missing:
         values = ", ".join(missing)
         raise ValueError(
-            f"Extended plot requires missing variables in {dataset_label}: {values}."
+            f"{plot_label} requires missing variables in {dataset_label}: {values}."
+        )
+
+
+def _validate_composite_layout(layout: str, plot_extended_variables: bool) -> None:
+    """Validate the composite figure layout and legacy extended-panel flag."""
+    if layout not in COMPOSITE_LAYOUTS:
+        choices = ", ".join(COMPOSITE_LAYOUTS)
+        raise ValueError(f"layout must be one of: {choices}; got {layout!r}.")
+    if layout == PRESENTATION_COMPOSITE_LAYOUT and plot_extended_variables:
+        raise ValueError(
+            "Presentation layout cannot be combined with plot_extended_variables."
         )
 
 

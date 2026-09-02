@@ -1,21 +1,28 @@
+import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 import xarray as xr
-
 from HW_analysis.scripts import plot_top_events
 from HW_analysis.src import analysis_io
 
-
 RUN_ARGS = [
-    "--region", "pnw_hotz",
-    "--bottom-boundary", "surface",
-    "--top-boundary", "700",
-    "--threshold-variable", "tas",
-    "--quantile", "90",
-    "--start-year", "1940",
-    "--end-year", "2024",
+    "--region",
+    "pnw_hotz",
+    "--bottom-boundary",
+    "surface",
+    "--top-boundary",
+    "700",
+    "--threshold-variable",
+    "tas",
+    "--quantile",
+    "90",
+    "--start-year",
+    "1940",
+    "--end-year",
+    "2024",
 ]
 
 
@@ -47,6 +54,23 @@ def test_parse_args_builds_default_paths(monkeypatch):
     )
     assert args.smoothing_window == plot_top_events.DEFAULT_SMOOTHING_WINDOW
     assert not args.plot_extended_variables
+    assert args.layout == "paper"
+
+
+def test_parse_args_builds_separate_presentation_output_path(monkeypatch):
+    monkeypatch.setattr("sys.argv", _argv("--layout", "presentation"))
+
+    args = plot_top_events.parse_args()
+
+    assert args.layout == "presentation"
+    assert args.output_dir == (
+        plot_top_events.REPO_ROOT
+        / "results"
+        / "plots_top_events_presentation"
+        / "region_pnw_hotz"
+        / "boundary_surface_700hPa"
+        / "time_range_1940_2024"
+    )
 
 
 def test_parse_args_accepts_custom_input_path(monkeypatch, tmp_path):
@@ -67,6 +91,19 @@ def test_parse_args_accepts_plot_extended_variables(monkeypatch):
     args = plot_top_events.parse_args()
 
     assert args.plot_extended_variables
+
+
+def test_validate_args_rejects_presentation_with_extended_panels():
+    args = argparse.Namespace(
+        top_n=10,
+        window_days=7,
+        smoothing_window=24,
+        layout="presentation",
+        plot_extended_variables=True,
+    )
+
+    with pytest.raises(ValueError, match="cannot be combined"):
+        plot_top_events.validate_args(args)
 
 
 def test_open_harmonized_dataset_delegates_to_analysis_io(monkeypatch, tmp_path):
@@ -154,9 +191,13 @@ def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp
         *,
         reference_composite=None,
         plot_extended_variables=False,
+        layout="paper",
     ):
         captured["plot_references"].append(reference_composite)
-        captured.setdefault("plot_extended_variables", []).append(plot_extended_variables)
+        captured.setdefault("plot_extended_variables", []).append(
+            plot_extended_variables
+        )
+        captured.setdefault("layouts", []).append(layout)
         fig = plt.figure()
         fig.add_subplot(111)
         return fig
@@ -201,6 +242,7 @@ def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp
         smoothed_reference_composite,
     ]
     assert captured["plot_extended_variables"] == [False, False, False, False]
+    assert captured["layouts"] == ["paper", "paper", "paper", "paper"]
     assert len(captured["smooth_calls"]) == 3
     first_smooth_source, first_smooth_kwargs = captured["smooth_calls"][0]
     assert first_smooth_source is reference_composite
@@ -209,7 +251,8 @@ def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp
         "smoothing_window": 6,
     }
     assert all(
-        kwargs == {
+        kwargs
+        == {
             "variables": plot_top_events.SMOOTHED_TOP_EVENT_VARIABLES,
             "smoothing_window": 6,
             "lag_dim": "time",
@@ -219,7 +262,9 @@ def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp
     assert all(path.exists() for path in written)
 
 
-def test_write_top_event_plots_uses_extended_variables_when_requested(monkeypatch, tmp_path):
+def test_write_top_event_plots_uses_extended_variables_when_requested(
+    monkeypatch, tmp_path
+):
     ds = _make_plot_dataset()
     selected = plot_top_events.select_top_tas_events(ds, n=1)
     reference_composite = xr.Dataset()
@@ -227,7 +272,7 @@ def test_write_top_event_plots_uses_extended_variables_when_requested(monkeypatc
     captured = {"plot_extended_variables": []}
 
     def fake_composite(source, **kwargs):
-        captured["composite_kwargs"] = kwargs #type: ignore
+        captured["composite_kwargs"] = kwargs  # type: ignore
         return reference_composite
 
     def fake_smooth(source, **kwargs):
@@ -242,8 +287,10 @@ def test_write_top_event_plots_uses_extended_variables_when_requested(monkeypatc
         *,
         reference_composite=None,
         plot_extended_variables=False,
+        layout="paper",
     ):
         captured["plot_extended_variables"].append(plot_extended_variables)
+        captured.setdefault("layouts", []).append(layout)
         fig = plt.figure()
         fig.add_subplot(111)
         return fig
@@ -273,13 +320,82 @@ def test_write_top_event_plots_uses_extended_variables_when_requested(monkeypatc
     )
 
     assert len(written) == 2
-    assert captured["composite_kwargs"]["variables"] == ( #type: ignore
+    assert captured["composite_kwargs"]["variables"] == (  # type: ignore
         plot_top_events.EXTENDED_TOP_EVENT_VARIABLES
     )
     assert captured["smooth_kwargs"][0]["variables"] == (
         plot_top_events.EXTENDED_SMOOTHED_TOP_EVENT_VARIABLES
     )
     assert captured["plot_extended_variables"] == [True, True]
+    assert captured["layouts"] == ["paper", "paper"]
+
+
+def test_write_top_event_plots_uses_presentation_variables_and_filenames(
+    monkeypatch,
+    tmp_path,
+):
+    ds = _make_plot_dataset()
+    selected = plot_top_events.select_top_tas_events(ds, n=1)
+    reference_composite = xr.Dataset()
+    captured = {"layouts": []}
+
+    def fake_composite(source, **kwargs):
+        captured["composite_kwargs"] = kwargs
+        return reference_composite
+
+    def fake_smooth(source, **kwargs):
+        captured.setdefault("smooth_kwargs", []).append(kwargs)
+        return source
+
+    def fake_plot(
+        event_window,
+        event,
+        *,
+        reference_composite=None,
+        plot_extended_variables=False,
+        layout="paper",
+    ):
+        captured["layouts"].append(layout)
+        fig = plt.figure()
+        fig.add_subplot(111)
+        return fig
+
+    monkeypatch.setattr(
+        plot_top_events.composites,
+        "all_event_peak_aligned_composite",
+        fake_composite,
+    )
+    monkeypatch.setattr(
+        plot_top_events.plotting,
+        "plot_top_event_timeseries",
+        fake_plot,
+    )
+    monkeypatch.setattr(
+        plot_top_events.plotting,
+        "smooth_composite_for_display",
+        fake_smooth,
+    )
+
+    written = plot_top_events.write_top_event_plots(
+        ds,
+        selected,
+        output_dir=tmp_path,
+        window_days=1,
+        smoothing_window=6,
+        layout="presentation",
+    )
+
+    assert captured["composite_kwargs"]["variables"] == (
+        plot_top_events.PRESENTATION_TOP_EVENT_VARIABLES
+    )
+    assert captured["smooth_kwargs"][0]["variables"] == (
+        plot_top_events.PRESENTATION_SMOOTHED_TOP_EVENT_VARIABLES
+    )
+    assert captured["layouts"] == ["presentation", "presentation"]
+    assert [path.name for path in written] == [
+        "top_event_rank_01_event_0002_2000-05-02_presentation.png",
+        "top_event_rank_01_event_0002_2000-05-02_presentation_smoothed.png",
+    ]
 
 
 def _make_plot_dataset() -> xr.Dataset:
@@ -308,15 +424,24 @@ def _make_plot_dataset() -> xr.Dataset:
             "event_id": ("event", np.array([1, 2, 3], dtype=np.int64)),
             "start_time": (
                 "event",
-                np.array(["2000-05-01T00:00", "2000-05-02T00:00", "2000-05-04T00:00"], dtype="datetime64[m]"),
+                np.array(
+                    ["2000-05-01T00:00", "2000-05-02T00:00", "2000-05-04T00:00"],
+                    dtype="datetime64[m]",
+                ),
             ),
             "end_time": (
                 "event",
-                np.array(["2000-05-01T12:00", "2000-05-02T00:00", "2000-05-04T00:00"], dtype="datetime64[m]"),
+                np.array(
+                    ["2000-05-01T12:00", "2000-05-02T00:00", "2000-05-04T00:00"],
+                    dtype="datetime64[m]",
+                ),
             ),
             "peak_time": (
                 "event",
-                np.array(["2000-05-01T12:00", "2000-05-02T00:00", "2000-05-04T00:00"], dtype="datetime64[m]"),
+                np.array(
+                    ["2000-05-01T12:00", "2000-05-02T00:00", "2000-05-04T00:00"],
+                    dtype="datetime64[m]",
+                ),
             ),
             "tas_peak": ("event", np.array([300.0, 305.0, 301.0])),
         },

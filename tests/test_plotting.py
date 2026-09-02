@@ -1,9 +1,10 @@
-import numpy as np
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
+import pytest
 import xarray as xr
-
 from HW_analysis.src import plotting
+from matplotlib.legend import Legend
 
 
 def test_smooth_composite_for_display_smooths_only_requested_variables():
@@ -155,15 +156,9 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
     try:
         assert len(fig.axes) == 12
 
-        assert set(_line_colors_by_label(fig.axes[4])) == {
-            _display_label("advection")
-        }
-        assert set(_line_colors_by_label(fig.axes[6])) == {
-            _display_label("adiabatic")
-        }
-        assert set(_line_colors_by_label(fig.axes[8])) == {
-            _display_label("diabatic")
-        }
+        assert set(_line_colors_by_label(fig.axes[4])) == {_display_label("advection")}
+        assert set(_line_colors_by_label(fig.axes[6])) == {_display_label("adiabatic")}
+        assert set(_line_colors_by_label(fig.axes[8])) == {_display_label("diabatic")}
 
         soil_axis = fig.axes[3]
         cloud_axis = fig.axes[11]
@@ -191,6 +186,91 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
         }
     finally:
         plt.close(fig)
+
+
+def test_presentation_composite_uses_requested_six_panel_layout():
+    composite = _make_composite()
+
+    fig = plotting.plot_composite_timeseries(
+        composite,
+        layout=plotting.PRESENTATION_COMPOSITE_LAYOUT,
+    )
+    try:
+        assert len(fig.axes) == 6
+        np.testing.assert_allclose(
+            fig.get_size_inches(),
+            plotting.plot_style.presentation_figsize(),
+        )
+        assert [ax.get_ylabel() for ax in fig.axes] == [
+            "LWA [m hPa]",
+            "[K hr-1]",
+            "T_mean [K]",
+            "[K hr-1]",
+            "[K hr-1]",
+            "[K hr-1]",
+        ]
+        assert set(_line_colors_by_label(fig.axes[0])) == {
+            _display_label("lwa_a_region"),
+            _display_label("lwa_c_region"),
+        }
+        assert set(_line_colors_by_label(fig.axes[1])) == {_display_label("advection")}
+        assert set(_line_colors_by_label(fig.axes[2])) == {_display_label("T_mean")}
+        assert set(_line_colors_by_label(fig.axes[3])) == {_display_label("adiabatic")}
+        assert set(_line_colors_by_label(fig.axes[4])) == {_display_label("dTdt")}
+        assert set(_line_colors_by_label(fig.axes[5])) == {_display_label("diabatic")}
+        assert _legend_label_count(fig, "IQR") == 1
+        assert all(
+            _display_label("volume") not in _line_colors_by_label(ax) for ax in fig.axes
+        )
+    finally:
+        plt.close(fig)
+
+
+def test_presentation_anomaly_composite_uses_delta_axis_labels():
+    composite = _make_composite()
+    composite.attrs["data_representation"] = "climatological_anomaly"
+
+    fig = plotting.plot_composite_timeseries(
+        composite,
+        layout=plotting.PRESENTATION_COMPOSITE_LAYOUT,
+    )
+    try:
+        assert "climatological-anomaly composite" in fig._suptitle.get_text()
+        assert [ax.get_ylabel() for ax in fig.axes] == [
+            "ΔLWA [m hPa]",
+            "Δ [K hr-1]",
+            "ΔT_mean [K]",
+            "Δ [K hr-1]",
+            "Δ [K hr-1]",
+            "Δ [K hr-1]",
+        ]
+    finally:
+        plt.close(fig)
+
+
+def test_presentation_composite_requires_only_presentation_variables():
+    composite = _make_composite().drop_vars("lwa_c_region")
+
+    with np.testing.assert_raises_regex(
+        ValueError,
+        "Presentation plot requires missing variables in composite: lwa_c_region",
+    ):
+        plotting.plot_composite_timeseries(
+            composite,
+            layout=plotting.PRESENTATION_COMPOSITE_LAYOUT,
+        )
+
+
+def test_presentation_layout_rejects_extended_panel_flag():
+    with np.testing.assert_raises_regex(
+        ValueError,
+        "Presentation layout cannot be combined",
+    ):
+        plotting.plot_composite_timeseries(
+            _make_composite(),
+            layout=plotting.PRESENTATION_COMPOSITE_LAYOUT,
+            plot_extended_variables=True,
+        )
 
 
 def test_climatological_anomaly_composite_uses_delta_axis_labels():
@@ -295,7 +375,10 @@ def test_plot_composite_timeseries_extended_layout_requires_optional_variables()
     try:
         plotting.plot_composite_timeseries(composite, plot_extended_variables=True)
     except ValueError as exc:
-        assert "Extended plot requires missing variables in composite: cloud_cover" in str(exc)
+        assert (
+            "Extended plot requires missing variables in composite: cloud_cover"
+            in str(exc)
+        )
     else:
         raise AssertionError("Expected missing extended variable to raise ValueError.")
 
@@ -359,7 +442,9 @@ def test_plot_split_composite_timeseries_draws_iqr_as_lines_not_fills():
 def test_plot_split_composite_timeseries_labels_dtdt_panel_variable():
     fig = plotting.plot_split_composite_timeseries(_make_split_composite())
     try:
-        legend_labels = [text.get_text() for text in fig.axes[1].get_legend().get_texts()]
+        legend_labels = [
+            text.get_text() for text in fig.axes[1].get_legend().get_texts()
+        ]
 
         assert _display_label("dTdt") in legend_labels
     finally:
@@ -426,9 +511,15 @@ def test_plot_split_composite_timeseries_extended_layout_uses_optional_panels():
     try:
         assert len(fig.axes) == 12
 
-        assert plotting.VARIABLE_COLORS["advection"] in _non_marker_line_colors(fig.axes[4])
-        assert plotting.VARIABLE_COLORS["adiabatic"] in _non_marker_line_colors(fig.axes[6])
-        assert plotting.VARIABLE_COLORS["diabatic"] in _non_marker_line_colors(fig.axes[8])
+        assert plotting.VARIABLE_COLORS["advection"] in _non_marker_line_colors(
+            fig.axes[4]
+        )
+        assert plotting.VARIABLE_COLORS["adiabatic"] in _non_marker_line_colors(
+            fig.axes[6]
+        )
+        assert plotting.VARIABLE_COLORS["diabatic"] in _non_marker_line_colors(
+            fig.axes[8]
+        )
 
         soil_axis = fig.axes[3]
         cloud_axis = fig.axes[11]
@@ -464,6 +555,36 @@ def test_plot_split_composite_timeseries_extended_layout_uses_optional_panels():
             fig.axes[9].lines[0].get_ydata(),
             -composite.isel(split_bin=0)["slhf_heating_rate_approx"].values,
         )
+    finally:
+        plt.close(fig)
+
+
+def test_presentation_split_composite_uses_requested_six_panel_layout():
+    composite = _make_split_composite()
+
+    fig = plotting.plot_split_composite_timeseries(
+        composite,
+        layout=plotting.PRESENTATION_COMPOSITE_LAYOUT,
+    )
+    try:
+        assert len(fig.axes) == 6
+        assert [ax.get_ylabel() for ax in fig.axes] == [
+            "LWA [m hPa]",
+            "[K hr-1]",
+            "T_mean [K]",
+            "[K hr-1]",
+            "[K hr-1]",
+            "[K hr-1]",
+        ]
+        assert _legend_label_count(fig, "IQR bounds") == 1
+        style_legend = fig.axes[0].get_legend()
+        assert [text.get_text() for text in style_legend.get_texts()] == [
+            "q0-0.5 (n=2)",
+            "q0.5-1 (n=2)",
+            "IQR bounds",
+        ]
+        assert len(fig.axes[0].lines) == 13
+        assert len(fig.axes[2].lines) == 7
     finally:
         plt.close(fig)
 
@@ -521,7 +642,9 @@ def test_extended_split_anomaly_uses_delta_labels_and_atmospheric_flux_signs():
         plt.close(fig)
 
 
-def test_write_split_composite_timeseries_outputs_writes_raw_and_smoothed_pngs(tmp_path):
+def test_write_split_composite_timeseries_outputs_writes_raw_and_smoothed_pngs(
+    tmp_path,
+):
     written = plotting.write_split_composite_timeseries_outputs(
         _make_split_composite(),
         tmp_path / "hw_split_composite.png",
@@ -545,8 +668,7 @@ def test_plot_top_event_timeseries_draws_event_and_reference_lines():
     )
     try:
         dtdt_styles = {
-            line.get_label(): line.get_linestyle()
-            for line in fig.axes[1].lines
+            line.get_label(): line.get_linestyle() for line in fig.axes[1].lines
         }
 
         assert dtdt_styles[_display_label("dTdt")] == "--"
@@ -563,7 +685,9 @@ def test_plot_top_event_timeseries_draws_reference_iqr():
     )
     try:
         assert sum(len(ax.collections) for ax in fig.axes) == 8
-        legend_labels = [text.get_text() for text in fig.axes[4].get_legend().get_texts()]
+        legend_labels = [
+            text.get_text() for text in fig.axes[4].get_legend().get_texts()
+        ]
 
         assert legend_labels == ["all-event average", "IQR"]
         assert _legend_label_count(fig, "all-event average") == 1
@@ -587,7 +711,9 @@ def test_plot_top_event_timeseries_aligns_reference_lag_zero_to_peak():
         )
         xdata = np.asarray(reference_line.get_xdata(), dtype="datetime64[ns]")
         peak_time = np.asarray(event["peak_time"].values).astype("datetime64[ns]")[()]
-        zero_lag_index = int(np.flatnonzero(_make_composite()["lag_hour"].values == 0)[0])
+        zero_lag_index = int(
+            np.flatnonzero(_make_composite()["lag_hour"].values == 0)[0]
+        )
 
         assert xdata[zero_lag_index] == peak_time
     finally:
@@ -595,7 +721,9 @@ def test_plot_top_event_timeseries_aligns_reference_lag_zero_to_peak():
 
 
 def test_plot_top_event_timeseries_marks_event_bounds_with_lines_not_span():
-    fig = plotting.plot_top_event_timeseries(_make_top_event_window(), _make_top_event())
+    fig = plotting.plot_top_event_timeseries(
+        _make_top_event_window(), _make_top_event()
+    )
     try:
         assert sum(len(ax.collections) for ax in fig.axes) == 0
         for ax in fig.axes[:4]:
@@ -627,15 +755,21 @@ def test_plot_top_event_timeseries_expands_tendency_axis_range():
 
 
 def test_plot_top_event_timeseries_uses_concise_datetime_formatter():
-    fig = plotting.plot_top_event_timeseries(_make_top_event_window(), _make_top_event())
+    fig = plotting.plot_top_event_timeseries(
+        _make_top_event_window(), _make_top_event()
+    )
     try:
-        assert isinstance(fig.axes[-1].xaxis.get_major_formatter(), mdates.ConciseDateFormatter)
+        assert isinstance(
+            fig.axes[-1].xaxis.get_major_formatter(), mdates.ConciseDateFormatter
+        )
     finally:
         plt.close(fig)
 
 
 def test_plot_top_event_timeseries_uses_boxed_axes():
-    fig = plotting.plot_top_event_timeseries(_make_top_event_window(), _make_top_event())
+    fig = plotting.plot_top_event_timeseries(
+        _make_top_event_window(), _make_top_event()
+    )
     try:
         _assert_all_spines_visible(fig)
     finally:
@@ -654,15 +788,9 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
     )
     try:
         assert len(fig.axes) == 12
-        assert set(_line_colors_by_label(fig.axes[4])) == {
-            _display_label("advection")
-        }
-        assert set(_line_colors_by_label(fig.axes[6])) == {
-            _display_label("adiabatic")
-        }
-        assert set(_line_colors_by_label(fig.axes[8])) == {
-            _display_label("diabatic")
-        }
+        assert set(_line_colors_by_label(fig.axes[4])) == {_display_label("advection")}
+        assert set(_line_colors_by_label(fig.axes[6])) == {_display_label("adiabatic")}
+        assert set(_line_colors_by_label(fig.axes[8])) == {_display_label("diabatic")}
 
         soil_axis = fig.axes[3]
         cloud_axis = fig.axes[11]
@@ -689,6 +817,60 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
         }
     finally:
         plt.close(fig)
+
+
+def test_plot_top_event_timeseries_presentation_uses_requested_six_panel_layout():
+    event_window = _make_top_event_window()
+    composite = _make_composite()
+
+    fig = plotting.plot_top_event_timeseries(
+        event_window,
+        _make_top_event(),
+        reference_composite=composite,
+        layout="presentation",
+    )
+    try:
+        assert len(fig.axes) == 6
+        np.testing.assert_allclose(
+            fig.get_size_inches(),
+            plotting.plot_style.presentation_figsize(),
+        )
+        assert set(_line_colors_by_label(fig.axes[0])) == {
+            _display_label("lwa_a_region"),
+            _display_label("lwa_c_region"),
+        }
+        assert set(_line_colors_by_label(fig.axes[1])) == {_display_label("advection")}
+        assert set(_line_colors_by_label(fig.axes[2])) == {_display_label("T_mean")}
+        assert set(_line_colors_by_label(fig.axes[3])) == {_display_label("adiabatic")}
+        assert set(_line_colors_by_label(fig.axes[4])) == {_display_label("dTdt")}
+        assert set(_line_colors_by_label(fig.axes[5])) == {_display_label("diabatic")}
+        assert sum(len(ax.collections) for ax in fig.axes) == 7
+        first_panel_legend_labels = [
+            text.get_text()
+            for artist in fig.axes[0].get_children()
+            if isinstance(artist, Legend)
+            for text in artist.get_texts()
+        ]
+        assert first_panel_legend_labels == [
+            _display_label("lwa_a_region"),
+            _display_label("lwa_c_region"),
+            "all-event average",
+            "IQR",
+        ]
+        for ax in fig.axes:
+            assert [line.get_linestyle() for line in ax.lines[-3:]] == [":", ":", "--"]
+    finally:
+        plt.close(fig)
+
+
+def test_plot_top_event_timeseries_presentation_rejects_extended_panels():
+    with pytest.raises(ValueError, match="cannot be combined"):
+        plotting.plot_top_event_timeseries(
+            _make_top_event_window(),
+            _make_top_event(),
+            plot_extended_variables=True,
+            layout="presentation",
+        )
 
 
 def test_top_event_surface_fluxes_use_atmospheric_sign_for_event_and_reference():
@@ -721,9 +903,7 @@ def test_top_event_surface_fluxes_use_atmospheric_sign_for_event_and_reference()
                 -event_sources[name],
             )
             reference_line = next(
-                line
-                for line in axis.lines
-                if line.get_label() == "_all_event_average"
+                line for line in axis.lines if line.get_label() == "_all_event_average"
             )
             np.testing.assert_allclose(
                 reference_line.get_ydata(),
@@ -751,8 +931,12 @@ def test_plot_top_event_timeseries_extended_uses_concise_datetime_formatter():
         plot_extended_variables=True,
     )
     try:
-        assert isinstance(fig.axes[8].xaxis.get_major_formatter(), mdates.ConciseDateFormatter)
-        assert isinstance(fig.axes[9].xaxis.get_major_formatter(), mdates.ConciseDateFormatter)
+        assert isinstance(
+            fig.axes[8].xaxis.get_major_formatter(), mdates.ConciseDateFormatter
+        )
+        assert isinstance(
+            fig.axes[9].xaxis.get_major_formatter(), mdates.ConciseDateFormatter
+        )
     finally:
         plt.close(fig)
 
@@ -775,10 +959,7 @@ def _make_composite() -> xr.Dataset:
         "soil_moisture": np.array([0.2, 0.19, 0.18, 0.17, 0.16]),
         "cloud_cover": np.array([0.7, 0.6, 0.4, 0.3, 0.5]),
     }
-    data_vars = {
-        name: ("lag_hour", values)
-        for name, values in variables.items()
-    }
+    data_vars = {name: ("lag_hour", values) for name, values in variables.items()}
     data_vars.update(
         {
             f"event_percentile_{name}": (
@@ -879,11 +1060,7 @@ def _display_label(name: str) -> str:
 
 
 def _assert_all_spines_visible(fig) -> None:
-    assert all(
-        spine.get_visible()
-        for ax in fig.axes
-        for spine in ax.spines.values()
-    )
+    assert all(spine.get_visible() for ax in fig.axes for spine in ax.spines.values())
 
 
 def _assert_extended_anomaly_axis_labels(fig) -> None:

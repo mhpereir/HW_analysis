@@ -2,7 +2,6 @@ import re
 import subprocess
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULERS = (
     REPO_ROOT / "schedulers" / "schedule_build_stage1_hourly_climatology.sh",
@@ -20,15 +19,22 @@ ABSOLUTE_PLOT_SCHEDULERS = (
     REPO_ROOT / "schedulers" / "schedule_composite_timeseries_split.sh",
     REPO_ROOT / "schedulers" / "schedule_top_events.sh",
 )
+TEMPORAL_COMPOSITE_SCHEDULERS = (
+    *ABSOLUTE_PLOT_SCHEDULERS,
+    SCHEDULERS[1],
+    SCHEDULERS[2],
+)
 
 
 def test_climatology_schedulers_are_commit_verified_and_syntax_valid():
     for scheduler in SCHEDULERS:
         text = scheduler.read_text()
         assert 'PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"' in text
-        assert 'EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"' in text
+        assert (
+            'EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"' in text
+        )
         assert "status --porcelain --untracked-files=normal" in text
-        assert "mamba activate \"${VENUS_MAMBA_ENV:-dev_env}\"" in text
+        assert 'mamba activate "${VENUS_MAMBA_ENV:-dev_env}"' in text
         subprocess.run(["bash", "-n", str(scheduler)], check=True)
 
 
@@ -36,10 +42,12 @@ def test_absolute_plot_schedulers_are_commit_verified_and_syntax_valid():
     for scheduler in ABSOLUTE_PLOT_SCHEDULERS:
         text = scheduler.read_text()
         assert 'PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"' in text
-        assert 'EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"' in text
+        assert (
+            'EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"' in text
+        )
         assert 'INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"' in text
         assert "status --porcelain --untracked-files=normal" in text
-        assert "mamba activate \"${VENUS_MAMBA_ENV:-dev_env}\"" in text
+        assert 'mamba activate "${VENUS_MAMBA_ENV:-dev_env}"' in text
         assert "/home/mhpereir/HW_analysis" not in text
         subprocess.run(["bash", "-n", str(scheduler)], check=True)
 
@@ -54,13 +62,27 @@ def test_absolute_plot_schedulers_require_explicit_non_overwriting_outputs():
     assert 'test -s "${SMOOTHED_OUTPUT_PATH}"' in all_text
 
     assert 'OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"' in split_text
-    assert 'for split_variable in "${split_variable_list[@]}" peak_time; do' in split_text
+    assert (
+        'for split_variable in "${split_variable_list[@]}" peak_time; do' in split_text
+    )
     assert 'test ! -e "${derived_output_path}"' in split_text
     assert split_text.count('test -s "${derived_output_path}"') == 2
 
     assert 'OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR is required}"' in top_text
     assert 'test ! -e "${OUTPUT_DIR}"' in top_text
     assert 'test -d "${OUTPUT_DIR}"' in top_text
+    assert "expected_png_count=$((2 * TOP_N))" in top_text
+    assert 'test "${actual_png_count}" -eq "${expected_png_count}"' in top_text
+
+
+def test_temporal_composite_schedulers_support_presentation_layout():
+    for scheduler in TEMPORAL_COMPOSITE_SCHEDULERS:
+        text = scheduler.read_text()
+        assert 'PLOT_LAYOUT="${PLOT_LAYOUT:-paper}"' in text
+        assert "plot_layout_args=(--layout paper --plot-extended-variables)" in text
+        assert "plot_layout_args=(--layout presentation)" in text
+        assert '"${plot_layout_args[@]}"' in text
+        assert 'echo "[info] plot_layout=${PLOT_LAYOUT}"' in text
 
 
 def test_climatology_builder_requires_explicit_products():
@@ -81,25 +103,30 @@ def test_anomaly_plot_schedulers_require_stage1_climatology_and_output():
             in text
         )
         assert 'OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"' in text
-        assert "--input-path \"${INPUT_PATH}\"" in text
-        assert "--climatology-path \"${CLIMATOLOGY_PATH}\"" in text
+        assert '--input-path "${INPUT_PATH}"' in text
+        assert '--climatology-path "${CLIMATOLOGY_PATH}"' in text
 
 
 def test_matched_advection_scheduler_requires_stage2_settings_and_atomic_output():
     text = SCHEDULERS[4].read_text()
 
-    assert 'EVENT_FEATURES_PATH="${EVENT_FEATURES_PATH:?EVENT_FEATURES_PATH is required}"' in text
+    assert (
+        'EVENT_FEATURES_PATH="${EVENT_FEATURES_PATH:?EVENT_FEATURES_PATH is required}"'
+        in text
+    )
     required_settings = (
         'MATCHING_SETTINGS_PATH="${MATCHING_SETTINGS_PATH:'
         '?MATCHING_SETTINGS_PATH is required}"'
     )
     assert required_settings in text
-    assert 'MATCHING_SPECIFICATION="${MATCHING_SPECIFICATION:-peak_anomaly_0p20}"' in text
+    assert (
+        'MATCHING_SPECIFICATION="${MATCHING_SPECIFICATION:-peak_anomaly_0p20}"' in text
+    )
     assert "plot_advection_direction_exploration_matched_clim_anom.py" in text
     assert '--event-features-path "${EVENT_FEATURES_PATH}"' in text
     assert '--matching-settings-path "${MATCHING_SETTINGS_PATH}"' in text
     assert '--matching-specification "${MATCHING_SPECIFICATION}"' in text
-    assert 'export PYTHONWARNINGS=error' in text
+    assert "export PYTHONWARNINGS=error" in text
     assert 'mv "${STAGED_OUTPUT}" "${OUTPUT_PATH}"' in text
     assert text.count('test ! -e "${OUTPUT_PATH}"') == 2
 
@@ -119,7 +146,7 @@ def test_split_anomaly_scheduler_matches_absolute_production_split_matrix():
     )
     assert 'SPLIT_QUANTILE="${SPLIT_QUANTILE:-0.75}"' in text
     assert 'SPLIT_YEAR="${SPLIT_YEAR:-1982}"' in text
-    assert '--split-variable peak_time' in text
+    assert "--split-variable peak_time" in text
     assert '--split-years "${SPLIT_YEAR}"' in text
 
 
@@ -198,14 +225,10 @@ def test_split_anomaly_scheduler_preflights_and_validates_all_outputs():
     assert 'for split_variable in "${split_variable_list[@]}" peak_time; do' in text
     assert 'for split_variable in "${split_variable_list[@]}"; do' in text
     assert text.count('test ! -e "${derived_output_path}"') == 1
-    missing_smoothed = (
-        'test ! -e "${derived_output_path%.*}_smoothed.${OUTPUT_SUFFIX}"'
-    )
+    missing_smoothed = 'test ! -e "${derived_output_path%.*}_smoothed.${OUTPUT_SUFFIX}"'
     assert text.count(missing_smoothed) == 1
     assert text.count('test -s "${derived_output_path}"') == 2
-    written_smoothed = (
-        'test -s "${derived_output_path%.*}_smoothed.${OUTPUT_SUFFIX}"'
-    )
+    written_smoothed = 'test -s "${derived_output_path%.*}_smoothed.${OUTPUT_SUFFIX}"'
     assert text.count(written_smoothed) == 2
 
 
