@@ -45,9 +45,9 @@ PRESENTATION_COMPOSITE_LAYOUT = "presentation"
 COMPOSITE_LAYOUTS = (PAPER_COMPOSITE_LAYOUT, PRESENTATION_COMPOSITE_LAYOUT)
 VARIABLE_COLORS = plot_style.VARIABLE_COLORS
 PRESENTATION_PLOT_VARIABLES: tuple[str, ...] = (
-    "T_mean",
     "lwa_a_region",
     "lwa_c_region",
+    "T_mean",
     "dTdt",
     "advection",
     "adiabatic",
@@ -252,15 +252,15 @@ def _plot_presentation_composite_timeseries(composite: xr.Dataset) -> Figure:
     left = axes[:, 0]
     right = axes[:, 1]
 
+    _plot_lwa_panel(left[0], composite)
+    _add_iqr_to_existing_legend(left[0])
     _plot_composite_variable_panel(
-        left[0],
+        left[1],
         composite,
         "T_mean",
         ylabel="T_mean [K]",
         zero_reference=False,
     )
-    _add_iqr_to_existing_legend(left[0])
-    _plot_lwa_panel(left[1], composite)
     _plot_composite_variable_panel(left[2], composite, "dTdt", ylabel="[K hr-1]")
 
     _plot_composite_variable_panel(right[0], composite, "advection", ylabel="[K hr-1]")
@@ -316,18 +316,15 @@ def _plot_presentation_split_composite_timeseries(composite: xr.Dataset) -> Figu
     left = axes[:, 0]
     right = axes[:, 1]
 
+    _plot_split_lwa_panel(left[0], composite)
+    _add_split_style_legend(left[0], _split_bin_labels(composite))
     _plot_split_single_variable_panel(
-        left[0],
+        left[1],
         composite,
         "T_mean",
         ylabel="T_mean [K]",
         zero_reference=False,
     )
-    variable_legend = left[0].get_legend()
-    if variable_legend is not None:
-        left[0].add_artist(variable_legend)
-    _add_split_style_legend(left[0], _split_bin_labels(composite))
-    _plot_split_lwa_panel(left[1], composite)
     _plot_split_single_variable_panel(left[2], composite, "dTdt", ylabel="[K hr-1]")
 
     _plot_split_single_variable_panel(right[0], composite, "advection", ylabel="[K hr-1]")
@@ -715,24 +712,24 @@ def _plot_presentation_top_event_timeseries(
     left = axes[:, 0]
     right = axes[:, 1]
 
-    _plot_top_event_single_variable_panel(
+    _plot_top_event_lwa_panel(
         left[0],
+        event_window,
+        event,
+        reference_composite=reference_composite,
+    )
+    variable_legend = left[0].get_legend()
+    if variable_legend is not None and reference_composite is not None:
+        left[0].add_artist(variable_legend)
+        _add_top_event_reference_legend(left[0])
+    _plot_top_event_single_variable_panel(
+        left[1],
         event_window,
         event,
         "T_mean",
         ylabel="T_mean [K]",
         reference_composite=reference_composite,
         zero_reference=False,
-    )
-    variable_legend = left[0].get_legend()
-    if variable_legend is not None and reference_composite is not None:
-        left[0].add_artist(variable_legend)
-        _add_top_event_reference_legend(left[0])
-    _plot_top_event_lwa_panel(
-        left[1],
-        event_window,
-        event,
-        reference_composite=reference_composite,
     )
     _plot_top_event_single_variable_panel(
         left[2],

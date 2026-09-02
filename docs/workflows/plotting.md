@@ -153,8 +153,8 @@ The presentation grid is arranged by row as follows:
 
 | Row | Left column | Right column |
 | --- | --- | --- |
-| 1 | temperature | advection |
-| 2 | anticyclonic and cyclonic LWA | adiabatic heating |
+| 1 | anticyclonic and cyclonic LWA | advection |
+| 2 | temperature | adiabatic heating |
 | 3 | `dTdt` | diabatic heating |
 
 The temperature panel contains `T_mean` only. Volume and the remaining

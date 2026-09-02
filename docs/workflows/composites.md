@@ -51,6 +51,10 @@ The presentation option changes only variable selection and rendering. It
 does not change event membership, composite reductions, anomaly construction,
 percentile semantics, or smoothing.
 
+Across all presentation temporal plots, the left column is ordered as
+anticyclonic and cyclonic LWA, temperature, then temperature tendency. The
+right column remains advection, adiabatic heating, then diabatic heating.
+
 The top-event entrypoint supports the same `paper` and `presentation` layout
 choices. Its presentation view preserves top-event ranking, absolute-time
 event windows, event-boundary and peak markers, the all-event mean and IQR

@@ -208,22 +208,22 @@ def test_presentation_composite_uses_requested_six_panel_layout():
             plotting.plot_style.presentation_figsize(),
         )
         assert [ax.get_ylabel() for ax in fig.axes] == [
-            "T_mean [K]",
-            "[K hr-1]",
             "LWA [m hPa]",
+            "[K hr-1]",
+            "T_mean [K]",
             "[K hr-1]",
             "[K hr-1]",
             "[K hr-1]",
         ]
         assert set(_line_colors_by_label(fig.axes[0])) == {
-            _display_label("T_mean")
+            _display_label("lwa_a_region"),
+            _display_label("lwa_c_region"),
         }
         assert set(_line_colors_by_label(fig.axes[1])) == {
             _display_label("advection")
         }
         assert set(_line_colors_by_label(fig.axes[2])) == {
-            _display_label("lwa_a_region"),
-            _display_label("lwa_c_region"),
+            _display_label("T_mean")
         }
         assert set(_line_colors_by_label(fig.axes[3])) == {
             _display_label("adiabatic")
@@ -254,9 +254,9 @@ def test_presentation_anomaly_composite_uses_delta_axis_labels():
     try:
         assert "climatological-anomaly composite" in fig._suptitle.get_text()
         assert [ax.get_ylabel() for ax in fig.axes] == [
-            "ΔT_mean [K]",
-            "Δ [K hr-1]",
             "ΔLWA [m hPa]",
+            "Δ [K hr-1]",
+            "ΔT_mean [K]",
             "Δ [K hr-1]",
             "Δ [K hr-1]",
             "Δ [K hr-1]",
@@ -575,9 +575,9 @@ def test_presentation_split_composite_uses_requested_six_panel_layout():
     try:
         assert len(fig.axes) == 6
         assert [ax.get_ylabel() for ax in fig.axes] == [
-            "T_mean [K]",
-            "[K hr-1]",
             "LWA [m hPa]",
+            "[K hr-1]",
+            "T_mean [K]",
             "[K hr-1]",
             "[K hr-1]",
             "[K hr-1]",
@@ -589,8 +589,8 @@ def test_presentation_split_composite_uses_requested_six_panel_layout():
             "q0.5-1 (n=2)",
             "IQR bounds",
         ]
-        assert len(fig.axes[0].lines) == 7
-        assert len(fig.axes[2].lines) == 13
+        assert len(fig.axes[0].lines) == 13
+        assert len(fig.axes[2].lines) == 7
     finally:
         plt.close(fig)
 
@@ -835,14 +835,14 @@ def test_plot_top_event_timeseries_presentation_uses_requested_six_panel_layout(
             plotting.plot_style.presentation_figsize(),
         )
         assert set(_line_colors_by_label(fig.axes[0])) == {
-            _display_label("T_mean")
+            _display_label("lwa_a_region"),
+            _display_label("lwa_c_region"),
         }
         assert set(_line_colors_by_label(fig.axes[1])) == {
             _display_label("advection")
         }
         assert set(_line_colors_by_label(fig.axes[2])) == {
-            _display_label("lwa_a_region"),
-            _display_label("lwa_c_region"),
+            _display_label("T_mean")
         }
         assert set(_line_colors_by_label(fig.axes[3])) == {
             _display_label("adiabatic")
@@ -861,7 +861,8 @@ def test_plot_top_event_timeseries_presentation_uses_requested_six_panel_layout(
             for text in artist.get_texts()
         ]
         assert first_panel_legend_labels == [
-            _display_label("T_mean"),
+            _display_label("lwa_a_region"),
+            _display_label("lwa_c_region"),
             "all-event average",
             "IQR",
         ]
