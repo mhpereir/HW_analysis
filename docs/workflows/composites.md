@@ -43,6 +43,14 @@ from the absolute Stage-1 product. Climatology subtraction does not redefine
 events. Absolute and climatological-anomaly figures use separate entrypoints
 and output paths.
 
+Each of the four temporal-composite entrypoints supports two figure layouts.
+The default `paper` layout preserves the existing compact or extended figure.
+Passing `--layout presentation` selects the documented six-panel, 16:9 slide
+layout and writes to a separate `*_presentation` output namespace by default.
+The presentation option changes only variable selection and rendering. It
+does not change event membership, composite reductions, anomaly construction,
+percentile semantics, or smoothing.
+
 The matched face-advection variant obtains matched membership from the
 canonical Stage-2 event-feature table and tracked matching settings. It then
 selects those event IDs from the absolute Stage-1 event table and verifies that
