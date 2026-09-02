@@ -22,6 +22,7 @@ TIME_START="${TIME_START:-1940}"
 TIME_END="${TIME_END:-2024}"
 WINDOW_DAYS="${WINDOW_DAYS:-7}"
 SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"
+PLOT_LAYOUT="${PLOT_LAYOUT:-paper}"
 SPLIT_QUANTILE="${SPLIT_QUANTILE:-0.75}"
 SPLIT_YEAR="${SPLIT_YEAR:-1982}"
 LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
@@ -29,6 +30,19 @@ OUTPUT_DIRECTORY="$(dirname "${OUTPUT_PATH}")"
 OUTPUT_FILENAME="$(basename "${OUTPUT_PATH}")"
 OUTPUT_STEM="${OUTPUT_FILENAME%.*}"
 OUTPUT_SUFFIX="${OUTPUT_FILENAME##*.}"
+
+case "${PLOT_LAYOUT}" in
+  paper)
+    plot_layout_args=(--layout paper --plot-extended-variables)
+    ;;
+  presentation)
+    plot_layout_args=(--layout presentation)
+    ;;
+  *)
+    echo "PLOT_LAYOUT must be paper or presentation; got ${PLOT_LAYOUT}." >&2
+    exit 2
+    ;;
+esac
 
 split_variable_list=(
   "duration"
@@ -84,6 +98,7 @@ echo "[info] threshold=${THRESHOLD_VARIABLE}_q${QUANTILE}"
 echo "[info] years=${TIME_START}-${TIME_END}"
 echo "[info] window_days=${WINDOW_DAYS}"
 echo "[info] smoothing_window=${SMOOTHING_WINDOW}"
+echo "[info] plot_layout=${PLOT_LAYOUT}"
 echo "[info] split_quantile=${SPLIT_QUANTILE}"
 echo "[info] split_year=${SPLIT_YEAR}"
 echo "[info] started=$(date -Is)"
@@ -108,7 +123,7 @@ for split_variable in "${split_variable_list[@]}"; do
     --split-quantiles "${SPLIT_QUANTILE}" \
     --season-months 6 7 8 \
     --require-full-event \
-    --plot-extended-variables
+    "${plot_layout_args[@]}"
   derived_output_path="$(split_output_path "${split_variable}")"
   test -s "${derived_output_path}"
   test -s "${derived_output_path%.*}_smoothed.${OUTPUT_SUFFIX}"
@@ -132,7 +147,7 @@ echo "[info] split_variable=peak_time"
   --split-years "${SPLIT_YEAR}" \
   --season-months 6 7 8 \
   --require-full-event \
-  --plot-extended-variables
+  "${plot_layout_args[@]}"
 derived_output_path="$(split_output_path peak_time)"
 test -s "${derived_output_path}"
 test -s "${derived_output_path%.*}_smoothed.${OUTPUT_SUFFIX}"

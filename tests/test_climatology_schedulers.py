@@ -2,7 +2,6 @@ import re
 import subprocess
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULERS = (
     REPO_ROOT / "schedulers" / "schedule_build_stage1_hourly_climatology.sh",
@@ -19,6 +18,12 @@ ABSOLUTE_PLOT_SCHEDULERS = (
     REPO_ROOT / "schedulers" / "schedule_composite_timeseries_all.sh",
     REPO_ROOT / "schedulers" / "schedule_composite_timeseries_split.sh",
     REPO_ROOT / "schedulers" / "schedule_top_events.sh",
+)
+TEMPORAL_COMPOSITE_SCHEDULERS = (
+    ABSOLUTE_PLOT_SCHEDULERS[0],
+    ABSOLUTE_PLOT_SCHEDULERS[1],
+    SCHEDULERS[1],
+    SCHEDULERS[2],
 )
 
 
@@ -61,6 +66,16 @@ def test_absolute_plot_schedulers_require_explicit_non_overwriting_outputs():
     assert 'OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR is required}"' in top_text
     assert 'test ! -e "${OUTPUT_DIR}"' in top_text
     assert 'test -d "${OUTPUT_DIR}"' in top_text
+
+
+def test_temporal_composite_schedulers_support_presentation_layout():
+    for scheduler in TEMPORAL_COMPOSITE_SCHEDULERS:
+        text = scheduler.read_text()
+        assert 'PLOT_LAYOUT="${PLOT_LAYOUT:-paper}"' in text
+        assert 'plot_layout_args=(--layout paper --plot-extended-variables)' in text
+        assert 'plot_layout_args=(--layout presentation)' in text
+        assert '"${plot_layout_args[@]}"' in text
+        assert 'echo "[info] plot_layout=${PLOT_LAYOUT}"' in text
 
 
 def test_climatology_builder_requires_explicit_products():

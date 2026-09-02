@@ -22,8 +22,22 @@ TIME_START="${TIME_START:-1940}"
 TIME_END="${TIME_END:-2024}"
 WINDOW_DAYS="${WINDOW_DAYS:-7}"
 SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"
+PLOT_LAYOUT="${PLOT_LAYOUT:-paper}"
 LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
 SMOOTHED_OUTPUT_PATH="${OUTPUT_PATH%.*}_smoothed.${OUTPUT_PATH##*.}"
+
+case "${PLOT_LAYOUT}" in
+  paper)
+    plot_layout_args=(--layout paper --plot-extended-variables)
+    ;;
+  presentation)
+    plot_layout_args=(--layout presentation)
+    ;;
+  *)
+    echo "PLOT_LAYOUT must be paper or presentation; got ${PLOT_LAYOUT}." >&2
+    exit 2
+    ;;
+esac
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
@@ -59,6 +73,7 @@ echo "[info] threshold=${THRESHOLD_VARIABLE}_q${QUANTILE}"
 echo "[info] years=${TIME_START}-${TIME_END}"
 echo "[info] window_days=${WINDOW_DAYS}"
 echo "[info] smoothing_window=${SMOOTHING_WINDOW}"
+echo "[info] plot_layout=${PLOT_LAYOUT}"
 echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
@@ -77,7 +92,7 @@ cd "${PROJECT_ROOT}"
   --smoothing-window "${SMOOTHING_WINDOW}" \
   --season-months 6 7 8 \
   --require-full-event \
-  --plot-extended-variables
+  "${plot_layout_args[@]}"
 
 test -s "${OUTPUT_PATH}"
 test -s "${SMOOTHED_OUTPUT_PATH}"

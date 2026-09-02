@@ -51,6 +51,11 @@ The presentation option changes only variable selection and rendering. It
 does not change event membership, composite reductions, anomaly construction,
 percentile semantics, or smoothing.
 
+The four temporal-composite Venus schedulers expose the same choice through
+`PLOT_LAYOUT`. Its default is `paper`, which retains the extended ten-panel
+production figures. Set `PLOT_LAYOUT=presentation` to pass the six-panel
+layout without the mutually exclusive extended-panel flag.
+
 The matched face-advection variant obtains matched membership from the
 canonical Stage-2 event-feature table and tracked matching settings. It then
 selects those event IDs from the absolute Stage-1 event table and verifies that
