@@ -107,6 +107,13 @@ figure entrypoints.
 - Event-versus-clean-baseline figures place the shared "Clean baseline days"
   and "Events" legend in the upper-right corner of the first panel. Later
   panels do not repeat that legend.
+- Event-versus-clean-baseline figures retain clean baseline days as the muted
+  background population and color foreground event points by the requested
+  event-feature variable, defaulting to `tas_anom_peak`. The event layers use
+  the same `gist_heat_r` mapping and peak-TAS-anomaly label as the corresponding
+  event-only diagnostic, with one shared event-derived color normalization and
+  colorbar across all panels. Event-only severity variables remain absent from
+  and are never inferred for baseline-day rows.
 - Event-versus-clean-baseline figures pad each finite plotted data range by 5%
   on both sides while keeping zero reference lines inside the padded range.
   Shared x-axes use the combined plotted x-data, while each panel derives its
