@@ -20,8 +20,7 @@ ABSOLUTE_PLOT_SCHEDULERS = (
     REPO_ROOT / "schedulers" / "schedule_top_events.sh",
 )
 TEMPORAL_COMPOSITE_SCHEDULERS = (
-    ABSOLUTE_PLOT_SCHEDULERS[0],
-    ABSOLUTE_PLOT_SCHEDULERS[1],
+    *ABSOLUTE_PLOT_SCHEDULERS,
     SCHEDULERS[1],
     SCHEDULERS[2],
 )
@@ -66,6 +65,8 @@ def test_absolute_plot_schedulers_require_explicit_non_overwriting_outputs():
     assert 'OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR is required}"' in top_text
     assert 'test ! -e "${OUTPUT_DIR}"' in top_text
     assert 'test -d "${OUTPUT_DIR}"' in top_text
+    assert 'expected_png_count=$((2 * TOP_N))' in top_text
+    assert 'test "${actual_png_count}" -eq "${expected_png_count}"' in top_text
 
 
 def test_temporal_composite_schedulers_support_presentation_layout():

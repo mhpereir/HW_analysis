@@ -22,7 +22,21 @@ TIME_END="${TIME_END:-2024}"
 TOP_N="${TOP_N:-10}"
 WINDOW_DAYS="${WINDOW_DAYS:-7}"
 SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"
+PLOT_LAYOUT="${PLOT_LAYOUT:-paper}"
 LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+
+case "${PLOT_LAYOUT}" in
+  paper)
+    plot_layout_args=(--layout paper --plot-extended-variables)
+    ;;
+  presentation)
+    plot_layout_args=(--layout presentation)
+    ;;
+  *)
+    echo "PLOT_LAYOUT must be paper or presentation; got ${PLOT_LAYOUT}." >&2
+    exit 2
+    ;;
+esac
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
@@ -39,6 +53,7 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
+export PYTHONWARNINGS=error
 export MAMBA_ROOT_PREFIX="${MAMBA_ROOT_PREFIX:-/home/mhpereir/miniconda3}"
 source "${MAMBA_ROOT_PREFIX}/etc/profile.d/mamba.sh"
 mamba activate "${VENUS_MAMBA_ENV:-dev_env}"
@@ -50,6 +65,7 @@ echo "[info] python=$(command -v python)"
 echo "[info] input_path=${INPUT_PATH}"
 echo "[info] output_dir=${OUTPUT_DIR}"
 echo "[info] top_n=${TOP_N}"
+echo "[info] plot_layout=${PLOT_LAYOUT}"
 echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
@@ -66,8 +82,10 @@ cd "${PROJECT_ROOT}"
   --top-n "${TOP_N}" \
   --window-days "${WINDOW_DAYS}" \
   --smoothing-window "${SMOOTHING_WINDOW}" \
-  --plot-extended-variables
+  "${plot_layout_args[@]}"
 
 test -d "${OUTPUT_DIR}"
-test -n "$(find "${OUTPUT_DIR}" -maxdepth 1 -type f -name '*.png' -print -quit)"
+expected_png_count=$((2 * TOP_N))
+actual_png_count=$(find "${OUTPUT_DIR}" -maxdepth 1 -type f -name '*.png' | wc -l)
+test "${actual_png_count}" -eq "${expected_png_count}"
 echo "[info] finished=$(date -Is)"

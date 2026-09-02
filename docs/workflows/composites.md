@@ -51,7 +51,15 @@ The presentation option changes only variable selection and rendering. It
 does not change event membership, composite reductions, anomaly construction,
 percentile semantics, or smoothing.
 
-The four temporal-composite Venus schedulers expose the same choice through
+The top-event entrypoint supports the same `paper` and `presentation` layout
+choices. Its presentation view preserves top-event ranking, absolute-time
+event windows, event-boundary and peak markers, the all-event mean and IQR
+reference, and raw plus 24-hour-smoothed output semantics. It changes only the
+variables and panel arrangement used for rendering. Presentation top-event
+figures use a separate `top_events_presentation` output namespace and include
+`presentation` in their default filenames.
+
+The five temporal plotting Venus schedulers expose the same choice through
 `PLOT_LAYOUT`. Its default is `paper`, which retains the extended ten-panel
 production figures. Set `PLOT_LAYOUT=presentation` to pass the six-panel
 layout without the mutually exclusive extended-panel flag.

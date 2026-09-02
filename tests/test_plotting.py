@@ -1,8 +1,10 @@
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 import xarray as xr
 from HW_analysis.src import plotting
+from matplotlib.legend import Legend
 
 
 def test_smooth_composite_for_display_smooths_only_requested_variables():
@@ -814,6 +816,69 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
         }
     finally:
         plt.close(fig)
+
+
+def test_plot_top_event_timeseries_presentation_uses_requested_six_panel_layout():
+    event_window = _make_top_event_window()
+    composite = _make_composite()
+
+    fig = plotting.plot_top_event_timeseries(
+        event_window,
+        _make_top_event(),
+        reference_composite=composite,
+        layout="presentation",
+    )
+    try:
+        assert len(fig.axes) == 6
+        np.testing.assert_allclose(
+            fig.get_size_inches(),
+            plotting.plot_style.presentation_figsize(),
+        )
+        assert set(_line_colors_by_label(fig.axes[0])) == {
+            _display_label("T_mean")
+        }
+        assert set(_line_colors_by_label(fig.axes[1])) == {
+            _display_label("advection")
+        }
+        assert set(_line_colors_by_label(fig.axes[2])) == {
+            _display_label("lwa_a_region"),
+            _display_label("lwa_c_region"),
+        }
+        assert set(_line_colors_by_label(fig.axes[3])) == {
+            _display_label("adiabatic")
+        }
+        assert set(_line_colors_by_label(fig.axes[4])) == {
+            _display_label("dTdt")
+        }
+        assert set(_line_colors_by_label(fig.axes[5])) == {
+            _display_label("diabatic")
+        }
+        assert sum(len(ax.collections) for ax in fig.axes) == 7
+        first_panel_legend_labels = [
+            text.get_text()
+            for artist in fig.axes[0].get_children()
+            if isinstance(artist, Legend)
+            for text in artist.get_texts()
+        ]
+        assert first_panel_legend_labels == [
+            _display_label("T_mean"),
+            "all-event average",
+            "IQR",
+        ]
+        for ax in fig.axes:
+            assert [line.get_linestyle() for line in ax.lines[-3:]] == [":", ":", "--"]
+    finally:
+        plt.close(fig)
+
+
+def test_plot_top_event_timeseries_presentation_rejects_extended_panels():
+    with pytest.raises(ValueError, match="cannot be combined"):
+        plotting.plot_top_event_timeseries(
+            _make_top_event_window(),
+            _make_top_event(),
+            plot_extended_variables=True,
+            layout="presentation",
+        )
 
 
 def test_top_event_surface_fluxes_use_atmospheric_sign_for_event_and_reference():

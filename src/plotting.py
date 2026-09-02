@@ -371,18 +371,22 @@ def plot_top_event_timeseries(
     *,
     reference_composite: xr.Dataset | None = None,
     plot_extended_variables: bool = False,
+    layout: str = PAPER_COMPOSITE_LAYOUT,
 ) -> Figure:
     """Return an absolute-time figure for one selected event."""
+    _validate_composite_layout(layout, plot_extended_variables)
+    if layout == PRESENTATION_COMPOSITE_LAYOUT:
+        return _plot_presentation_top_event_timeseries(
+            event_window,
+            event,
+            reference_composite=reference_composite,
+        )
     if plot_extended_variables:
         return _plot_extended_top_event_timeseries(
             event_window,
             event,
             reference_composite=reference_composite,
         )
-
-    peak_time = _event_time_value(event, "peak_time")
-    start_time = _event_time_value(event, "start_time")
-    end_time = _event_time_value(event, "end_time")
 
     fig, axes = plt.subplots(
         nrows=4,
@@ -420,41 +424,8 @@ def plot_top_event_timeseries(
         reference_composite=reference_composite,
     )
 
-    for ax in axes:
-        ax.axvline(
-            start_time,
-            color=plot_style.FACE_COLORS["top"],
-            linewidth=plot_style.LINE_WIDTH_PT,
-            linestyle=":",
-            alpha=0.9,
-        )
-        ax.axvline(
-            end_time,
-            color=plot_style.FACE_COLORS["top"],
-            linewidth=plot_style.LINE_WIDTH_PT,
-            linestyle=":",
-            alpha=0.9,
-        )
-        ax.axvline(
-            peak_time,
-            color=plot_style.COLORS["zero"],
-            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
-            linestyle="--",
-            alpha=0.8,
-        )
-
-    event_id = int(event["event_id"].item())
-    rank = int(event["selection_rank"].item()) if "selection_rank" in event else event_id
-    peak_value = float(event["tas_peak"].item()) if "tas_peak" in event else np.nan
-    smoothing_window = event_window.attrs.get("smoothing_window")
-    smoothing_label = (
-        f", {int(smoothing_window)}-hour running mean"
-        if smoothing_window is not None
-        else ""
-    )
-    fig.suptitle(
-        f"Rank {rank} HW event {event_id}: peak tas={peak_value:.2f}{smoothing_label}"
-    )
+    _mark_top_event_times(axes, event)
+    _set_top_event_title(fig, event_window, event)
     ax3.set_xlabel("Time")
 
     _format_datetime_xaxis(axes)
@@ -633,10 +604,6 @@ def _plot_extended_top_event_timeseries(
             dataset_label="reference composite",
         )
 
-    peak_time = _event_time_value(event, "peak_time")
-    start_time = _event_time_value(event, "start_time")
-    end_time = _event_time_value(event, "end_time")
-
     fig, axes = plt.subplots(
         nrows=5,
         ncols=2,
@@ -708,7 +675,103 @@ def _plot_extended_top_event_timeseries(
         reference_composite=reference_composite,
     )
 
-    for ax in axes.ravel():
+    _mark_top_event_times(axes.ravel(), event)
+    _set_top_event_title(fig, event_window, event)
+    left[-1].set_xlabel("Time")
+    right[-1].set_xlabel("Time")
+    _format_datetime_xaxis(axes.ravel())
+    _style_axes(axes.ravel())
+    return fig
+
+
+def _plot_presentation_top_event_timeseries(
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+    *,
+    reference_composite: xr.Dataset | None,
+) -> Figure:
+    """Return a widescreen 3x2 top-event figure for presentations."""
+    _require_dataset_variables(
+        event_window,
+        PRESENTATION_PLOT_VARIABLES,
+        dataset_label="event window",
+        plot_label="Presentation plot",
+    )
+    if reference_composite is not None:
+        _require_dataset_variables(
+            reference_composite,
+            PRESENTATION_PLOT_VARIABLES,
+            dataset_label="reference composite",
+            plot_label="Presentation plot",
+        )
+
+    fig, axes = plt.subplots(
+        nrows=3,
+        ncols=2,
+        figsize=plot_style.presentation_figsize(),
+        sharex=True,
+        constrained_layout=True,
+    )
+    left = axes[:, 0]
+    right = axes[:, 1]
+
+    _plot_top_event_single_variable_panel(
+        left[0],
+        event_window,
+        event,
+        "T_mean",
+        ylabel="T_mean [K]",
+        reference_composite=reference_composite,
+        zero_reference=False,
+    )
+    variable_legend = left[0].get_legend()
+    if variable_legend is not None and reference_composite is not None:
+        left[0].add_artist(variable_legend)
+        _add_top_event_reference_legend(left[0])
+    _plot_top_event_lwa_panel(
+        left[1],
+        event_window,
+        event,
+        reference_composite=reference_composite,
+    )
+    _plot_top_event_single_variable_panel(
+        left[2],
+        event_window,
+        event,
+        "dTdt",
+        ylabel="[K hr-1]",
+        reference_composite=reference_composite,
+    )
+
+    for ax, name in zip(
+        right,
+        ("advection", "adiabatic", "diabatic"),
+        strict=True,
+    ):
+        _plot_top_event_single_variable_panel(
+            ax,
+            event_window,
+            event,
+            name,
+            ylabel="[K hr-1]",
+            reference_composite=reference_composite,
+        )
+
+    _mark_top_event_times(axes.ravel(), event)
+    _set_top_event_title(fig, event_window, event)
+    left[-1].set_xlabel("Time")
+    right[-1].set_xlabel("Time")
+    _format_datetime_xaxis(axes.ravel())
+    _style_axes(axes.ravel())
+    return fig
+
+
+def _mark_top_event_times(axes: Sequence[Axes], event: xr.Dataset) -> None:
+    """Mark one event's start, end, and peak on every supplied axis."""
+    peak_time = _event_time_value(event, "peak_time")
+    start_time = _event_time_value(event, "start_time")
+    end_time = _event_time_value(event, "end_time")
+    for ax in axes:
         ax.axvline(
             start_time,
             color=plot_style.FACE_COLORS["top"],
@@ -731,6 +794,13 @@ def _plot_extended_top_event_timeseries(
             alpha=0.8,
         )
 
+
+def _set_top_event_title(
+    fig: Figure,
+    event_window: xr.Dataset,
+    event: xr.Dataset,
+) -> None:
+    """Set the shared title for one top-event figure layout."""
     event_id = int(event["event_id"].item())
     rank = int(event["selection_rank"].item()) if "selection_rank" in event else event_id
     peak_value = float(event["tas_peak"].item()) if "tas_peak" in event else np.nan
@@ -743,11 +813,6 @@ def _plot_extended_top_event_timeseries(
     fig.suptitle(
         f"Rank {rank} HW event {event_id}: peak tas={peak_value:.2f}{smoothing_label}"
     )
-    left[-1].set_xlabel("Time")
-    right[-1].set_xlabel("Time")
-    _format_datetime_xaxis(axes.ravel())
-    _style_axes(axes.ravel())
-    return fig
 
 
 def _plot_line(

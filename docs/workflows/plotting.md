@@ -140,7 +140,7 @@ range from zero to one, while a climatological anomaly is not. PBL diagnostics
 and panels are inactive under
 [decision 008](../decisions/008_retire_pbl_diagnostics.md).
 
-### Presentation temporal-composite layout
+### Presentation temporal layout
 
 The four active all-event, split-event, absolute, and
 climatological-anomaly composite entrypoints also accept
@@ -163,6 +163,15 @@ exactly six axes and remains legible in a presentation. Presentation outputs
 use a distinct `*_presentation` plot directory and filename by default, and
 must not overwrite the paper-layout products. `--layout presentation` and
 `--plot-extended-variables` are mutually exclusive.
+
+The top-event entrypoint accepts the same presentation layout and panel order.
+It preserves the selected event trace, the all-event mean and IQR reference,
+absolute-time x-axis, event start/end markers, event-peak marker, ranking, and
+raw plus 24-hour-smoothed output behavior. The temperature panel contains only
+`T_mean`, with the event trace and reference keys both retained. Presentation
+top-event outputs use a distinct `plots_top_events_presentation` directory and
+include `presentation` in each default filename, so they cannot overwrite the
+extended paper figures.
 
 ### Composite labels and surface-flux signs
 
