@@ -114,6 +114,19 @@ figure entrypoints.
   event-only diagnostic, with one shared event-derived color normalization and
   colorbar across all panels. Event-only severity variables remain absent from
   and are never inferred for baseline-day rows.
+- The four-panel event-only and event-versus-clean-baseline
+  adiabatic/advection comparison entrypoints support `full` and `presentation`
+  layouts. `full` remains the default and preserves the existing 2-by-2
+  figure. `presentation` retains the first panel, advection versus adiabatic
+  heating, and the fourth panel, diabatic heating versus `I_dyn,net`, in a
+  2-row by 1-column figure. Both retained panels show their own x-axis label
+  because their x variables differ. Point populations, finite-value masks,
+  reference lines, titles, count annotations, event-severity colors, shared
+  colorbar, and baseline-versus-event layering retain their full-layout
+  meanings. When no output path is supplied, presentation figures use a
+  distinct `_presentation.png` filename so they cannot overwrite the default
+  four-panel product. Synthetic plot tests must confirm both layouts and their
+  CLI routing.
 - Event-versus-clean-baseline figures pad each finite plotted data range by 5%
   on both sides while keeping zero reference lines inside the padded range.
   Shared x-axes use the combined plotted x-data, while each panel derives its
