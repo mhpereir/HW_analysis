@@ -1,13 +1,12 @@
 import argparse
-from pathlib import Path
 
 import numpy as np
 import pytest
 import xarray as xr
-
-from HW_analysis.scripts import plot_composite_timeseries_all as plot_composite_timeseries
+from HW_analysis.scripts import (
+    plot_composite_timeseries_all as plot_composite_timeseries,
+)
 from HW_analysis.src import analysis_io
-
 
 RUN_ARGS = [
     "--region", "pnw_hotz",
@@ -50,6 +49,24 @@ def test_parse_args_builds_default_paths(monkeypatch):
     assert args.season_months is None
     assert not args.require_full_event
     assert not args.plot_extended_variables
+    assert args.layout == "paper"
+
+
+def test_parse_args_builds_separate_presentation_output_path(monkeypatch):
+    monkeypatch.setattr("sys.argv", _argv("--layout", "presentation"))
+
+    args = plot_composite_timeseries.parse_args()
+
+    assert args.layout == "presentation"
+    assert args.output_path == (
+        plot_composite_timeseries.REPO_ROOT
+        / "results"
+        / "plots_composite_timeseries_all_presentation"
+        / "region_pnw_hotz"
+        / "boundary_surface_700hPa"
+        / "time_range_1940_2024"
+        / "hw_all_events_composite_presentation.png"
+    )
 
 
 def test_parse_args_accepts_season_months(monkeypatch):
@@ -178,6 +195,7 @@ def test_main_orchestrates_dataset_composite_and_plotting(monkeypatch, tmp_path,
         "smoothing_window": 6,
         "smoothed_variables": plot_composite_timeseries.SMOOTHED_VARIABLES,
         "plot_extended_variables": False,
+        "layout": "paper",
     }
     assert "Wrote HW all-event composite figures:" in capsys.readouterr().out
 
@@ -235,6 +253,69 @@ def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
         plot_composite_timeseries.EXTENDED_SMOOTHED_VARIABLES
     )
     assert captured["plot_kwargs"]["plot_extended_variables"]
+
+
+def test_main_uses_presentation_variables_and_renderer(monkeypatch, tmp_path):
+    opened = xr.Dataset()
+    captured = {}
+
+    def fake_composite(ds, **kwargs):
+        captured["composite_kwargs"] = kwargs
+        return xr.Dataset()
+
+    def fake_write(ds, output, **kwargs):
+        captured["plot_kwargs"] = kwargs
+        return [output, kwargs["smoothed_output_path"]]
+
+    monkeypatch.setattr(
+        "sys.argv",
+        _argv(
+            "--input-path",
+            str(tmp_path / "stage1.nc"),
+            "--output-path",
+            str(tmp_path / "presentation.png"),
+            "--layout",
+            "presentation",
+        ),
+    )
+    monkeypatch.setattr(
+        plot_composite_timeseries.analysis_io,
+        "open_harmonized_timeseries",
+        lambda path: opened,
+    )
+    monkeypatch.setattr(
+        plot_composite_timeseries.composites,
+        "all_event_peak_aligned_composite",
+        fake_composite,
+    )
+    monkeypatch.setattr(
+        plot_composite_timeseries.plotting,
+        "write_composite_timeseries_outputs",
+        fake_write,
+    )
+
+    assert plot_composite_timeseries.main() == 0
+    assert captured["composite_kwargs"]["variables"] == (
+        plot_composite_timeseries.PRESENTATION_COMPOSITE_VARIABLES
+    )
+    assert captured["plot_kwargs"]["smoothed_variables"] == (
+        plot_composite_timeseries.PRESENTATION_SMOOTHED_VARIABLES
+    )
+    assert captured["plot_kwargs"]["layout"] == "presentation"
+
+
+def test_validate_args_rejects_presentation_with_extended_panels():
+    args = argparse.Namespace(
+        window_days=7,
+        smoothing_window=24,
+        season_months=None,
+        require_full_event=False,
+        layout="presentation",
+        plot_extended_variables=True,
+    )
+
+    with pytest.raises(ValueError, match="cannot be combined"):
+        plot_composite_timeseries.validate_args(args)
 
 
 def test_main_filters_event_table_before_composite_when_season_requested(monkeypatch, tmp_path):

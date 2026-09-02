@@ -7,6 +7,8 @@ from pathlib import Path
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
 from matplotlib.ticker import (
     AutoMinorLocator,
     Formatter,
@@ -14,11 +16,11 @@ from matplotlib.ticker import (
     NullFormatter,
     StrMethodFormatter,
 )
-import numpy as np
-import seaborn as sns
 
 SINGLE_COLUMN_WIDTH_IN = 6
 FULL_TWO_COLUMN_WIDTH_IN = 12
+PRESENTATION_WIDTH_IN = 13.333
+PRESENTATION_HEIGHT_IN = 7.5
 
 PAPER_FONT_SIZE_PT = 14
 LEGEND_FONT_SIZE_PT = 9
@@ -192,6 +194,11 @@ def publication_figsize(
     }
     figure_width = widths[width]
     return figure_width, figure_width * aspect
+
+
+def presentation_figsize() -> tuple[float, float]:
+    """Return a widescreen 16:9 figure size suitable for slide decks."""
+    return PRESENTATION_WIDTH_IN, PRESENTATION_HEIGHT_IN
 
 
 def date_locator_formatter() -> tuple[mdates.AutoDateLocator, mdates.ConciseDateFormatter]:

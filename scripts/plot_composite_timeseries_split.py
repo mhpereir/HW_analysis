@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
 import xarray as xr
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -17,10 +17,11 @@ if str(REPO_ROOT) not in sys.path:
 
 from src import analysis_io, composites, plot_paths, plotting, selectors
 
-
 PLOT_NAME = "composite_timeseries_split"
 DEFAULT_OUTPUT_FILENAME = "hw_events_composite.png"
 DEFAULT_OUTPUT_PATH = REPO_ROOT / "results" / f"plots_{PLOT_NAME}" / DEFAULT_OUTPUT_FILENAME
+PRESENTATION_PLOT_NAME = f"{PLOT_NAME}_presentation"
+PRESENTATION_DEFAULT_OUTPUT_FILENAME = "hw_events_composite_presentation.png"
 DEFAULT_WINDOW_DAYS = 7
 DEFAULT_SMOOTHING_WINDOW = 24
 SPLIT_BIN_DIM = "split_bin"
@@ -42,6 +43,7 @@ EXTENDED_COMPOSITE_VARIABLES: tuple[str, ...] = COMPOSITE_VARIABLES + (
     "soil_moisture",
     "cloud_cover",
 )
+PRESENTATION_COMPOSITE_VARIABLES = plotting.PRESENTATION_PLOT_VARIABLES
 SMOOTHED_VARIABLES: tuple[str, ...] = (
     "T_mean",
     "volume",
@@ -57,6 +59,13 @@ EXTENDED_SMOOTHED_VARIABLES: tuple[str, ...] = SMOOTHED_VARIABLES + (
     "slhf_heating_rate_approx",
     "soil_moisture",
     "cloud_cover",
+)
+PRESENTATION_SMOOTHED_VARIABLES: tuple[str, ...] = (
+    "T_mean",
+    "dTdt",
+    "advection",
+    "adiabatic",
+    "diabatic",
 )
 
 
@@ -123,12 +132,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Plot optional extended diagnostics when present in the input dataset.",
     )
+    parser.add_argument(
+        "--layout",
+        choices=plotting.COMPOSITE_LAYOUTS,
+        default=plotting.PAPER_COMPOSITE_LAYOUT,
+        help="Figure layout. Presentation uses a widescreen six-panel grid.",
+    )
     args = parser.parse_args()
+    plot_name, default_output_filename = _default_plot_destination(args.layout)
     return plot_paths.finalize_stage1_plot_paths(
         args,
         parser,
-        plot_name=PLOT_NAME,
-        default_output_filename=DEFAULT_OUTPUT_FILENAME,
+        plot_name=plot_name,
+        default_output_filename=default_output_filename,
     )
 
 
@@ -148,6 +164,15 @@ def validate_args(args: argparse.Namespace) -> None:
             raise ValueError("--split-years is only supported with --split-variable peak_time.")
     if args.require_full_event and args.season_months is None:
         raise ValueError("--require-full-event requires --season-months.")
+    if (
+        getattr(args, "layout", plotting.PAPER_COMPOSITE_LAYOUT)
+        == plotting.PRESENTATION_COMPOSITE_LAYOUT
+        and getattr(args, "plot_extended_variables", False)
+    ):
+        raise ValueError(
+            "--layout presentation cannot be combined with "
+            "--plot-extended-variables."
+        )
     if args.season_months is not None:
         _validate_season_months(args.season_months)
 
@@ -159,8 +184,11 @@ def main() -> int:
 
     ds = analysis_io.open_harmonized_timeseries(args.input_path)
     try:
-        variables = _composite_variables(args.plot_extended_variables)
-        smoothed_variables = _smoothed_variables(args.plot_extended_variables)
+        variables = _composite_variables(args.plot_extended_variables, args.layout)
+        smoothed_variables = _smoothed_variables(
+            args.plot_extended_variables,
+            args.layout,
+        )
         composite_kwargs: dict[str, object] = {
             "variables": variables,                 # Sequence[str]
             "pre_days": args.window_days,           # int
@@ -201,6 +229,7 @@ def main() -> int:
             smoothing_window=args.smoothing_window,
             smoothed_variables=smoothed_variables,
             plot_extended_variables=args.plot_extended_variables,
+            layout=args.layout,
         )
         print("Wrote HW split-bin composite figures:")
         for path in written:
@@ -231,7 +260,7 @@ def build_split_quantile_composite(
     upper_values: list[float] = []
     n_events: list[int] = []
 
-    for index, (qmin, qmax) in enumerate(zip(bounds[:-1], bounds[1:], strict=True)):
+    for index, (qmin, qmax) in enumerate(pairwise(bounds)):
         inclusive = "both" if index == 0 else "right"
         selected = selectors.select_event_quantile_bin(
             event_table,
@@ -456,18 +485,35 @@ def _validate_season_months(months: list[int]) -> None:
         raise ValueError(f"--season-months values must be between 1 and 12; got {values}.")
 
 
-def _composite_variables(plot_extended_variables: bool) -> tuple[str, ...]:
+def _composite_variables(
+    plot_extended_variables: bool,
+    layout: str = plotting.PAPER_COMPOSITE_LAYOUT,
+) -> tuple[str, ...]:
     """Return variables required for the selected split composite layout."""
+    if layout == plotting.PRESENTATION_COMPOSITE_LAYOUT:
+        return PRESENTATION_COMPOSITE_VARIABLES
     if plot_extended_variables:
         return EXTENDED_COMPOSITE_VARIABLES
     return COMPOSITE_VARIABLES
 
 
-def _smoothed_variables(plot_extended_variables: bool) -> tuple[str, ...]:
+def _smoothed_variables(
+    plot_extended_variables: bool,
+    layout: str = plotting.PAPER_COMPOSITE_LAYOUT,
+) -> tuple[str, ...]:
     """Return display-smoothed variables for the selected split layout."""
+    if layout == plotting.PRESENTATION_COMPOSITE_LAYOUT:
+        return PRESENTATION_SMOOTHED_VARIABLES
     if plot_extended_variables:
         return EXTENDED_SMOOTHED_VARIABLES
     return SMOOTHED_VARIABLES
+
+
+def _default_plot_destination(layout: str) -> tuple[str, str]:
+    """Return the output namespace and filename for one figure layout."""
+    if layout == plotting.PRESENTATION_COMPOSITE_LAYOUT:
+        return PRESENTATION_PLOT_NAME, PRESENTATION_DEFAULT_OUTPUT_FILENAME
+    return PLOT_NAME, DEFAULT_OUTPUT_FILENAME
 
 
 def _split_output_path(output_path: Path, split_variable: str) -> Path:

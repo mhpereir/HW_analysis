@@ -1,8 +1,7 @@
-import numpy as np
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
 import xarray as xr
-
 from HW_analysis.src import plotting
 
 
@@ -191,6 +190,102 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
         }
     finally:
         plt.close(fig)
+
+
+def test_presentation_composite_uses_requested_six_panel_layout():
+    composite = _make_composite()
+
+    fig = plotting.plot_composite_timeseries(
+        composite,
+        layout=plotting.PRESENTATION_COMPOSITE_LAYOUT,
+    )
+    try:
+        assert len(fig.axes) == 6
+        np.testing.assert_allclose(
+            fig.get_size_inches(),
+            plotting.plot_style.presentation_figsize(),
+        )
+        assert [ax.get_ylabel() for ax in fig.axes] == [
+            "T_mean [K]",
+            "[K hr-1]",
+            "LWA [m hPa]",
+            "[K hr-1]",
+            "[K hr-1]",
+            "[K hr-1]",
+        ]
+        assert set(_line_colors_by_label(fig.axes[0])) == {
+            _display_label("T_mean")
+        }
+        assert set(_line_colors_by_label(fig.axes[1])) == {
+            _display_label("advection")
+        }
+        assert set(_line_colors_by_label(fig.axes[2])) == {
+            _display_label("lwa_a_region"),
+            _display_label("lwa_c_region"),
+        }
+        assert set(_line_colors_by_label(fig.axes[3])) == {
+            _display_label("adiabatic")
+        }
+        assert set(_line_colors_by_label(fig.axes[4])) == {
+            _display_label("dTdt")
+        }
+        assert set(_line_colors_by_label(fig.axes[5])) == {
+            _display_label("diabatic")
+        }
+        assert _legend_label_count(fig, "IQR") == 1
+        assert all(
+            _display_label("volume") not in _line_colors_by_label(ax)
+            for ax in fig.axes
+        )
+    finally:
+        plt.close(fig)
+
+
+def test_presentation_anomaly_composite_uses_delta_axis_labels():
+    composite = _make_composite()
+    composite.attrs["data_representation"] = "climatological_anomaly"
+
+    fig = plotting.plot_composite_timeseries(
+        composite,
+        layout=plotting.PRESENTATION_COMPOSITE_LAYOUT,
+    )
+    try:
+        assert "climatological-anomaly composite" in fig._suptitle.get_text()
+        assert [ax.get_ylabel() for ax in fig.axes] == [
+            "ΔT_mean [K]",
+            "Δ [K hr-1]",
+            "ΔLWA [m hPa]",
+            "Δ [K hr-1]",
+            "Δ [K hr-1]",
+            "Δ [K hr-1]",
+        ]
+    finally:
+        plt.close(fig)
+
+
+def test_presentation_composite_requires_only_presentation_variables():
+    composite = _make_composite().drop_vars("lwa_c_region")
+
+    with np.testing.assert_raises_regex(
+        ValueError,
+        "Presentation plot requires missing variables in composite: lwa_c_region",
+    ):
+        plotting.plot_composite_timeseries(
+            composite,
+            layout=plotting.PRESENTATION_COMPOSITE_LAYOUT,
+        )
+
+
+def test_presentation_layout_rejects_extended_panel_flag():
+    with np.testing.assert_raises_regex(
+        ValueError,
+        "Presentation layout cannot be combined",
+    ):
+        plotting.plot_composite_timeseries(
+            _make_composite(),
+            layout=plotting.PRESENTATION_COMPOSITE_LAYOUT,
+            plot_extended_variables=True,
+        )
 
 
 def test_climatological_anomaly_composite_uses_delta_axis_labels():
@@ -464,6 +559,36 @@ def test_plot_split_composite_timeseries_extended_layout_uses_optional_panels():
             fig.axes[9].lines[0].get_ydata(),
             -composite.isel(split_bin=0)["slhf_heating_rate_approx"].values,
         )
+    finally:
+        plt.close(fig)
+
+
+def test_presentation_split_composite_uses_requested_six_panel_layout():
+    composite = _make_split_composite()
+
+    fig = plotting.plot_split_composite_timeseries(
+        composite,
+        layout=plotting.PRESENTATION_COMPOSITE_LAYOUT,
+    )
+    try:
+        assert len(fig.axes) == 6
+        assert [ax.get_ylabel() for ax in fig.axes] == [
+            "T_mean [K]",
+            "[K hr-1]",
+            "LWA [m hPa]",
+            "[K hr-1]",
+            "[K hr-1]",
+            "[K hr-1]",
+        ]
+        assert _legend_label_count(fig, "IQR bounds") == 1
+        style_legend = fig.axes[0].get_legend()
+        assert [text.get_text() for text in style_legend.get_texts()] == [
+            "q0-0.5 (n=2)",
+            "q0.5-1 (n=2)",
+            "IQR bounds",
+        ]
+        assert len(fig.axes[0].lines) == 7
+        assert len(fig.axes[2].lines) == 13
     finally:
         plt.close(fig)
 

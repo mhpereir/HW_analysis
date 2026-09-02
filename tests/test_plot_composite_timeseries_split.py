@@ -3,10 +3,7 @@ import argparse
 import numpy as np
 import pytest
 import xarray as xr
-
 from HW_analysis.scripts import plot_composite_timeseries_split as plot_split
-from HW_analysis.src import analysis_io
-
 
 RUN_ARGS = [
     "--region", "pnw_hotz",
@@ -34,6 +31,31 @@ def test_parse_args_defaults_to_base_plot(monkeypatch):
     args = plot_split.parse_args()
 
     assert not args.plot_extended_variables
+    assert args.layout == "paper"
+
+
+def test_parse_args_builds_separate_presentation_output_path(monkeypatch):
+    monkeypatch.setattr("sys.argv", _argv(
+        "--split-variable",
+        "duration",
+        "--split-quantiles",
+        "0.5",
+        "--layout",
+        "presentation",
+    ))
+
+    args = plot_split.parse_args()
+
+    assert args.layout == "presentation"
+    assert args.output_path == (
+        plot_split.REPO_ROOT
+        / "results"
+        / "plots_composite_timeseries_split_presentation"
+        / "region_pnw_hotz"
+        / "boundary_surface_700hPa"
+        / "time_range_1940_2024"
+        / "hw_events_composite_presentation.png"
+    )
 
 
 def test_parse_args_accepts_plot_extended_variables(monkeypatch):
@@ -325,6 +347,7 @@ def test_main_filters_event_table_before_quantile_splitting(monkeypatch, tmp_pat
     assert captured["composite_kwargs"]["variables"] == plot_split.COMPOSITE_VARIABLES
     assert captured["plot_kwargs"]["smoothed_variables"] == plot_split.SMOOTHED_VARIABLES
     assert not captured["plot_kwargs"]["plot_extended_variables"]
+    assert captured["plot_kwargs"]["layout"] == "paper"
     assert captured["output_path"].name == "split_duration.png"
     assert captured["smoothed_output_path"].name == "split_duration_smoothed.png"
 
@@ -377,6 +400,55 @@ def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
         plot_split.EXTENDED_SMOOTHED_VARIABLES
     )
     assert captured["plot_kwargs"]["plot_extended_variables"]
+
+
+def test_main_uses_presentation_variables_and_renderer(monkeypatch, tmp_path):
+    opened = _make_event_table()
+    captured = {}
+
+    def fake_build(ds, **kwargs):
+        captured["composite_kwargs"] = kwargs["composite_kwargs"]
+        return xr.Dataset(
+            data_vars={"T_mean": (("split_bin", "lag_hour"), np.ones((2, 1)))},
+            coords={"split_bin": ["low", "high"], "lag_hour": [0]},
+        )
+
+    def fake_write(ds, output, **kwargs):
+        captured["plot_kwargs"] = kwargs
+        return [output, kwargs["smoothed_output_path"]]
+
+    monkeypatch.setattr("sys.argv", _argv(
+        "--input-path",
+        str(tmp_path / "stage1.nc"),
+        "--output-path",
+        str(tmp_path / "split.png"),
+        "--split-variable",
+        "duration",
+        "--split-quantiles",
+        "0.5",
+        "--layout",
+        "presentation",
+    ))
+    monkeypatch.setattr(
+        plot_split.analysis_io,
+        "open_harmonized_timeseries",
+        lambda path: opened,
+    )
+    monkeypatch.setattr(plot_split, "build_split_quantile_composite", fake_build)
+    monkeypatch.setattr(
+        plot_split.plotting,
+        "write_split_composite_timeseries_outputs",
+        fake_write,
+    )
+
+    assert plot_split.main() == 0
+    assert captured["composite_kwargs"]["variables"] == (
+        plot_split.PRESENTATION_COMPOSITE_VARIABLES
+    )
+    assert captured["plot_kwargs"]["smoothed_variables"] == (
+        plot_split.PRESENTATION_SMOOTHED_VARIABLES
+    )
+    assert captured["plot_kwargs"]["layout"] == "presentation"
 
 
 def test_main_filters_event_table_before_year_splitting(monkeypatch, tmp_path):
