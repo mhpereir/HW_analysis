@@ -1,9 +1,8 @@
 """Compare advection with adiabatic heating and net dynamical contribution.
 
-The diagnostic loads a Stage-2 event-feature table and writes a 2x2 scatter
-figure. The left-column panels use integrated adiabatic tendency on the x-axis,
-while the right-column panels use net dynamical contribution on the x-axis.
-Points are colored by peak temperature anomaly by default.
+The diagnostic loads a Stage-2 event-feature table and writes either the full
+2x2 scatter figure or a presentation-oriented 2x1 subset. Points are colored
+by peak temperature anomaly by default.
 """
 
 from __future__ import annotations
@@ -47,6 +46,9 @@ DEFAULT_OUTPUT_PATH = (
     / THRESHOLD_VARIABLE
     / "adiabatic_advection_distance_comparison.png"
 )
+DEFAULT_PRESENTATION_OUTPUT_PATH = DEFAULT_OUTPUT_PATH.with_name(
+    "adiabatic_advection_distance_comparison_presentation.png"
+)
 
 X_VARIABLE = "I_adiabatic_pre"
 ADVECTION_VARIABLE = "I_advection_pre"
@@ -58,6 +60,9 @@ COLOR_MAP = plot_style.EVENT_SEVERITY_COLOR_MAP
 # Set to False to use Matplotlib's default color normalization.
 USE_CENTERED_COLOR_NORMALIZATION = False
 COLOR_NORMALIZATION_CENTER = 3.0
+FULL_LAYOUT = "full"
+PRESENTATION_LAYOUT = "presentation"
+LAYOUT_CHOICES = (FULL_LAYOUT, PRESENTATION_LAYOUT)
 NET_DYNAMICAL_LABEL = r"$I_{dyn,net}$ (K)"
 VARIABLE_LABELS = {
     "tas_anom_peak": plot_style.EVENT_SEVERITY_LABEL,
@@ -88,8 +93,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-path",
         type=Path,
-        default=DEFAULT_OUTPUT_PATH,
-        help="Path where the scatter-plot PNG will be written.",
+        default=None,
+        help=(
+            "Path where the scatter-plot PNG will be written. Defaults to a "
+            "layout-specific filename."
+        ),
+    )
+    parser.add_argument(
+        "--layout",
+        choices=LAYOUT_CHOICES,
+        default=FULL_LAYOUT,
+        help="Use the full four-panel or presentation two-panel layout.",
     )
     parser.add_argument(
         "--color-variable",
@@ -120,6 +134,21 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--alpha must satisfy 0 < alpha <= 1.")
 
 
+def validate_layout(layout: str) -> None:
+    """Reject unknown figure layouts for programmatic callers."""
+    if layout not in LAYOUT_CHOICES:
+        choices = ", ".join(LAYOUT_CHOICES)
+        raise ValueError(f"layout must be one of: {choices}.")
+
+
+def default_output_path(layout: str) -> Path:
+    """Return the non-overlapping default output for a figure layout."""
+    validate_layout(layout)
+    if layout == PRESENTATION_LAYOUT:
+        return DEFAULT_PRESENTATION_OUTPUT_PATH
+    return DEFAULT_OUTPUT_PATH
+
+
 def main() -> int:
     """Load event features and write the adiabatic/advection comparison."""
     args = parse_args()
@@ -127,9 +156,11 @@ def main() -> int:
 
     features = open_event_features(args.input_path)
     try:
+        output_path = args.output_path or default_output_path(args.layout)
         written = write_tendency_scatter_plot(
             features,
-            args.output_path,
+            output_path,
+            layout=args.layout,
             color_variable=args.color_variable,
             point_size=args.point_size,
             alpha=args.alpha,
@@ -151,6 +182,7 @@ def write_tendency_scatter_plot(
     features: xr.Dataset,
     output_path: str | Path,
     *,
+    layout: str = FULL_LAYOUT,
     color_variable: str | None = COLOR_VARIABLE,
     point_size: float = 24.0,
     alpha: float = 0.75,
@@ -160,6 +192,7 @@ def write_tendency_scatter_plot(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig = plot_tendency_scatter(
         features,
+        layout=layout,
         color_variable=color_variable,
         point_size=point_size,
         alpha=alpha,
@@ -172,11 +205,13 @@ def write_tendency_scatter_plot(
 def plot_tendency_scatter(
     features: xr.Dataset,
     *,
+    layout: str = FULL_LAYOUT,
     color_variable: str | None = COLOR_VARIABLE,
     point_size: float = 24.0,
     alpha: float = 0.75,
 ) -> plt.Figure:  # type: ignore[type-arg]
-    """Return the 2x2 adiabatic/advection net dynamical comparison."""
+    """Return the requested adiabatic/advection comparison layout."""
+    validate_layout(layout)
     validate_feature_variables(features, color_variable=color_variable)
 
     x_values = feature_values(features, X_VARIABLE)
@@ -186,6 +221,10 @@ def plot_tendency_scatter(
     diabatic_values = feature_values(features, DIABATIC_VARIABLE)
     color_values = feature_values(features, color_variable) if color_variable else None
     color_norm = color_norm_for_values(color_values)
+    if color_values is not None and color_norm is None:
+        raise ValueError(
+            f"Event color variable {color_variable!r} contains no finite values."
+        )
 
     finite_adiabatic = (
         np.isfinite(x_values)
@@ -199,6 +238,55 @@ def plot_tendency_scatter(
     )
     finite_diabatic = finite_adiabatic & np.isfinite(diabatic_values)
 
+    if layout == PRESENTATION_LAYOUT:
+        return plot_presentation_tendency_scatter(
+            x_values,
+            advection_values,
+            net_dynamical_values,
+            diabatic_values,
+            finite_adiabatic,
+            finite_diabatic,
+            color_variable=color_variable,
+            color_values=color_values,
+            color_norm=color_norm,
+            point_size=point_size,
+            alpha=alpha,
+        )
+
+    return plot_full_tendency_scatter(
+        x_values,
+        advection_values,
+        net_dynamical_values,
+        temperature_change_values,
+        diabatic_values,
+        finite_adiabatic,
+        finite_temperature_change,
+        finite_diabatic,
+        color_variable=color_variable,
+        color_values=color_values,
+        color_norm=color_norm,
+        point_size=point_size,
+        alpha=alpha,
+    )
+
+
+def plot_full_tendency_scatter(
+    x_values: np.ndarray,
+    advection_values: np.ndarray,
+    net_dynamical_values: np.ndarray,
+    temperature_change_values: np.ndarray,
+    diabatic_values: np.ndarray,
+    finite_adiabatic: np.ndarray,
+    finite_temperature_change: np.ndarray,
+    finite_diabatic: np.ndarray,
+    *,
+    color_variable: str | None,
+    color_values: np.ndarray | None,
+    color_norm: Normalize | None,
+    point_size: float,
+    alpha: float,
+) -> plt.Figure:  # type: ignore[type-arg]
+    """Return the full 2x2 event-only comparison."""
     fig = plt.figure(
         figsize=plot_style.publication_figsize(
             "full",
@@ -288,6 +376,79 @@ def plot_tendency_scatter(
     return fig
 
 
+def plot_presentation_tendency_scatter(
+    x_values: np.ndarray,
+    advection_values: np.ndarray,
+    net_dynamical_values: np.ndarray,
+    diabatic_values: np.ndarray,
+    finite_adiabatic: np.ndarray,
+    finite_diabatic: np.ndarray,
+    *,
+    color_variable: str | None,
+    color_values: np.ndarray | None,
+    color_norm: Normalize | None,
+    point_size: float,
+    alpha: float,
+) -> plt.Figure:  # type: ignore[type-arg]
+    """Return the presentation 2x1 event-only comparison."""
+    fig, axes = plt.subplots(
+        nrows=2,
+        ncols=1,
+        figsize=plot_style.publication_figsize(
+            "single",
+            aspect=plot_style.TWO_PANEL_COLUMN_ASPECT,
+        ),
+        constrained_layout=True,
+    )
+    axes = np.atleast_1d(axes)
+
+    plot_scatter_panel(
+        axes[0],
+        x_values,
+        advection_values,
+        finite_adiabatic,
+        color_values=color_values,
+        color_norm=color_norm,
+        point_size=point_size,
+        alpha=alpha,
+    )
+    add_one_to_negative_one_line(
+        axes[0],
+        x_values[finite_adiabatic],
+        advection_values[finite_adiabatic],
+    )
+    axes[0].set_title("Advection vs Adiabatic Heating")
+    axes[0].set_ylabel(variable_label(ADVECTION_VARIABLE))
+    axes[0].set_xlabel(variable_label(X_VARIABLE))
+
+    mappable = plot_scatter_panel(
+        axes[1],
+        net_dynamical_values,
+        diabatic_values,
+        finite_diabatic,
+        color_values=color_values,
+        color_norm=color_norm,
+        point_size=point_size,
+        alpha=alpha,
+    )
+    axes[1].set_title(r"Diabatic Heating vs $I_{dyn,net}$")
+    axes[1].set_ylabel(variable_label(DIABATIC_VARIABLE))
+    axes[1].set_xlabel(NET_DYNAMICAL_LABEL)
+
+    set_shared_x_data_limits(np.array([axes[0]]), x_values[finite_adiabatic])
+    set_shared_x_data_limits(
+        np.array([axes[1]]),
+        net_dynamical_values[finite_diabatic],
+    )
+
+    if color_variable is not None:
+        cbar = fig.colorbar(mappable, ax=axes, shrink=0.92)
+        cbar.set_label(variable_label(color_variable))
+
+    fig.suptitle("Advection and Net Dynamical Contribution")
+    return fig
+
+
 def plot_scatter_panel(
     ax: Axes,
     x_values: np.ndarray,
@@ -335,8 +496,10 @@ def plot_scatter_panel(
 
 def color_norm_for_values(color_values: np.ndarray | None) -> Normalize | None:
     """Return a shared color norm centered on the configured value when enabled."""
-    if color_values is None or not USE_CENTERED_COLOR_NORMALIZATION:
+    if color_values is None:
         return None
+    if not USE_CENTERED_COLOR_NORMALIZATION:
+        return plot_style.finite_range_color_norm(color_values)
 
     finite = np.asarray(color_values, dtype=float)
     finite = finite[np.isfinite(finite)]

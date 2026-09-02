@@ -15,6 +15,10 @@ SCHEDULERS = {
     / "schedulers"
     / "schedule_plot_adiabatic_diabatic_advection_baseline.sh",
 }
+PRESENTATION_SCHEDULERS = (
+    SCHEDULERS["event"],
+    SCHEDULERS["baseline_net"],
+)
 
 
 @pytest.mark.parametrize("scheduler", SCHEDULERS.values(), ids=SCHEDULERS.keys())
@@ -57,6 +61,15 @@ def test_event_scheduler_requires_explicit_non_overwriting_paths():
     assert '--input-path "${EVENT_INPUT_PATH}"' in text
     assert '--output-path "${OUTPUT_PATH}"' in text
     assert 'test -s "${OUTPUT_PATH}"' in text
+
+
+@pytest.mark.parametrize("scheduler", PRESENTATION_SCHEDULERS)
+def test_four_panel_schedulers_forward_the_requested_layout(scheduler):
+    text = scheduler.read_text()
+
+    assert 'LAYOUT="${LAYOUT:-full}"' in text
+    assert 'echo "[info] layout=${LAYOUT}"' in text
+    assert '--layout "${LAYOUT}"' in text
 
 
 @pytest.mark.parametrize(

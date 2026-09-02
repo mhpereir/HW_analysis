@@ -3,8 +3,61 @@ from pathlib import Path
 import numpy as np
 import pytest
 import xarray as xr
+from HW_analysis.scripts.event_features import (
+    plot_adiabatic_advection_comparison as plot_diag,
+)
 
-from HW_analysis.scripts.event_features import plot_adiabatic_advection_comparison as plot_diag
+
+def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
+    features = _make_feature_table()
+
+    fig = plot_diag.plot_tendency_scatter(
+        features,
+        layout=plot_diag.PRESENTATION_LAYOUT,
+    )
+    try:
+        assert len(fig.axes) == 3
+        plot_axes = fig.axes[:2]
+        assert [ax.get_title() for ax in plot_axes] == [
+            "Advection vs Adiabatic Heating",
+            r"Diabatic Heating vs $I_{dyn,net}$",
+        ]
+        assert [ax.get_xlabel() for ax in plot_axes] == [
+            plot_diag.variable_label(plot_diag.X_VARIABLE),
+            plot_diag.NET_DYNAMICAL_LABEL,
+        ]
+        np.testing.assert_allclose(fig.get_size_inches(), np.array([6.0, 9.0]))
+        np.testing.assert_allclose(
+            np.asarray(plot_axes[0].collections[0].get_offsets())[:, 0],
+            features["I_adiabatic_pre"].values,
+        )
+        np.testing.assert_allclose(
+            np.asarray(plot_axes[0].collections[0].get_offsets())[:, 1],
+            features["I_advection_pre"].values,
+        )
+        np.testing.assert_allclose(
+            np.asarray(plot_axes[1].collections[0].get_offsets())[:, 0],
+            features["I_dyn_pre"].values,
+        )
+        np.testing.assert_allclose(
+            np.asarray(plot_axes[1].collections[0].get_offsets())[:, 1],
+            features["I_diabatic_pre"].values,
+        )
+        assert fig.axes[-1].get_ylabel() == "Peak TAS Anomaly (K)"
+    finally:
+        plot_diag.plt.close(fig)
+
+
+def test_layout_defaults_use_distinct_output_paths_and_reject_unknown_layouts():
+    assert plot_diag.default_output_path(plot_diag.FULL_LAYOUT) == (
+        plot_diag.DEFAULT_OUTPUT_PATH
+    )
+    assert plot_diag.default_output_path(plot_diag.PRESENTATION_LAYOUT) == (
+        plot_diag.DEFAULT_PRESENTATION_OUTPUT_PATH
+    )
+    assert plot_diag.DEFAULT_PRESENTATION_OUTPUT_PATH != plot_diag.DEFAULT_OUTPUT_PATH
+    with pytest.raises(ValueError, match="layout must be one of"):
+        plot_diag.plot_tendency_scatter(_make_feature_table(), layout="unknown")
 
 
 def test_panels_consume_stored_i_dyn_pre_without_reconstructing_it():
@@ -73,12 +126,25 @@ def test_panels_share_color_normalization_centered_on_configured_value(monkeypat
         plot_diag.plt.close(fig)
 
 
-def test_centered_color_normalization_can_be_disabled(monkeypatch):
+def test_disabled_centering_uses_shared_finite_range_normalization(monkeypatch):
     monkeypatch.setattr(plot_diag, "USE_CENTERED_COLOR_NORMALIZATION", False)
 
     norm = plot_diag.color_norm_for_values(np.array([2.0, 4.0, 6.0]))
 
-    assert norm is None
+    assert norm is not None
+    assert norm.vmin == 2.0
+    assert norm.vmax == 6.0
+
+
+def test_plot_rejects_event_color_variable_without_finite_values():
+    features = _make_feature_table()
+    features["tas_anom_peak"] = ("event", np.full(6, np.nan))
+
+    with pytest.raises(ValueError, match="contains no finite values"):
+        plot_diag.plot_tendency_scatter(
+            features,
+            layout=plot_diag.PRESENTATION_LAYOUT,
+        )
 
 
 def test_validate_feature_variables_requires_only_plotted_and_color_variables():
@@ -161,11 +227,12 @@ def test_main_writes_configured_output(monkeypatch, tmp_path):
         features,
         path,
         *,
+        layout,
         color_variable,
         point_size,
         alpha,
     ):
-        written.append((Path(path), color_variable, point_size, alpha))
+        written.append((Path(path), layout, color_variable, point_size, alpha))
         return Path(path)
 
     monkeypatch.setattr(
@@ -176,6 +243,8 @@ def test_main_writes_configured_output(monkeypatch, tmp_path):
             str(input_path),
             "--output-path",
             str(output_path),
+            "--layout",
+            "presentation",
             "--point-size",
             "10",
             "--alpha",
@@ -189,6 +258,7 @@ def test_main_writes_configured_output(monkeypatch, tmp_path):
     assert written == [
         (
             output_path,
+            "presentation",
             "tas_anom_peak",
             10.0,
             0.6,

@@ -1,8 +1,9 @@
 """Compare selected events with clean baseline-day tendencies.
 
-The diagnostic loads matching Stage-2 baseline-day and event-feature tables.
-Clean baseline days are plotted as a translucent background and the selected
-event population is plotted as a foreground layer.
+The diagnostic loads matching Stage-2 baseline-day and event-feature tables
+and writes either the full 2x2 scatter figure or a presentation-oriented 2x1
+subset. Clean baseline days are plotted as a translucent background and the
+selected event population is plotted as a foreground layer.
 """
 
 from __future__ import annotations
@@ -62,6 +63,9 @@ DEFAULT_OUTPUT_PATH = (
     / THRESHOLD_VARIABLE
     / "event_vs_clean_baseline_adiabatic_advection_comparison.png"
 )
+DEFAULT_PRESENTATION_OUTPUT_PATH = DEFAULT_OUTPUT_PATH.with_name(
+    "event_vs_clean_baseline_adiabatic_advection_comparison_presentation.png"
+)
 
 X_VARIABLE = "I_adiabatic_pre"
 ADVECTION_VARIABLE = "I_advection_pre"
@@ -72,6 +76,9 @@ EVENT_ADJACENT_VARIABLE = "event_adjacent"
 EVENT_DIM = "event"
 COLOR_VARIABLE = plot_style.EVENT_SEVERITY_VARIABLE
 COLOR_MAP = plot_style.EVENT_SEVERITY_COLOR_MAP
+FULL_LAYOUT = "full"
+PRESENTATION_LAYOUT = "presentation"
+LAYOUT_CHOICES = (FULL_LAYOUT, PRESENTATION_LAYOUT)
 PLOTTED_VARIABLES = (
     X_VARIABLE,
     ADVECTION_VARIABLE,
@@ -115,8 +122,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-path",
         type=Path,
-        default=DEFAULT_OUTPUT_PATH,
-        help="Path where the scatter-plot PNG will be written.",
+        default=None,
+        help=(
+            "Path where the scatter-plot PNG will be written. Defaults to a "
+            "layout-specific filename."
+        ),
+    )
+    parser.add_argument(
+        "--layout",
+        choices=LAYOUT_CHOICES,
+        default=FULL_LAYOUT,
+        help="Use the full four-panel or presentation two-panel layout.",
     )
     parser.add_argument(
         "--color-variable",
@@ -163,6 +179,21 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--event-alpha must satisfy 0 < value <= 1.")
 
 
+def validate_layout(layout: str) -> None:
+    """Reject unknown figure layouts for programmatic callers."""
+    if layout not in LAYOUT_CHOICES:
+        choices = ", ".join(LAYOUT_CHOICES)
+        raise ValueError(f"layout must be one of: {choices}.")
+
+
+def default_output_path(layout: str) -> Path:
+    """Return the non-overlapping default output for a figure layout."""
+    validate_layout(layout)
+    if layout == PRESENTATION_LAYOUT:
+        return DEFAULT_PRESENTATION_OUTPUT_PATH
+    return DEFAULT_OUTPUT_PATH
+
+
 def main() -> int:
     """Load matching feature tables and write the comparison diagnostic."""
     args = parse_args()
@@ -172,10 +203,12 @@ def main() -> int:
     try:
         event_features = open_event_features(args.event_input_path)
         try:
+            output_path = args.output_path or default_output_path(args.layout)
             written = write_tendency_scatter_plot(
                 baseline_features,
                 event_features,
-                args.output_path,
+                output_path,
+                layout=args.layout,
                 color_variable=args.color_variable,
                 point_size=args.point_size,
                 alpha=args.alpha,
@@ -208,6 +241,7 @@ def write_tendency_scatter_plot(
     event_features: xr.Dataset,
     output_path: str | Path,
     *,
+    layout: str = FULL_LAYOUT,
     color_variable: str = COLOR_VARIABLE,
     point_size: float = 24.0,
     alpha: float = 0.2,
@@ -220,6 +254,7 @@ def write_tendency_scatter_plot(
     fig = plot_tendency_scatter(
         baseline_features,
         event_features,
+        layout=layout,
         color_variable=color_variable,
         point_size=point_size,
         alpha=alpha,
@@ -235,6 +270,7 @@ def plot_tendency_scatter(
     baseline_features: xr.Dataset,
     event_features: xr.Dataset,
     *,
+    layout: str = FULL_LAYOUT,
     color_variable: str = COLOR_VARIABLE,
     point_size: float = 24.0,
     alpha: float = 0.2,
@@ -242,6 +278,7 @@ def plot_tendency_scatter(
     event_alpha: float = 0.9,
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return the selected event-versus-clean-baseline comparison figure."""
+    validate_layout(layout)
     validate_feature_variables(
         baseline_features,
         event_features,
@@ -256,6 +293,20 @@ def plot_tendency_scatter(
     if event_color_norm is None:
         raise ValueError(
             f"Event color variable {color_variable!r} contains no finite values."
+        )
+
+    if layout == PRESENTATION_LAYOUT:
+        return plot_presentation_tendency_scatter(
+            baseline,
+            events,
+            clean,
+            event_color_values,
+            event_color_norm,
+            color_variable=color_variable,
+            point_size=point_size,
+            alpha=alpha,
+            event_point_size=event_point_size,
+            event_alpha=event_alpha,
         )
 
     fig = plt.figure(
@@ -353,6 +404,79 @@ def plot_tendency_scatter(
 
     set_shared_x_data_limits(axes[:2], panel_x_values(axes[:2]))
     set_shared_x_data_limits(axes[2:], panel_x_values(axes[2:]))
+
+    colorbar = fig.colorbar(event_mappable, ax=axes, shrink=0.92)
+    colorbar.set_label(variable_label(color_variable))
+    fig.suptitle("Events vs Clean Baseline-Day Tendencies")
+    return fig
+
+
+def plot_presentation_tendency_scatter(
+    baseline: dict[str, np.ndarray],
+    events: dict[str, np.ndarray],
+    clean: np.ndarray,
+    event_color_values: np.ndarray,
+    event_color_norm: Normalize,
+    *,
+    color_variable: str,
+    point_size: float,
+    alpha: float,
+    event_point_size: float,
+    event_alpha: float,
+) -> plt.Figure:  # type: ignore[type-arg]
+    """Return the presentation 2x1 event-versus-baseline comparison."""
+    fig, axes = plt.subplots(
+        nrows=2,
+        ncols=1,
+        figsize=plot_style.publication_figsize(
+            "single",
+            aspect=plot_style.TWO_PANEL_COLUMN_ASPECT,
+        ),
+        constrained_layout=True,
+    )
+    axes = np.atleast_1d(axes)
+
+    plot_comparison_panel(
+        axes[0],
+        baseline["adiabatic"],
+        baseline["advection"],
+        clean,
+        events["adiabatic"],
+        events["advection"],
+        event_color_values,
+        event_color_norm,
+        point_size=point_size,
+        alpha=alpha,
+        event_point_size=event_point_size,
+        event_alpha=event_alpha,
+        show_legend=True,
+    )
+    add_one_to_negative_one_line_from_panel(axes[0])
+    axes[0].set_title("Advection vs Adiabatic Heating")
+    axes[0].set_ylabel(variable_label(ADVECTION_VARIABLE))
+    axes[0].set_xlabel(variable_label(X_VARIABLE))
+
+    event_mappable = plot_comparison_panel(
+        axes[1],
+        baseline["net_dynamical"],
+        baseline["diabatic"],
+        clean,
+        events["net_dynamical"],
+        events["diabatic"],
+        event_color_values,
+        event_color_norm,
+        point_size=point_size,
+        alpha=alpha,
+        event_point_size=event_point_size,
+        event_alpha=event_alpha,
+        show_legend=False,
+    )
+    axes[1].set_title(r"Diabatic Heating vs $I_{dyn,net}$")
+    axes[1].set_ylabel(variable_label(DIABATIC_VARIABLE))
+    axes[1].set_xlabel(NET_DYNAMICAL_LABEL)
+
+    for ax in axes:
+        set_shared_x_data_limits(np.array([ax]), panel_x_values(np.array([ax])))
 
     colorbar = fig.colorbar(event_mappable, ax=axes, shrink=0.92)
     colorbar.set_label(variable_label(color_variable))

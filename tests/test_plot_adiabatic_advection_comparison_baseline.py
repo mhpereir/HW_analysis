@@ -8,6 +8,70 @@ from HW_analysis.scripts.event_features import (
 )
 
 
+def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
+    baseline = _make_baseline_table()
+    events = _make_event_table()
+
+    fig = plot_diag.plot_tendency_scatter(
+        baseline,
+        events,
+        layout=plot_diag.PRESENTATION_LAYOUT,
+    )
+    try:
+        assert len(fig.axes) == 3
+        plot_axes = fig.axes[:2]
+        assert [ax.get_title() for ax in plot_axes] == [
+            "Advection vs Adiabatic Heating",
+            r"Diabatic Heating vs $I_{dyn,net}$",
+        ]
+        assert [ax.get_xlabel() for ax in plot_axes] == [
+            plot_diag.variable_label(plot_diag.X_VARIABLE),
+            plot_diag.NET_DYNAMICAL_LABEL,
+        ]
+        np.testing.assert_allclose(fig.get_size_inches(), np.array([6.0, 9.0]))
+        assert plot_axes[0].get_legend() is not None
+        assert plot_axes[1].get_legend() is None
+        assert fig.axes[-1].get_ylabel() == "Peak TAS Anomaly (K)"
+        _assert_offsets(
+            plot_axes[0].collections[0],
+            np.array([1.0, 4.0, 5.0, 8.0]),
+            np.array([-2.0, 0.0, 2.0, 4.0]),
+        )
+        _assert_offsets(
+            plot_axes[0].collections[1],
+            np.array([-3.0, 6.0, 10.0]),
+            np.array([3.0, -6.0, -9.0]),
+        )
+        _assert_offsets(
+            plot_axes[1].collections[0],
+            np.array([-1.0, 4.0, 7.0, 12.0]),
+            np.array([2.0, 5.0, 6.0, 9.0]),
+        )
+        _assert_offsets(
+            plot_axes[1].collections[1],
+            np.array([0.0, 0.0, 1.0]),
+            np.array([1.0, 7.0, 11.0]),
+        )
+    finally:
+        plot_diag.plt.close(fig)
+
+
+def test_layout_defaults_use_distinct_output_paths_and_reject_unknown_layouts():
+    assert plot_diag.default_output_path(plot_diag.FULL_LAYOUT) == (
+        plot_diag.DEFAULT_OUTPUT_PATH
+    )
+    assert plot_diag.default_output_path(plot_diag.PRESENTATION_LAYOUT) == (
+        plot_diag.DEFAULT_PRESENTATION_OUTPUT_PATH
+    )
+    assert plot_diag.DEFAULT_PRESENTATION_OUTPUT_PATH != plot_diag.DEFAULT_OUTPUT_PATH
+    with pytest.raises(ValueError, match="layout must be one of"):
+        plot_diag.plot_tendency_scatter(
+            _make_baseline_table(),
+            _make_event_table(),
+            layout="unknown",
+        )
+
+
 def test_plot_creates_four_panels_with_baseline_and_colored_event_layers():
     fig = plot_diag.plot_tendency_scatter(
         _make_baseline_table(),
@@ -302,6 +366,7 @@ def test_main_forwards_arguments_and_closes_both_datasets(monkeypatch, tmp_path)
         event_features,
         path,
         *,
+        layout,
         color_variable,
         point_size,
         alpha,
@@ -313,6 +378,7 @@ def test_main_forwards_arguments_and_closes_both_datasets(monkeypatch, tmp_path)
         written.append(
             (
                 Path(path),
+                layout,
                 color_variable,
                 point_size,
                 alpha,
@@ -334,6 +400,8 @@ def test_main_forwards_arguments_and_closes_both_datasets(monkeypatch, tmp_path)
             str(output_path),
             "--color-variable",
             "tas_anom_peak",
+            "--layout",
+            "presentation",
             "--point-size",
             "10",
             "--alpha",
@@ -349,7 +417,17 @@ def test_main_forwards_arguments_and_closes_both_datasets(monkeypatch, tmp_path)
     monkeypatch.setattr(plot_diag, "write_tendency_scatter_plot", fake_write)
 
     assert plot_diag.main() == 0
-    assert written == [(output_path, "tas_anom_peak", 10.0, 0.1, 50.0, 0.8)]
+    assert written == [
+        (
+            output_path,
+            "presentation",
+            "tas_anom_peak",
+            10.0,
+            0.1,
+            50.0,
+            0.8,
+        )
+    ]
     assert closed == ["events", "baseline"]
 
 
