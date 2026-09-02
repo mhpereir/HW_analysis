@@ -11,7 +11,6 @@ import argparse
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -54,8 +53,8 @@ DEFAULT_OUTPUT_PATH = (
 )
 
 X_VARIABLE = "I_adiabatic_pre"
-COLOR_VARIABLE = "tas_anom_peak"
-COLOR_MAP = "gist_heat_r"
+COLOR_VARIABLE = plot_style.EVENT_SEVERITY_VARIABLE
+COLOR_MAP = plot_style.EVENT_SEVERITY_COLOR_MAP
 Y_VARIABLES = (
     "I_diabatic_pre",
     "I_advection_pre",
@@ -63,7 +62,7 @@ Y_VARIABLES = (
 )
 VARIABLE_LABELS = {
     "tas_peak": "Peak TAS (K)",
-    "tas_anom_peak": "Peak TAS Anomaly (K)",
+    "tas_anom_peak": plot_style.EVENT_SEVERITY_LABEL,
     "lwa_a_peak": "LWA a ([hPa m])",
     "sqrt_lwa_a_peak": "sqrt(LWA_a [hPa m])",
     "I_diabatic_pre": "I_diabatic (K)",
@@ -306,8 +305,7 @@ def validate_feature_variables(
     missing = [name for name in dict.fromkeys(required) if name not in features]
     if missing:
         raise ValueError(
-            "Event-feature table is missing required variables: "
-            f"{', '.join(missing)}."
+            f"Event-feature table is missing required variables: {', '.join(missing)}."
         )
 
 

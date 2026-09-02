@@ -14,6 +14,7 @@ BASELINE_INPUT_PATH="${BASELINE_INPUT_PATH:?BASELINE_INPUT_PATH is required}"
 EVENT_INPUT_PATH="${EVENT_INPUT_PATH:?EVENT_INPUT_PATH is required}"
 OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"
 LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+COLOR_VARIABLE="${COLOR_VARIABLE:-tas_anom_peak}"
 POINT_SIZE="${POINT_SIZE:-24.0}"
 ALPHA="${ALPHA:-0.2}"
 EVENT_POINT_SIZE="${EVENT_POINT_SIZE:-24.0}"
@@ -47,6 +48,7 @@ echo "[info] python=$(command -v python)"
 echo "[info] baseline_input_path=${BASELINE_INPUT_PATH}"
 echo "[info] event_input_path=${EVENT_INPUT_PATH}"
 echo "[info] output_path=${OUTPUT_PATH}"
+echo "[info] color_variable=${COLOR_VARIABLE}"
 echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
@@ -54,6 +56,7 @@ cd "${PROJECT_ROOT}"
   --input-path "${BASELINE_INPUT_PATH}" \
   --event-input-path "${EVENT_INPUT_PATH}" \
   --output-path "${OUTPUT_PATH}" \
+  --color-variable "${COLOR_VARIABLE}" \
   --point-size "${POINT_SIZE}" \
   --alpha "${ALPHA}" \
   --event-point-size "${EVENT_POINT_SIZE}" \

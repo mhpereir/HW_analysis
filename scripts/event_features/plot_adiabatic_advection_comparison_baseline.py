@@ -11,7 +11,6 @@ import argparse
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -24,6 +23,8 @@ import xarray as xr
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.collections import PathCollection
+from matplotlib.colors import Normalize
 
 from src import plot_style
 
@@ -69,6 +70,8 @@ TEMPERATURE_CHANGE_VARIABLE = "I_dTdt_pre"
 DIABATIC_VARIABLE = "I_diabatic_pre"
 EVENT_ADJACENT_VARIABLE = "event_adjacent"
 EVENT_DIM = "event"
+COLOR_VARIABLE = plot_style.EVENT_SEVERITY_VARIABLE
+COLOR_MAP = plot_style.EVENT_SEVERITY_COLOR_MAP
 PLOTTED_VARIABLES = (
     X_VARIABLE,
     ADVECTION_VARIABLE,
@@ -77,10 +80,10 @@ PLOTTED_VARIABLES = (
     DIABATIC_VARIABLE,
 )
 BASELINE_POINT_COLOR = plot_style.COLORS["volume"]
-EVENT_POINT_COLOR = plot_style.COLORS["diabatic"]
 EVENT_EDGE_COLOR = "white"
 NET_DYNAMICAL_LABEL = r"$I_{dyn,net}$ (K)"
 VARIABLE_LABELS = {
+    "tas_anom_peak": plot_style.EVENT_SEVERITY_LABEL,
     "I_advection_pre": r"$I_{advective}$(K)",
     "I_adiabatic_pre": r"$I_{adiabatic}$ (K)",
     "I_dyn_pre": r"$I_{dyn,net}$ (K)",
@@ -114,6 +117,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_OUTPUT_PATH,
         help="Path where the scatter-plot PNG will be written.",
+    )
+    parser.add_argument(
+        "--color-variable",
+        type=str,
+        default=COLOR_VARIABLE,
+        help="Event-level feature used to color foreground event points.",
     )
     parser.add_argument(
         "--point-size",
@@ -167,6 +176,7 @@ def main() -> int:
                 baseline_features,
                 event_features,
                 args.output_path,
+                color_variable=args.color_variable,
                 point_size=args.point_size,
                 alpha=args.alpha,
                 event_point_size=args.event_point_size,
@@ -198,6 +208,7 @@ def write_tendency_scatter_plot(
     event_features: xr.Dataset,
     output_path: str | Path,
     *,
+    color_variable: str = COLOR_VARIABLE,
     point_size: float = 24.0,
     alpha: float = 0.2,
     event_point_size: float = 40.0,
@@ -209,6 +220,7 @@ def write_tendency_scatter_plot(
     fig = plot_tendency_scatter(
         baseline_features,
         event_features,
+        color_variable=color_variable,
         point_size=point_size,
         alpha=alpha,
         event_point_size=event_point_size,
@@ -223,20 +235,33 @@ def plot_tendency_scatter(
     baseline_features: xr.Dataset,
     event_features: xr.Dataset,
     *,
+    color_variable: str = COLOR_VARIABLE,
     point_size: float = 24.0,
     alpha: float = 0.2,
     event_point_size: float = 40.0,
     event_alpha: float = 0.9,
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return the selected event-versus-clean-baseline comparison figure."""
-    validate_feature_variables(baseline_features, event_features)
+    validate_feature_variables(
+        baseline_features,
+        event_features,
+        color_variable=color_variable,
+    )
     clean = clean_baseline_mask(baseline_features)
 
     baseline = tendency_values(baseline_features)
     events = tendency_values(event_features)
+    event_color_values = feature_values(event_features, color_variable)
+    event_color_norm = plot_style.finite_range_color_norm(event_color_values)
+    if event_color_norm is None:
+        raise ValueError(
+            f"Event color variable {color_variable!r} contains no finite values."
+        )
 
     fig = plt.figure(
-        figsize=plot_style.publication_figsize("full", aspect=plot_style.TWO_PANEL_STACK_ASPECT),
+        figsize=plot_style.publication_figsize(
+            "full", aspect=plot_style.TWO_PANEL_STACK_ASPECT
+        ),
         constrained_layout=True,
     )
     grid = fig.add_gridspec(nrows=2, ncols=2)
@@ -251,13 +276,15 @@ def plot_tendency_scatter(
     axes[1].sharex(axes[0])
     axes[3].sharex(axes[2])
 
-    plot_comparison_panel(
+    event_mappable = plot_comparison_panel(
         axes[0],
         baseline["adiabatic"],
         baseline["advection"],
         clean,
         events["adiabatic"],
         events["advection"],
+        event_color_values,
+        event_color_norm,
         point_size=point_size,
         alpha=alpha,
         event_point_size=event_point_size,
@@ -275,6 +302,8 @@ def plot_tendency_scatter(
         clean,
         events["adiabatic"],
         events["net_dynamical"],
+        event_color_values,
+        event_color_norm,
         point_size=point_size,
         alpha=alpha,
         event_point_size=event_point_size,
@@ -292,6 +321,8 @@ def plot_tendency_scatter(
         clean,
         events["net_dynamical"],
         events["temperature_change"],
+        event_color_values,
+        event_color_norm,
         point_size=point_size,
         alpha=alpha,
         event_point_size=event_point_size,
@@ -308,6 +339,8 @@ def plot_tendency_scatter(
         clean,
         events["net_dynamical"],
         events["diabatic"],
+        event_color_values,
+        event_color_norm,
         point_size=point_size,
         alpha=alpha,
         event_point_size=event_point_size,
@@ -321,6 +354,8 @@ def plot_tendency_scatter(
     set_shared_x_data_limits(axes[:2], panel_x_values(axes[:2]))
     set_shared_x_data_limits(axes[2:], panel_x_values(axes[2:]))
 
+    colorbar = fig.colorbar(event_mappable, ax=axes, shrink=0.92)
+    colorbar.set_label(variable_label(color_variable))
     fig.suptitle("Events vs Clean Baseline-Day Tendencies")
     return fig
 
@@ -332,16 +367,20 @@ def plot_comparison_panel(
     clean: np.ndarray,
     event_x: np.ndarray,
     event_y: np.ndarray,
+    event_color_values: np.ndarray,
+    event_color_norm: Normalize,
     *,
     point_size: float,
     alpha: float,
     event_point_size: float,
     event_alpha: float,
     show_legend: bool,
-) -> None:
+) -> PathCollection:
     """Plot clean baseline and selected event layers in one panel."""
     baseline_finite = clean & np.isfinite(baseline_x) & np.isfinite(baseline_y)
-    event_finite = np.isfinite(event_x) & np.isfinite(event_y)
+    event_finite = (
+        np.isfinite(event_x) & np.isfinite(event_y) & np.isfinite(event_color_values)
+    )
 
     baseline_scatter = ax.scatter(
         baseline_x[baseline_finite],
@@ -360,7 +399,9 @@ def plot_comparison_panel(
         alpha=event_alpha,
         edgecolors=EVENT_EDGE_COLOR,
         linewidths=0.45,
-        color=EVENT_POINT_COLOR,
+        c=event_color_values[event_finite],
+        cmap=COLOR_MAP,
+        norm=event_color_norm,
         label="Events",
         zorder=3,
     )
@@ -390,11 +431,14 @@ def plot_comparison_panel(
         ax,
         np.concatenate((baseline_y[baseline_finite], event_y[event_finite])),
     )
+    return event_scatter
 
 
 def validate_feature_variables(
     baseline_features: xr.Dataset,
     event_features: xr.Dataset,
+    *,
+    color_variable: str = COLOR_VARIABLE,
 ) -> None:
     """Fail clearly when either feature table lacks required variables."""
     validate_required_variables(
@@ -404,7 +448,7 @@ def validate_feature_variables(
     )
     validate_required_variables(
         event_features,
-        list(PLOTTED_VARIABLES),
+        [*PLOTTED_VARIABLES, color_variable],
         table_label="Event-feature",
     )
     validate_event_rows(event_features)
@@ -420,8 +464,7 @@ def validate_required_variables(
     missing = [name for name in dict.fromkeys(required) if name not in features]
     if missing:
         raise ValueError(
-            f"{table_label} table is missing required variables: "
-            f"{', '.join(missing)}."
+            f"{table_label} table is missing required variables: {', '.join(missing)}."
         )
 
 

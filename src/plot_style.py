@@ -7,6 +7,9 @@ from pathlib import Path
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+from matplotlib.colors import Normalize
 from matplotlib.ticker import (
     AutoMinorLocator,
     Formatter,
@@ -14,8 +17,6 @@ from matplotlib.ticker import (
     NullFormatter,
     StrMethodFormatter,
 )
-import numpy as np
-import seaborn as sns
 
 SINGLE_COLUMN_WIDTH_IN = 6
 FULL_TWO_COLUMN_WIDTH_IN = 12
@@ -31,6 +32,9 @@ AXIS_TICK_DECIMALS = 2
 AXIS_SCALE_LOW_THRESHOLD = 1e-2
 AXIS_SCALE_HIGH_THRESHOLD = 1e3
 DATA_RANGE_PADDING_FRACTION = 0.05
+EVENT_SEVERITY_VARIABLE = "tas_anom_peak"
+EVENT_SEVERITY_LABEL = "Peak TAS Anomaly (K)"
+EVENT_SEVERITY_COLOR_MAP = "gist_heat_r"
 
 SINGLE_PANEL_ASPECT = 0.6
 TWO_PANEL_STACK_ASPECT = 0.55
@@ -72,14 +76,14 @@ VARIABLE_COLORS = {
 }
 
 COLORS = {
-    "volume": VARIABLE_COLORS['volume'],
-    "temperature": VARIABLE_COLORS['T_mean'],
+    "volume": VARIABLE_COLORS["volume"],
+    "temperature": VARIABLE_COLORS["T_mean"],
     "storage": "#D55E00",
     "volume_tendency": "#0072B2",
     "temperature_tendency": "#009E73",
-    "advection": VARIABLE_COLORS['advection'],
-    "adiabatic": VARIABLE_COLORS['adiabatic'],
-    "diabatic": VARIABLE_COLORS['diabatic'],
+    "advection": VARIABLE_COLORS["advection"],
+    "adiabatic": VARIABLE_COLORS["adiabatic"],
+    "diabatic": VARIABLE_COLORS["diabatic"],
     "residual": "#111111",
     "mass": "#0072B2",
     "benchmark": "#4D4D4D",
@@ -194,7 +198,9 @@ def publication_figsize(
     return figure_width, figure_width * aspect
 
 
-def date_locator_formatter() -> tuple[mdates.AutoDateLocator, mdates.ConciseDateFormatter]:
+def date_locator_formatter() -> tuple[
+    mdates.AutoDateLocator, mdates.ConciseDateFormatter
+]:
     locator = mdates.AutoDateLocator(minticks=3, maxticks=6)
     formatter = mdates.ConciseDateFormatter(locator)
     return locator, formatter
@@ -267,6 +273,22 @@ def padded_data_limits(
     return lower - padding, upper + padding
 
 
+def finite_range_color_norm(values: np.ndarray) -> Normalize | None:
+    """Return a finite-range color normalization shared across plot panels."""
+    finite = np.asarray(values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return None
+
+    lower = float(np.min(finite))
+    upper = float(np.max(finite))
+    if lower == upper:
+        padding = max(abs(lower), 1.0) * DATA_RANGE_PADDING_FRACTION
+        lower -= padding
+        upper += padding
+    return Normalize(vmin=lower, vmax=upper)
+
+
 class FixedDecimalScaleFormatter(Formatter):
     """Format ticks with a fixed decimal count after applying an axis scale."""
 
@@ -312,7 +334,10 @@ def _axis_scale_exponent(axis) -> int:
         return 0
 
     largest_tick = np.nanmax(np.abs(nonzero_ticks))
-    if largest_tick >= AXIS_SCALE_HIGH_THRESHOLD or largest_tick < AXIS_SCALE_LOW_THRESHOLD:
+    if (
+        largest_tick >= AXIS_SCALE_HIGH_THRESHOLD
+        or largest_tick < AXIS_SCALE_LOW_THRESHOLD
+    ):
         return int(np.floor(np.log10(largest_tick)))
     return 0
 
@@ -324,7 +349,7 @@ def _scale_label(label: str, exponent: int) -> str:
     scale_label = rf"$\times 10^{{{exponent}}}$"
     close_bracket = label.rfind("]")
     if close_bracket >= 0:
-        return f"{label[:close_bracket + 1]} {scale_label}{label[close_bracket + 1:]}"
+        return f"{label[: close_bracket + 1]} {scale_label}{label[close_bracket + 1 :]}"
     if label:
         return f"{label} {scale_label}"
     return scale_label

@@ -3,25 +3,25 @@ from pathlib import Path
 import numpy as np
 import pytest
 import xarray as xr
-
 from HW_analysis.scripts.event_features import (
     plot_adiabatic_diabatic_advection_baseline as plot_diag,
 )
 
 
-def test_plot_creates_three_axes_with_background_and_foreground_collections():
+def test_plot_creates_three_panels_with_background_and_colored_events():
     fig = plot_diag.plot_tendency_scatter(
         _make_baseline_table(),
         _make_event_table(),
     )
     try:
-        assert len(fig.axes) == 3
-        assert [ax.get_title() for ax in fig.axes] == [
+        assert len(fig.axes) == 4
+        plot_axes = fig.axes[:3]
+        assert [ax.get_title() for ax in plot_axes] == [
             "Diabatic vs Adiabatic",
             "Advection vs Adiabatic",
             "Sqrt LWA a Exposure",
         ]
-        for ax in fig.axes:
+        for ax in plot_axes:
             assert len(ax.collections) == 2
             baseline_scatter, event_scatter = ax.collections
             assert baseline_scatter.get_alpha() == 0.2
@@ -30,11 +30,20 @@ def test_plot_creates_three_axes_with_background_and_foreground_collections():
             assert baseline_scatter.get_label() == "Clean baseline days"
             assert event_scatter.get_label() == "Events"
         assert fig.axes[0].get_legend() is not None
-        assert [
-            text.get_text() for text in fig.axes[0].get_legend().get_texts()
-        ] == ["Clean baseline days", "Events"]
+        assert [text.get_text() for text in fig.axes[0].get_legend().get_texts()] == [
+            "Clean baseline days",
+            "Events",
+        ]
         assert fig.axes[0].get_legend()._loc == 1
         assert all(ax.get_legend() is None for ax in fig.axes[1:])
+        assert fig.axes[-1].get_ylabel() == "Peak TAS Anomaly (K)"
+        event_norms = [ax.collections[1].norm for ax in plot_axes]
+        assert all(norm is event_norms[0] for norm in event_norms)
+        for ax in plot_axes:
+            np.testing.assert_allclose(
+                np.asarray(ax.collections[1].get_array()),
+                np.array([2.0, 4.0, 6.0]),
+            )
     finally:
         plot_diag.plt.close(fig)
 
@@ -59,7 +68,7 @@ def test_plot_filters_baseline_only_and_uses_matching_lwa_exposures():
         )
 
         for ax, baseline_y, event_y in zip(
-            fig.axes,
+            fig.axes[:3],
             expected_baseline_y,
             expected_event_y,
         ):
@@ -100,6 +109,7 @@ def test_nonfinite_values_are_filtered_independently_and_limits_use_both_tables(
         np.array([2.0, 3.0, np.nan, 6.0, 8.0, 9.0]),
     )
     events["I_advection_pre"] = ("event", np.array([3.0, np.nan, -9.0]))
+    events["tas_anom_peak"] = ("event", np.array([2.0, np.nan, 6.0]))
 
     fig = plot_diag.plot_tendency_scatter(baseline, events)
     try:
@@ -108,18 +118,23 @@ def test_nonfinite_values_are_filtered_independently_and_limits_use_both_tables(
         advection_baseline = np.asarray(fig.axes[1].collections[0].get_offsets())
         advection_events = np.asarray(fig.axes[1].collections[1].get_offsets())
         np.testing.assert_allclose(diabatic_baseline[:, 0], np.array([1.0, 5.0, 8.0]))
-        np.testing.assert_allclose(diabatic_events[:, 0], np.array([-3.0, 6.0, 10.0]))
+        np.testing.assert_allclose(diabatic_events[:, 0], np.array([-3.0, 10.0]))
         np.testing.assert_allclose(
             advection_baseline[:, 0],
             np.array([1.0, 4.0, 5.0, 8.0]),
         )
         np.testing.assert_allclose(advection_events[:, 0], np.array([-3.0, 10.0]))
-        for ax in fig.axes:
+        for ax in fig.axes[:3]:
+            np.testing.assert_allclose(
+                np.asarray(ax.collections[1].get_array()),
+                np.array([2.0, 6.0]),
+            )
+        for ax in fig.axes[:3]:
             np.testing.assert_allclose(ax.get_xlim(), np.array([-3.65, 10.65]))
         np.testing.assert_allclose(fig.axes[0].get_ylim(), np.array([-0.55, 11.55]))
         np.testing.assert_allclose(fig.axes[1].get_ylim(), np.array([-9.65, 4.65]))
         np.testing.assert_allclose(fig.axes[2].get_ylim(), np.array([-0.35, 7.35]))
-        for ax in fig.axes:
+        for ax in fig.axes[:3]:
             assert ax.get_xlim()[0] < 0.0 < ax.get_xlim()[1]
             assert ax.get_ylim()[0] < 0.0 < ax.get_ylim()[1]
     finally:
@@ -178,6 +193,11 @@ def test_validate_feature_variables_checks_both_tables():
             baseline,
             events.drop_vars("I_lwa_a_pre_peak"),
         )
+    with pytest.raises(ValueError, match="Event-feature.*tas_anom_peak"):
+        plot_diag.validate_feature_variables(
+            baseline,
+            events.drop_vars("tas_anom_peak"),
+        )
 
 
 def test_plot_rejects_no_clean_baseline_rows_or_empty_event_table():
@@ -192,6 +212,11 @@ def test_plot_rejects_no_clean_baseline_rows_or_empty_event_table():
     empty_events = _make_event_table().isel(event=slice(0, 0))
     with pytest.raises(ValueError, match="no event rows"):
         plot_diag.plot_tendency_scatter(_make_baseline_table(), empty_events)
+
+    events = _make_event_table()
+    events["tas_anom_peak"] = ("event", np.full(3, np.nan))
+    with pytest.raises(ValueError, match="contains no finite values"):
+        plot_diag.plot_tendency_scatter(_make_baseline_table(), events)
 
 
 def test_write_tendency_scatter_plot_writes_png(tmp_path):
@@ -238,6 +263,7 @@ def test_main_forwards_arguments_and_closes_both_datasets(monkeypatch, tmp_path)
         event_features,
         path,
         *,
+        color_variable,
         point_size,
         alpha,
         event_point_size,
@@ -246,7 +272,14 @@ def test_main_forwards_arguments_and_closes_both_datasets(monkeypatch, tmp_path)
         assert baseline_features is baseline
         assert event_features is events
         written.append(
-            (Path(path), point_size, alpha, event_point_size, event_alpha)
+            (
+                Path(path),
+                color_variable,
+                point_size,
+                alpha,
+                event_point_size,
+                event_alpha,
+            )
         )
         return Path(path)
 
@@ -260,6 +293,8 @@ def test_main_forwards_arguments_and_closes_both_datasets(monkeypatch, tmp_path)
             str(event_path),
             "--output-path",
             str(output_path),
+            "--color-variable",
+            "tas_anom_peak",
             "--point-size",
             "10",
             "--alpha",
@@ -275,7 +310,7 @@ def test_main_forwards_arguments_and_closes_both_datasets(monkeypatch, tmp_path)
     monkeypatch.setattr(plot_diag, "write_tendency_scatter_plot", fake_write)
 
     assert plot_diag.main() == 0
-    assert written == [(output_path, 10.0, 0.1, 50.0, 0.8)]
+    assert written == [(output_path, "tas_anom_peak", 10.0, 0.1, 50.0, 0.8)]
     assert closed == ["events", "baseline"]
 
 
@@ -314,6 +349,7 @@ def _make_event_table() -> xr.Dataset:
             "I_diabatic_pre": ("event", np.array([1.0, 7.0, 11.0])),
             "I_advection_pre": ("event", np.array([3.0, -6.0, -9.0])),
             "I_lwa_a_pre_peak": ("event", np.array([4.0, 25.0, 49.0])),
+            "tas_anom_peak": ("event", np.array([2.0, 4.0, 6.0])),
         },
         coords={"event": np.arange(3)},
     )
