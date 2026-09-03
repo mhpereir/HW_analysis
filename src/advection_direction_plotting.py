@@ -731,7 +731,12 @@ def _validate_top_event_composites(
 ) -> None:
     if "lag_hour" not in reference.coords or "lag_hour" not in top_event.coords:
         raise ValueError("Top-event inputs must contain a lag_hour coordinate.")
-    if not reference["lag_hour"].equals(top_event["lag_hour"]):
+    # Compare the coordinate variables rather than the full DataArrays. Event
+    # windows retain time-derived auxiliary coordinates such as month, day,
+    # and climatology_time, while the composite reference has averaged those
+    # coordinates away. Those auxiliary coordinates do not change the common
+    # lag grid used for plotting.
+    if not reference["lag_hour"].variable.equals(top_event["lag_hour"].variable):
         raise ValueError("Top-event inputs must use identical lag_hour coordinates.")
     reference_faces = advection_direction.available_stage1_faces(reference)
     top_event_faces = advection_direction.available_stage1_faces(top_event)

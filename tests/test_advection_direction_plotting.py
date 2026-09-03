@@ -275,6 +275,39 @@ def test_top_event_plot_uses_solid_reference_and_dashed_event_lines():
         plt.close(fig)
 
 
+def test_top_event_plot_ignores_unrelated_lag_auxiliary_coordinates():
+    reference, event_windows = _make_top_event_composites()
+    reference = reference.assign_coords(
+        hour_utc=("lag_hour", np.arange(reference.sizes["lag_hour"]) % 24),
+    )
+    event_windows = event_windows.assign_coords(
+        climatology_time=(
+            ("event", "lag_hour"),
+            np.arange(event_windows.sizes["lag_hour"])[None, :],
+        ),
+    )
+    top_event = event_windows.isel(event=0, drop=True)
+    assert not reference["lag_hour"].equals(top_event["lag_hour"])
+
+    advection_direction_plotting._validate_top_event_composites(
+        reference,
+        top_event,
+    )
+
+
+def test_top_event_plot_rejects_different_lag_values():
+    reference, event_windows = _make_top_event_composites()
+    top_event = event_windows.isel(event=0, drop=True).assign_coords(
+        lag_hour=event_windows["lag_hour"] + 1,
+    )
+
+    with np.testing.assert_raises_regex(ValueError, "identical lag_hour"):
+        advection_direction_plotting._validate_top_event_composites(
+            reference,
+            top_event,
+        )
+
+
 def test_top_event_writer_smooths_reference_and_events_independently(
     monkeypatch,
     tmp_path,
