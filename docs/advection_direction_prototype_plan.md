@@ -41,8 +41,14 @@ be hidden inside one combined scheduler job.
 
 The earlier combined production scheduler, combined smoke scheduler, and shell
 pipeline runner have therefore been removed. The retained
-`schedulers/schedule_plot_advection_direction_exploration.sh` is plot-only: it
-consumes an existing enhanced Stage-1 product and writes a new figure.
+`schedulers/schedule_plot_advection_direction_exploration.sh` is plot-only. It
+requires explicit `REGION`, `INPUT_PATH`, and `OUTPUT_PATH` values and accepts
+an optional external `LOG_DIR`. The input must be a validated Stage-1 version 2
+product containing the normalized face tendencies. The scheduler retains the
+surface-to-700-hPa, TAS q90, 1940-2024, complete-JJA-event, and seven-day
+composite configuration while allowing the region and artifact namespace to
+change. It stages the PNG beside its final destination and refuses to overwrite
+an existing output.
 
 If the base or enhanced Stage-1 products need to be rebuilt, add or use a
 tracked scheduler for that one builder only, submit it independently, validate
@@ -369,13 +375,11 @@ Only after prototype approval:
 Generated paths:
 
 ```text
-results/stage1/advection_direction_exploration/
-  base_stage1/
-    harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc
-  harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc
+results/stage1/runs/<accepted-run>/
+  harmonized_regional_timeseries_<region>_surface_700hPa_tas_q90_1940_2024.nc
 
 results/plots_advection_direction_exploration/
-  region_pnw_bartusek/
+  region_<region>/
     boundary_surface_700hPa/
       time_range_1940_2024/
         advection_face_contributions.png
