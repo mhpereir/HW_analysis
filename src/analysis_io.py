@@ -18,15 +18,14 @@ Out of scope:
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 import numpy as np
 import xarray as xr
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HARMONIZED_TIMESERIES_PATH = (
@@ -83,7 +82,7 @@ def default_harmonized_timeseries_path(
     *,
     region: str,
     threshold_variable: str,
-    quantile: str | int | float,
+    quantile: str | float,
     start_year: int,
     end_year: int,
     bottom_boundary: str | int | None = None,
@@ -279,21 +278,18 @@ def _normalize_attrs(attrs: Mapping[Any, Any]) -> dict[Any, Any]:
     """Convert Python booleans in attrs to NetCDF-compatible integers."""
     normalized: dict[Any, Any] = {}
     for key, value in attrs.items():
-        if isinstance(value, bool):
-            normalized[key] = int(value)
-        elif isinstance(value, np.bool_):
+        if isinstance(value, (bool, np.bool_)):
             normalized[key] = int(value)
         else:
             normalized[key] = value
     return normalized
 
 
-def _normalize_filename_quantile_token(quantile: str | int | float) -> str:
+def _normalize_filename_quantile_token(quantile: str | float) -> str:
     """Return the quantile token used in Stage-1 product filenames."""
     if isinstance(quantile, str):
         token = quantile.strip()
-        if token.startswith("q"):
-            token = token[1:]
+        token = token.removeprefix("q")
         return _filename_token(token)
 
     if isinstance(quantile, int):

@@ -25,7 +25,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-
 DEFAULT_TIME_DIM = "time"
 DEFAULT_EVENT_DIM = "event"
 DEFAULT_LAG_DIM = "lag_hour"

@@ -1,13 +1,11 @@
 import json
-from pathlib import Path
 
 import numpy as np
 import xarray as xr
-
-from HW_analysis.scripts.Idyn_matching_exploration import (
+from HW_analysis.scripts.idyn_matching_exploration import (
     explore_idyn_matching as exploration,
 )
-from HW_analysis.scripts.Idyn_matching_exploration import matching_settings
+from HW_analysis.scripts.idyn_matching_exploration import matching_settings
 
 
 def test_prepare_exploration_builds_deterministic_complete_primary_match():

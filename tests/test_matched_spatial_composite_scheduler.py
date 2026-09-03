@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULER = (
     REPO_ROOT / "schedulers/schedule_matched_dyn_pre_spatial_composites.sh"

@@ -11,7 +11,6 @@ import argparse
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -26,7 +25,6 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
 from src import plot_style
-
 
 DEFAULT_INPUT_PATH = (
     REPO_ROOT

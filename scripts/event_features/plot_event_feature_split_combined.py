@@ -8,7 +8,6 @@ import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -216,7 +215,6 @@ def plot_split_violin_combined(
     validate_feature_variables(features, split_specs=tuple(split.spec for split in splits))
 
     nrows = len(Y_VARIABLES)
-    ncols = max(len(splits) + 1, 1)
     fig_width = plot_style.FULL_TWO_COLUMN_WIDTH_IN
     fig_height = max(12.0, 1.75 * nrows + 1.4)
     fig, axes_grid = plt.subplots(
@@ -465,7 +463,7 @@ def source_variable_name(variable: str) -> str:
     """Return the dataset variable needed for a plot variable."""
     source = DERIVED_VARIABLE_SOURCES.get(variable, variable)
     if isinstance(source, tuple):
-        raise ValueError(f"{variable!r} maps to multiple source variables.")
+        raise TypeError(f"{variable!r} maps to multiple source variables.")
     return source
 
 

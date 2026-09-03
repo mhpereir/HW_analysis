@@ -1,7 +1,6 @@
 import subprocess
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DAILY_SCRIPT = REPO_ROOT / "scripts/spatial_composites/build_era5_daily_spatial_data.sh"
 CLIMATE_SCRIPT = REPO_ROOT / "scripts/spatial_composites/build_era5_daily_doy_climatology.sh"
@@ -110,6 +109,7 @@ def test_daily_script_refuses_existing_output_without_overwrite(tmp_path):
         ],
         capture_output=True,
         text=True,
+        check=False,
     )
 
     assert result.returncode != 0

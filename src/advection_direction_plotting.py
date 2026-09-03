@@ -15,7 +15,6 @@ from matplotlib.lines import Line2D
 
 from . import advection_direction, plot_style
 
-
 GROUP_COLORS = {
     "advection_zonal": "#6A5ACD",
     "advection_meridional": "#009E73",

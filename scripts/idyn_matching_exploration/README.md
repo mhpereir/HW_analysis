@@ -211,7 +211,7 @@ sha256: 1a38fa88040bb3597a643e26dfd2882ecb4ac2e859285a01d524f127ef197780
 The tracked matching settings were:
 
 ```text
-/home/mhpereir/HW_analysis/scripts/Idyn_matching_exploration/
+/home/mhpereir/HW_analysis/scripts/idyn_matching_exploration/
 matching_settings.json
 sha256: 6b65aaf712ef494a16e5794a19c24b2f2516e5565251a8e922a4311bec434244
 ```
@@ -377,9 +377,9 @@ under the ignored `results/` tree.
 
 ```bash
 mamba activate dev_env
-python scripts/Idyn_matching_exploration/explore_idyn_matching.py \
+python scripts/idyn_matching_exploration/explore_idyn_matching.py \
   --input-path /path/to/hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc \
-  --settings-path scripts/Idyn_matching_exploration/matching_settings.json \
+  --settings-path scripts/idyn_matching_exploration/matching_settings.json \
   --output-dir results/Idyn_matching_exploration
 ```
 

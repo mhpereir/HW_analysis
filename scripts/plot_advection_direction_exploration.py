@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Plot face-resolved peak-aligned advection diagnostics from enhanced Stage 1."""
 
 from __future__ import annotations
@@ -5,7 +6,6 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -21,7 +21,6 @@ from src import (
     plot_paths,
     selectors,
 )
-
 
 PLOT_NAME = "advection_direction_exploration"
 DEFAULT_OUTPUT_FILENAME = "advection_face_contributions_two_panel.png"

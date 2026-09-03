@@ -21,14 +21,13 @@ Out of scope:
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 
 import numpy as np
-from scipy.optimize import linear_sum_assignment
 import xarray as xr
-
+from scipy.optimize import linear_sum_assignment
 
 DEFAULT_EVENT_DIM = "event"
 DEFAULT_EVENT_ID_NAME = "event_id"
@@ -705,7 +704,7 @@ def _match_calipers(
     calipers: dict[str, float] = {}
     for name, value in raw_calipers.items():
         if isinstance(value, (bool, np.bool_)):
-            raise ValueError("caliper_sd values must be finite positive numbers.")
+            raise TypeError("caliper_sd values must be finite positive numbers.")
         try:
             caliper = float(value)
         except (TypeError, ValueError) as exc:
@@ -765,11 +764,14 @@ def _group_metric_dataarray(
         )
     if group_da.sizes[event_dim] != event_table.sizes[event_dim]:
         raise ValueError("Grouping metric does not align with the event table.")
-    if event_dim in event_table.coords and event_dim in group_da.coords:
-        if not group_da[event_dim].equals(event_table[event_dim]):
-            raise ValueError(
-                "Grouping-metric event coordinates do not align with the event table."
-            )
+    if (
+        event_dim in event_table.coords
+        and event_dim in group_da.coords
+        and not group_da[event_dim].equals(event_table[event_dim])
+    ):
+        raise ValueError(
+            "Grouping-metric event coordinates do not align with the event table."
+        )
     if group_da.name is None:
         group_da = group_da.rename("group_metric")
     return group_da
@@ -813,7 +815,7 @@ def _validate_season_months(season_months: Sequence[int]) -> tuple[int, ...]:
             month,
             (int, np.integer),
         ):
-            raise ValueError("season_months must contain only integer month numbers.")
+            raise TypeError("season_months must contain only integer month numbers.")
         month_int = int(month)
         if month_int < 1 or month_int > 12:
             raise ValueError("season_months values must be between 1 and 12.")
@@ -905,7 +907,7 @@ def _full_event_season_mask(
     """Return a mask for events whose inclusive interval touches only season months."""
     start_values = np.asarray(start_time.compute().values, dtype="datetime64[ns]")
     end_values = np.asarray(end_time.compute().values, dtype="datetime64[ns]")
-    allowed = set(int(month) for month in months)
+    allowed = {int(month) for month in months}
     selected = np.asarray(
         [
             _interval_months_are_in_season(start, end, allowed)

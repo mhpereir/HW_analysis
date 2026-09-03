@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Build an isolated Stage-1 copy with face-resolved advection tendencies."""
 
 from __future__ import annotations
@@ -6,14 +7,12 @@ import argparse
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
 from src import advection_direction, analysis_io, data_io, plot_paths
-
 
 EXPLORATION_SUBDIR = "advection_direction_exploration"
 DEFAULT_CHUNK_HOURS = 24 * 31

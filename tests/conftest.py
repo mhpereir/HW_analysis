@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from importlib.machinery import ModuleSpec
 import sys
+from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import ModuleType
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_NAME = "HW_analysis"

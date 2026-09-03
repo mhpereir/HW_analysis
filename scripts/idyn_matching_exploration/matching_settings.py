@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
 import numpy as np
-
 
 DEFAULT_SETTINGS_PATH = Path(__file__).with_name("matching_settings.json")
 SETTINGS_SCHEMA_VERSION = 2
@@ -89,7 +88,7 @@ def load_matching_settings(
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid matching-settings JSON: {source_path}") from exc
     if not isinstance(raw, dict):
-        raise ValueError("Matching settings must contain a top-level JSON object.")
+        raise TypeError("Matching settings must contain a top-level JSON object.")
 
     _require_exact_keys(
         raw,
@@ -307,7 +306,7 @@ def _load_specifications(
 
 def _mapping(value: object, *, context: str) -> Mapping[str, object]:
     if not isinstance(value, dict):
-        raise ValueError(f"{context} must be a JSON object.")
+        raise TypeError(f"{context} must be a JSON object.")
     return value
 
 
@@ -336,7 +335,7 @@ def _nonempty_string(value: object, *, context: str) -> str:
 
 def _unique_strings(value: object, *, context: str) -> tuple[str, ...]:
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
-        raise ValueError(f"{context} must be a nonempty array of strings.")
+        raise TypeError(f"{context} must be a nonempty array of strings.")
     out = tuple(
         _nonempty_string(item, context=f"{context} item")
         for item in value
@@ -350,13 +349,13 @@ def _unique_strings(value: object, *, context: str) -> tuple[str, ...]:
 
 def _integer(value: object, *, context: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"{context} must be an integer.")
+        raise TypeError(f"{context} must be an integer.")
     return value
 
 
 def _positive_float(value: object, *, context: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError(f"{context} must be a finite positive number.")
+        raise TypeError(f"{context} must be a finite positive number.")
     out = float(value)
     if not np.isfinite(out) or out <= 0:
         raise ValueError(f"{context} must be a finite positive number.")
@@ -365,7 +364,7 @@ def _positive_float(value: object, *, context: str) -> float:
 
 def _positive_floats(value: object, *, context: str) -> tuple[float, ...]:
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
-        raise ValueError(f"{context} must be a nonempty array of numbers.")
+        raise TypeError(f"{context} must be a nonempty array of numbers.")
     out = tuple(
         _positive_float(item, context=f"{context} item")
         for item in value

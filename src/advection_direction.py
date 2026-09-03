@@ -22,7 +22,6 @@ from collections.abc import Sequence
 import numpy as np
 import xarray as xr
 
-
 SECONDS_PER_HOUR = 3600.0
 TIME_DIM = "time"
 LAG_DIM = "lag_hour"

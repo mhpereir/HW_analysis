@@ -4,10 +4,8 @@ import h5netcdf
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
-
 from HW_analysis.scripts.region_vis import plot_stage1_regions as plotter
 from HW_analysis.src import analysis_io, config, plot_style
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULER = REPO_ROOT / "scripts/region_vis/schedule_plot_stage1_regions.sh"

@@ -16,7 +16,6 @@ import math
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -229,7 +228,7 @@ def validate_pca_dataset(
     if missing:
         raise ValueError(f"PCA dataset is missing required variables: {', '.join(missing)}.")
 
-    pcs = set(str(value) for value in pca["pc"].values)
+    pcs = {str(value) for value in pca["pc"].values}
     for pc_name in (pc_x, pc_y):
         if pc_name not in pcs:
             raise ValueError(f"Requested PC {pc_name!r} is not present in the dataset.")
@@ -445,7 +444,9 @@ def event_variable_values(pca: xr.Dataset, variable: str) -> np.ndarray:
             return values / np.timedelta64(1, "D")
         return np.asarray(values, dtype=float)
 
-    if "feature" in pca.coords and variable in set(str(value) for value in pca["feature"].values):
+    if "feature" in pca.coords and variable in {
+        str(value) for value in pca["feature"].values
+    }:
         return np.asarray(pca["feature_matrix"].sel(feature=variable).values, dtype=float)
 
     raise ValueError(f"PCA dataset does not contain diagnostic variable {variable!r}.")
@@ -457,7 +458,7 @@ def has_event_variable(pca: xr.Dataset, variable: str) -> bool:
         return True
     if "feature" not in pca.coords or "feature_matrix" not in pca:
         return False
-    return variable in set(str(value) for value in pca["feature"].values)
+    return variable in {str(value) for value in pca["feature"].values}
 
 
 def print_pc1_diagnostic_correlations(

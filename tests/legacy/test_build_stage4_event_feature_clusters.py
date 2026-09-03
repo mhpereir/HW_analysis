@@ -4,7 +4,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 import xarray as xr
-
 from HW_analysis.scripts.event_features.old import (
     build_stage4_event_feature_clusters as build_stage4_clusters,
 )
