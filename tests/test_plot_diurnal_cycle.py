@@ -5,10 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 import xarray as xr
-
 from HW_analysis.scripts import plot_diurnal_cycle
 from HW_analysis.src import analysis_io
-
 
 RUN_ARGS = [
     "--region", "pnw_hotz",
@@ -90,7 +88,7 @@ def test_validate_args_rejects_invalid_months():
 def test_validate_args_rejects_invalid_utc_offset_type():
     args = argparse.Namespace(season_months=[6, 7, 8], local_utc_offset_hours="-7")
 
-    with pytest.raises(ValueError, match="local-utc-offset-hours"):
+    with pytest.raises(TypeError, match="local-utc-offset-hours"):
         plot_diurnal_cycle.validate_args(args)
 
 

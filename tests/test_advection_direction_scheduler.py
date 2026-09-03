@@ -1,7 +1,6 @@
 import subprocess
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PLOT_SCHEDULER = (
     REPO_ROOT / "schedulers" / "schedule_plot_advection_direction_exploration.sh"

@@ -4,7 +4,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 import xarray as xr
-
 from HW_analysis.scripts import build_stage1_harmonized_timeseries as stage1_builder
 from HW_analysis.src import analysis_io, config, data_io
 

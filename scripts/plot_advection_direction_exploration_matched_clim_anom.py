@@ -3,22 +3,21 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import hashlib
-from pathlib import Path
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import xarray as xr
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from scripts.Idyn_matching_exploration import matching_settings  # noqa: E402
-from src import (  # noqa: E402
+from scripts.idyn_matching_exploration import matching_settings
+from src import (
     advection_direction,
     advection_direction_plotting,
     analysis_io,
@@ -27,7 +26,6 @@ from src import (  # noqa: E402
     plot_paths,
     selectors,
 )
-
 
 PLOT_NAME = "advection_direction_exploration_matched_clim_anom"
 DEFAULT_OUTPUT_FILENAME = "advection_face_contributions_matched_clim_anom.png"

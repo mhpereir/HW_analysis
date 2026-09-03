@@ -3,11 +3,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 import xarray as xr
-
 from HW_analysis.scripts import (
     plot_advection_direction_exploration_matched_clim_anom as matched_script,
 )
-from HW_analysis.scripts.Idyn_matching_exploration import matching_settings
+from HW_analysis.scripts.idyn_matching_exploration import matching_settings
 
 
 def test_build_matched_composites_uses_selector_and_stage1_event_alignment(

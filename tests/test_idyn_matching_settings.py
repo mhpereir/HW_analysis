@@ -1,8 +1,7 @@
 import json
 
 import pytest
-
-from HW_analysis.scripts.Idyn_matching_exploration import matching_settings
+from HW_analysis.scripts.idyn_matching_exploration import matching_settings
 from HW_analysis.src import selectors
 
 

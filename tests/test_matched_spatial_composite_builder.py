@@ -4,8 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
-
-from HW_analysis.scripts.Idyn_matching_exploration import matching_settings
+from HW_analysis.scripts.idyn_matching_exploration import matching_settings
 from HW_analysis.scripts.spatial_composites import (
     build_matched_dyn_pre_spatial_composites as matched_builder,
 )

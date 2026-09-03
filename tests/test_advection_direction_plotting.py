@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-
 from HW_analysis.src import advection_direction, advection_direction_plotting
 
 

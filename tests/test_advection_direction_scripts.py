@@ -3,6 +3,8 @@ from pathlib import Path
 
 from HW_analysis.scripts import (
     build_stage1_advection_exploration as build_script,
+)
+from HW_analysis.scripts import (
     plot_advection_direction_exploration as plot_script,
 )
 

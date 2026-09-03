@@ -11,7 +11,6 @@ import argparse
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -389,7 +388,7 @@ def source_variable_name(variable: str) -> str:
     """Return the dataset variable needed for a plot variable."""
     source = DERIVED_VARIABLE_SOURCES.get(variable, variable)
     if isinstance(source, tuple):
-        raise ValueError(f"{variable!r} maps to multiple source variables.")
+        raise TypeError(f"{variable!r} maps to multiple source variables.")
     return source
 
 

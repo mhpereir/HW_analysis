@@ -18,14 +18,12 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
 from src import analysis_io, plot_paths, plot_style
-
 
 PLOT_NAME = "diurnal_cycle"
 DEFAULT_OUTPUT_FILENAME = "hw_non_hw_diurnal_cycle_jja_local.png"
@@ -533,7 +531,7 @@ def _validate_season_months(season_months: Sequence[int]) -> tuple[int, ...]:
     months: list[int] = []
     for month in season_months:
         if isinstance(month, (bool, np.bool_)) or not isinstance(month, (int, np.integer)):
-            raise ValueError("season_months must contain only integer month numbers.")
+            raise TypeError("season_months must contain only integer month numbers.")
         month_int = int(month)
         if month_int < 1 or month_int > 12:
             raise ValueError("--season-months values must be between 1 and 12.")
@@ -547,7 +545,7 @@ def _validate_season_months(season_months: Sequence[int]) -> tuple[int, ...]:
 def _validate_local_utc_offset_hours(value: int) -> int:
     """Return a validated fixed UTC offset in whole hours."""
     if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)):
-        raise ValueError("--local-utc-offset-hours must be an integer.")
+        raise TypeError("--local-utc-offset-hours must be an integer.")
     offset = int(value)
     if offset < -23 or offset > 23:
         raise ValueError("--local-utc-offset-hours must be between -23 and 23.")

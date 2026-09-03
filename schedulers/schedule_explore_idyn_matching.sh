@@ -11,7 +11,7 @@ cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 INPUT_PATH="${INPUT_PATH:-${PROJECT_ROOT}/results/stage2_event_features/hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc}"
-SETTINGS_PATH="${SETTINGS_PATH:-${PROJECT_ROOT}/scripts/Idyn_matching_exploration/matching_settings.json}"
+SETTINGS_PATH="${SETTINGS_PATH:-${PROJECT_ROOT}/scripts/idyn_matching_exploration/matching_settings.json}"
 OUTPUT_DIR="${OUTPUT_DIR:-${PROJECT_ROOT}/results/Idyn_matching_exploration}"
 LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
 
@@ -72,7 +72,7 @@ echo "[info] started=$(date -Is)"
 
 mkdir -p "${STAGED_OUTPUT_DIR}"
 cd "${PROJECT_ROOT}"
-/usr/bin/time -v python scripts/Idyn_matching_exploration/explore_idyn_matching.py \
+/usr/bin/time -v python scripts/idyn_matching_exploration/explore_idyn_matching.py \
     --input-path "${INPUT_PATH}" \
     --settings-path "${SETTINGS_PATH}" \
     --output-dir "${STAGED_OUTPUT_DIR}"

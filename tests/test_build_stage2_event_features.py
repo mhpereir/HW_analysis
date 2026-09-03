@@ -4,8 +4,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 import xarray as xr
-
-from HW_analysis.scripts.event_features import build_stage2_event_features as build_event_features
+from HW_analysis.scripts.event_features import (
+    build_stage2_event_features as build_event_features,
+)
 from HW_analysis.scripts.event_features import event_feature_config as feature_config
 
 

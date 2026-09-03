@@ -10,7 +10,6 @@ import xarray as xr
 
 from scripts.event_features import event_feature_config as config
 
-
 SURFACE_FLUX_FEATURES = frozenset({"I_sshf_pre", "I_slhf_pre"})
 
 

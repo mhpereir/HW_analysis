@@ -3,31 +3,29 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-import sys
-from typing import Sequence
 
 import matplotlib
 import numpy as np
 
 matplotlib.use("Agg")
-import cartopy.crs as ccrs  # noqa: E402
-import cartopy.feature as cfeature  # noqa: E402
-import h5netcdf  # noqa: E402
-import matplotlib.path as mpath  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.lines import Line2D  # noqa: E402
-from matplotlib.patches import Rectangle  # noqa: E402
-from matplotlib.ticker import FixedLocator  # noqa: E402
-
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import h5netcdf
+import matplotlib.path as mpath
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from matplotlib.patches import Rectangle
+from matplotlib.ticker import FixedLocator
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src import analysis_io, config, plot_style  # noqa: E402
-
+from src import analysis_io, config, plot_style
 
 DEFAULT_RUN_ID = "bf232281_20260819"
 DEFAULT_RUN_DIR = REPO_ROOT / "results/stage1/runs" / DEFAULT_RUN_ID
@@ -262,8 +260,7 @@ def plot_region_domains(
     if len(names) != len(set(names)):
         raise ValueError("Regional domains must have unique names.")
     for domain in domains:
-        domain.label
-        domain.color
+        _ = domain.label, domain.color
 
     plot_style.apply_theme()
     projection = ccrs.NorthPolarStereo(central_longitude=-100.0)

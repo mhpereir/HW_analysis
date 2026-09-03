@@ -3,26 +3,24 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import hashlib
 import json
-from pathlib import Path
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import xarray as xr
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.Idyn_matching_exploration import matching_settings  # noqa: E402
-from scripts.spatial_composites import (  # noqa: E402
+from scripts.idyn_matching_exploration import matching_settings
+from scripts.spatial_composites import (
     build_dyn_net_spatial_composites as spatial_builder,
 )
-from src import selectors  # noqa: E402
-
+from src import selectors
 
 DEFAULT_EVENT_FEATURES_PATH = spatial_builder.DEFAULT_EVENT_FEATURES_PATH
 DEFAULT_DAILY_DIR = spatial_builder.DEFAULT_DAILY_DIR

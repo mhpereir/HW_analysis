@@ -6,12 +6,10 @@ import argparse
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import xarray as xr
 from sklearn.decomposition import PCA
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -501,7 +499,7 @@ def add_global_attrs(
             "n_input_events": int(n_input_events),
             "n_valid_events": int(n_valid_events),
             "n_dropped_events": int(n_input_events - n_valid_events),
-            "n_features": int(len(feature_names)),
+            "n_features": len(feature_names),
             "n_components": int(n_components),
             "missing_event_policy": "drop_missing_events",
             "clustering_performed": 0,
@@ -531,7 +529,7 @@ def source_variable_name(feature_name: str) -> str:
     """Return the single source variable needed for a raw or simple derived feature."""
     source = DERIVED_FEATURE_SOURCES.get(feature_name, feature_name)
     if isinstance(source, tuple):
-        raise ValueError(f"{feature_name!r} maps to multiple source variables.")
+        raise TypeError(f"{feature_name!r} maps to multiple source variables.")
     return source
 
 
