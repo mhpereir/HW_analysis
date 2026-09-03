@@ -76,6 +76,19 @@ for event windows and alignment; Stage 2 supplies only the configured matched
 membership. The positive and negative groups are composited separately with
 the same event count and lag window.
 
+Each face-resolved advection entrypoint writes two figures from the same
+prepared composite: the existing unsmoothed figure and a sibling whose filename
+ends in `_smoothed.png`. The second figure applies a centered running mean to
+the signed face tendencies, with a default window of 24 hourly samples and a
+complete-window requirement at the lag boundaries. Grouped zonal,
+meridional, horizontal, vertical, and all-face curves are derived from the
+smoothed face tendencies, so their identities remain exact. For the matched
+variant, the display smoothing is applied independently to the positive and
+negative composites after event reduction. It does not change event selection,
+matching, climatology subtraction, or any Stage-1 or Stage-2 product. The
+running-mean window remains configurable through `--smoothing-window`, and the
+smoothed figure title identifies the applied window.
+
 The Venus scheduler wrappers are likewise one operation per PBS job:
 
 ```text
@@ -90,6 +103,9 @@ runtime commit. The two all-event schedulers and the two split-event schedulers
 accept the same regional, boundary, threshold, year, lag-window, smoothing, and
 output/log configuration at submission time. They do not build prerequisites
 inside plotting jobs.
+
+The three face-resolved advection schedulers preflight, stage, validate, and
+publish both the unsmoothed and smoothed PNGs as one no-overwrite operation.
 
 The production split-composite schedulers render the same complete
 split-variable matrix. The five numeric split variables are `duration`,

@@ -6,7 +6,6 @@ import argparse
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -22,7 +21,6 @@ from src import (
     selectors,
 )
 
-
 PLOT_NAME = "advection_direction_exploration_clim_anom"
 DEFAULT_OUTPUT_FILENAME = "advection_face_contributions_clim_anom.png"
 
@@ -36,6 +34,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--climatology-path", type=Path, default=None)
     parser.add_argument("--output-path", type=Path, default=None)
     parser.add_argument("--window-days", type=int, default=7)
+    parser.add_argument(
+        "--smoothing-window",
+        type=int,
+        default=advection_direction_plotting.DEFAULT_SMOOTHING_WINDOW,
+    )
     parser.add_argument("--season-months", type=int, nargs="+", default=None)
     parser.add_argument("--require-full-event", action="store_true")
     args = plot_paths.finalize_stage1_plot_paths(
@@ -59,6 +62,8 @@ def parse_args() -> argparse.Namespace:
 def validate_args(args: argparse.Namespace) -> None:
     if args.window_days < 1:
         raise ValueError("--window-days must be >= 1.")
+    if args.smoothing_window < 1:
+        raise ValueError("--smoothing-window must be >= 1.")
     if args.require_full_event and args.season_months is None:
         raise ValueError("--require-full-event requires --season-months.")
     if args.season_months is not None:
@@ -69,11 +74,11 @@ def validate_args(args: argparse.Namespace) -> None:
 
 
 def main() -> int:
-    """Build timestamp anomalies before stacking and write the two-panel figure."""
+    """Build timestamp anomalies and write raw and smoothed figures."""
     args = parse_args()
     validate_args(args)
-    if args.output_path.exists():
-        raise FileExistsError(f"Anomaly plot already exists: {args.output_path}.")
+    smoothed_path = advection_direction_plotting.smoothed_output_path(args.output_path)
+    _require_new_outputs(args.output_path, smoothed_path)
     stage1 = analysis_io.open_harmonized_timeseries(args.input_path)
     climate = analysis_io.open_regional_hourly_climatology(args.climatology_path)
     try:
@@ -108,15 +113,28 @@ def main() -> int:
         )
         composite.attrs.update(anomaly_source.attrs)
         composite.attrs["climatology_path"] = str(args.climatology_path)
-        path = advection_direction_plotting.write_advection_direction_exploration_plot(
-            composite,
-            args.output_path,
+        written = (
+            advection_direction_plotting.write_advection_direction_exploration_outputs(
+                composite,
+                args.output_path,
+                smoothed_output_path=smoothed_path,
+                smoothing_window=args.smoothing_window,
+            )
         )
     finally:
         climate.close()
         stage1.close()
-    print(f"Wrote advection-direction climatological-anomaly plot: {path}")
+    print("Wrote advection-direction climatological-anomaly plots:")
+    for path in written:
+        print(f"  {path}")
     return 0
+
+
+def _require_new_outputs(output_path: Path, smoothed_path: Path) -> None:
+    existing = [path for path in (output_path, smoothed_path) if path.exists()]
+    if existing:
+        paths = ", ".join(str(path) for path in existing)
+        raise FileExistsError(f"Anomaly plot output already exists: {paths}.")
 
 
 if __name__ == "__main__":

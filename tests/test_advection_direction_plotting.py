@@ -1,7 +1,8 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-
 from HW_analysis.src import advection_direction, advection_direction_plotting
 
 
@@ -15,12 +16,14 @@ def test_plot_advection_direction_exploration_has_selected_two_panels():
         assert "Grouped advective contributions" == fig.axes[1].get_title()
         assert all("Component ratios" not in ax.get_title() for ax in fig.axes)
         assert all("glyph" not in ax.get_title().lower() for ax in fig.axes)
-        assert {
-            text.get_text() for text in fig.axes[0].get_legend().get_texts()
-        } == {"West", "East", "South", "North", "Top"}
-        assert {
-            text.get_text() for text in fig.axes[1].get_legend().get_texts()
-        } == {
+        assert {text.get_text() for text in fig.axes[0].get_legend().get_texts()} == {
+            "West",
+            "East",
+            "South",
+            "North",
+            "Top",
+        }
+        assert {text.get_text() for text in fig.axes[1].get_legend().get_texts()} == {
             "Zonal (west + east)",
             "Meridional (south + north)",
             "Horizontal",
@@ -63,8 +66,7 @@ def test_add_upper_axis_headroom_expands_only_upper_limit():
         assert new_lower == lower
         assert np.isclose(
             new_upper,
-            upper
-            + advection_direction_plotting.LEGEND_HEADROOM_FRACTION * span,
+            upper + advection_direction_plotting.LEGEND_HEADROOM_FRACTION * span,
         )
     finally:
         plt.close(fig)
@@ -84,15 +86,95 @@ def test_climatological_anomaly_title_is_explicit():
 def test_write_advection_direction_exploration_plot_writes_nonempty_png(tmp_path):
     output = tmp_path / "advection_face_contributions.png"
 
-    written = (
-        advection_direction_plotting.write_advection_direction_exploration_plot(
-            _make_composite(),
-            output,
-        )
+    written = advection_direction_plotting.write_advection_direction_exploration_plot(
+        _make_composite(),
+        output,
     )
 
     assert written == output.resolve()
     assert written.stat().st_size > 0
+
+
+def test_dual_output_writer_preserves_raw_and_smooths_faces_before_groups(
+    monkeypatch,
+    tmp_path,
+):
+    composite = _make_composite()
+    original = composite.copy(deep=True)
+    captured = []
+
+    def fake_write(ds, output_path):
+        captured.append(ds)
+        return Path(output_path).resolve()
+
+    monkeypatch.setattr(
+        advection_direction_plotting,
+        "write_advection_direction_exploration_plot",
+        fake_write,
+    )
+    output = tmp_path / "advection.png"
+    smoothed_output = tmp_path / "advection_smoothed.png"
+
+    written = (
+        advection_direction_plotting.write_advection_direction_exploration_outputs(
+            composite,
+            output,
+            smoothed_output_path=smoothed_output,
+            smoothing_window=24,
+        )
+    )
+
+    assert written == [output.resolve(), smoothed_output.resolve()]
+    assert captured[0] is composite
+    smoothed = captured[1]
+    assert smoothed.attrs["smoothing_window"] == 24
+    expected_west = (
+        composite["advection_west"]
+        .rolling(
+            lag_hour=24,
+            center=True,
+            min_periods=24,
+        )
+        .mean()
+    )
+    xr.testing.assert_allclose(smoothed["advection_west"], expected_west)
+    grouped = advection_direction.grouped_advection_components(smoothed)
+    xr.testing.assert_allclose(
+        grouped["advection_face_total"],
+        sum(
+            smoothed[f"advection_{face}"]
+            for face in ("west", "east", "south", "north", "top")
+        ),
+    )
+    xr.testing.assert_identical(composite, original)
+
+
+def test_smoothed_advection_plot_title_identifies_running_mean():
+    composite = _make_composite()
+    composite.attrs["smoothing_window"] = 24
+
+    fig = advection_direction_plotting.plot_advection_direction_exploration(composite)
+    try:
+        assert "24-hour running mean" in fig._suptitle.get_text()
+    finally:
+        plt.close(fig)
+
+
+def test_write_advection_direction_outputs_writes_two_nonempty_pngs(tmp_path):
+    output = tmp_path / "advection.png"
+    smoothed_output = tmp_path / "advection_smoothed.png"
+
+    written = (
+        advection_direction_plotting.write_advection_direction_exploration_outputs(
+            _make_composite(),
+            output,
+            smoothed_output_path=smoothed_output,
+            smoothing_window=24,
+        )
+    )
+
+    assert written == [output.resolve(), smoothed_output.resolve()]
+    assert all(path.stat().st_size > 0 for path in written)
 
 
 def test_matched_plot_uses_positive_solid_and_negative_dashed_lines():
@@ -161,6 +243,80 @@ def test_write_matched_advection_plot_writes_nonempty_png(tmp_path):
 
     assert written == output.resolve()
     assert written.stat().st_size > 0
+
+
+def test_matched_dual_output_writer_smooths_populations_independently(
+    monkeypatch,
+    tmp_path,
+):
+    negative, positive = _make_matched_composites()
+    negative_original = negative.copy(deep=True)
+    positive_original = positive.copy(deep=True)
+    captured = []
+
+    def fake_write(negative_ds, positive_ds, output_path):
+        captured.append((negative_ds, positive_ds))
+        return Path(output_path).resolve()
+
+    monkeypatch.setattr(
+        advection_direction_plotting,
+        "write_matched_advection_direction_exploration_plot",
+        fake_write,
+    )
+    output = tmp_path / "matched.png"
+    smoothed_output = tmp_path / "matched_smoothed.png"
+
+    written = advection_direction_plotting.write_matched_advection_direction_exploration_outputs(
+        negative,
+        positive,
+        output,
+        smoothed_output_path=smoothed_output,
+        smoothing_window=24,
+    )
+
+    assert written == [output.resolve(), smoothed_output.resolve()]
+    assert captured[0][0] is negative
+    assert captured[0][1] is positive
+    negative_smoothed, positive_smoothed = captured[1]
+    assert negative_smoothed.attrs["smoothing_window"] == 24
+    assert positive_smoothed.attrs["smoothing_window"] == 24
+    expected_negative = (
+        negative["advection_west"]
+        .rolling(
+            lag_hour=24,
+            center=True,
+            min_periods=24,
+        )
+        .mean()
+    )
+    expected_positive = (
+        positive["advection_west"]
+        .rolling(
+            lag_hour=24,
+            center=True,
+            min_periods=24,
+        )
+        .mean()
+    )
+    xr.testing.assert_allclose(
+        negative_smoothed["advection_west"],
+        expected_negative,
+    )
+    xr.testing.assert_allclose(
+        positive_smoothed["advection_west"],
+        expected_positive,
+    )
+    xr.testing.assert_identical(negative, negative_original)
+    xr.testing.assert_identical(positive, positive_original)
+
+    fig = advection_direction_plotting.plot_matched_advection_direction_exploration(
+        negative_smoothed,
+        positive_smoothed,
+    )
+    try:
+        assert "24-hour running mean" in fig._suptitle.get_text()
+    finally:
+        plt.close(fig)
 
 
 def _make_composite() -> xr.Dataset:

@@ -385,6 +385,7 @@ results/plots_advection_direction_exploration/
         advection_face_contributions.png
         advection_face_contributions_three_panel.png
         advection_face_contributions_two_panel.png
+        advection_face_contributions_two_panel_smoothed.png
 ```
 
 The original `advection_face_contributions.png` is retained as the reviewed
@@ -397,6 +398,11 @@ retained as the reviewed three-panel intermediate.
 
 Each product and figure will record the region, pressure boundaries, event
 definition, years, season filter, lag window, input paths, and source commit.
+The two-panel plotting entrypoints retain the unsmoothed output and additionally
+write a sibling `_smoothed.png` figure using a centered, complete-window
+24-hour running mean by default. This is a display-only transform of the
+post-composite signed face tendencies; grouped curves are recomputed from the
+smoothed faces.
 
 ## Compatibility Requirements
 
@@ -423,7 +429,10 @@ Local validation in `dev_env`:
 - metadata and unit validation;
 - plotting tests for the two-panel order, absence of ratio and glyph panels,
   data-relative legend headroom, the five-column grouped legend, unit-only
-  y-axis labels, one-day integer x-axis ticks, and non-empty output; and
+  y-axis labels, one-day integer x-axis ticks, and non-empty output;
+- dual-output tests for unchanged raw values, centered complete-window
+  smoothing, exact grouped identities after smoothing, matched-population
+  independence, title labeling, and no-overwrite preflight; and
 - the full repository test suite.
 
 Venus validation through OpenPBS:

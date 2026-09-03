@@ -85,6 +85,14 @@ figure entrypoints.
   and validates matching Stage-1 and Stage-2 peak timestamps before building
   composites. Component identity remains color encoded. Positive `I_dyn_pre`
   uses solid lines and negative `I_dyn_pre` uses dashed lines.
+- The absolute, climatological-anomaly, and matched-population face-advection
+  entrypoints each preserve the existing unsmoothed two-panel figure and write
+  a second `_smoothed.png` figure. The second figure uses the shared centered
+  display-only running mean, defaults to 24 hourly samples, requires complete
+  windows at the lag boundaries, and identifies the smoothing window in its
+  title. Smooth signed face tendencies before deriving grouped curves. For the
+  matched figure, smooth each sign population independently. Do not alter event
+  membership, climatology subtraction, matching, or source composites.
 - The matched spatial figure must consume a separate matched spatial-composite
   product built from the canonical Stage-2 table and tracked settings. It must
   not infer matched membership from an already averaged all-event spatial

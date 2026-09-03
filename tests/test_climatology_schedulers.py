@@ -127,8 +127,27 @@ def test_matched_advection_scheduler_requires_stage2_settings_and_atomic_output(
     assert '--matching-settings-path "${MATCHING_SETTINGS_PATH}"' in text
     assert '--matching-specification "${MATCHING_SPECIFICATION}"' in text
     assert "export PYTHONWARNINGS=error" in text
-    assert 'mv "${STAGED_OUTPUT}" "${OUTPUT_PATH}"' in text
+    assert 'mv --no-clobber "${STAGED_OUTPUT}" "${OUTPUT_PATH}"' in text
     assert text.count('test ! -e "${OUTPUT_PATH}"') == 2
+
+
+def test_advection_anomaly_schedulers_publish_raw_and_smoothed_outputs():
+    for scheduler in SCHEDULERS[3:]:
+        text = scheduler.read_text()
+        assert 'SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"' in text
+        assert (
+            'SMOOTHED_OUTPUT_PATH="${OUTPUT_PATH%.*}_smoothed.${OUTPUT_PATH##*.}"'
+            in text
+        )
+        assert '--smoothing-window "${SMOOTHING_WINDOW}"' in text
+        assert text.count('test ! -e "${SMOOTHED_OUTPUT_PATH}"') == 2
+        assert 'test -s "${STAGED_SMOOTHED_OUTPUT}"' in text
+        assert (
+            'mv --no-clobber "${STAGED_SMOOTHED_OUTPUT}" '
+            '"${SMOOTHED_OUTPUT_PATH}"' in text
+        )
+        assert 'test -s "${SMOOTHED_OUTPUT_PATH}"' in text
+        assert 'echo "[info] smoothed_output_sha256=' in text
 
 
 def test_split_anomaly_scheduler_matches_absolute_production_split_matrix():

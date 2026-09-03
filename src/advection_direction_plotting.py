@@ -13,8 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 
-from . import advection_direction, plot_style
-
+from . import advection_direction, plot_style, plotting
 
 GROUP_COLORS = {
     "advection_zonal": "#6A5ACD",
@@ -36,6 +35,7 @@ MATCHED_SIGN_LINESTYLES = {
     "negative": "--",
 }
 LEGEND_HEADROOM_FRACTION = 0.30
+DEFAULT_SMOOTHING_WINDOW = 24
 
 
 def plot_advection_direction_exploration(
@@ -103,6 +103,33 @@ def write_advection_direction_exploration_plot(
     finally:
         plt.close(fig)
     return path
+
+
+def write_advection_direction_exploration_outputs(
+    composite: xr.Dataset,
+    output_path: str | Path,
+    *,
+    smoothed_output_path: str | Path,
+    smoothing_window: int = DEFAULT_SMOOTHING_WINDOW,
+) -> list[Path]:
+    """Write unsmoothed and display-smoothed face-advection figures."""
+    smoothed = _smooth_advection_composite_for_display(
+        composite,
+        smoothing_window=smoothing_window,
+    )
+    written = [
+        write_advection_direction_exploration_plot(
+            composite,
+            output_path,
+        )
+    ]
+    written.append(
+        write_advection_direction_exploration_plot(
+            smoothed,
+            smoothed_output_path,
+        )
+    )
+    return written
 
 
 def plot_matched_advection_direction_exploration(
@@ -173,6 +200,66 @@ def write_matched_advection_direction_exploration_plot(
     finally:
         plt.close(fig)
     return path
+
+
+def write_matched_advection_direction_exploration_outputs(
+    negative_composite: xr.Dataset,
+    positive_composite: xr.Dataset,
+    output_path: str | Path,
+    *,
+    smoothed_output_path: str | Path,
+    smoothing_window: int = DEFAULT_SMOOTHING_WINDOW,
+) -> list[Path]:
+    """Write unsmoothed and display-smoothed matched-population figures."""
+    negative_smoothed = _smooth_advection_composite_for_display(
+        negative_composite,
+        smoothing_window=smoothing_window,
+    )
+    positive_smoothed = _smooth_advection_composite_for_display(
+        positive_composite,
+        smoothing_window=smoothing_window,
+    )
+    written = [
+        write_matched_advection_direction_exploration_plot(
+            negative_composite,
+            positive_composite,
+            output_path,
+        )
+    ]
+    written.append(
+        write_matched_advection_direction_exploration_plot(
+            negative_smoothed,
+            positive_smoothed,
+            smoothed_output_path,
+        )
+    )
+    return written
+
+
+def smoothed_output_path(output_path: str | Path) -> Path:
+    """Return the sibling `_smoothed` PNG path for an advection figure."""
+    path = Path(output_path).expanduser().resolve()
+    return path.with_name(f"{path.stem}_smoothed{path.suffix}")
+
+
+def _smooth_advection_composite_for_display(
+    composite: xr.Dataset,
+    *,
+    smoothing_window: int,
+) -> xr.Dataset:
+    """Smooth face tendencies before grouped diagnostics are derived."""
+    variables = (
+        "advection",
+        *(
+            advection_direction.stage1_face_variable(face)
+            for face in advection_direction.available_stage1_faces(composite)
+        ),
+    )
+    return plotting.smooth_composite_for_display(
+        composite,
+        variables=variables,
+        smoothing_window=smoothing_window,
+    )
 
 
 def _plot_face_timeseries(
@@ -378,6 +465,8 @@ def _validate_matched_composites(
         "matching_label",
         "matching_variables",
         "matching_caliper_sd",
+        "smoothing_window",
+        "smoothing_applied_to",
     ):
         if negative.attrs.get(name) != positive.attrs.get(name):
             raise ValueError(f"Matched composites disagree on attribute {name!r}.")
@@ -404,11 +493,12 @@ def _matched_figure_title(
         caliper_label = f"{float(caliper):.2f}"
     except (TypeError, ValueError):
         caliper_label = str(caliper)
+    smoothing_label = _smoothing_title_label(negative)
     return (
         "Matched face-resolved advection climatological-anomaly composites "
         f"for {region} (n={n_pairs} pairs, {matching_label}, "
         f"{caliper_label} pooled SD, "
-        f"-{pre_days} to +{post_days} days)"
+        f"-{pre_days} to +{post_days} days{smoothing_label})"
     )
 
 
@@ -422,7 +512,15 @@ def _figure_title(ds: xr.Dataset) -> str:
         if ds.attrs.get("data_representation") == "climatological_anomaly"
         else ""
     )
+    smoothing_label = _smoothing_title_label(ds)
     return (
         f"Face-resolved advection{representation} composite for {region} "
-        f"(n={n_events}, -{pre_days} to +{post_days} days)"
+        f"(n={n_events}, -{pre_days} to +{post_days} days{smoothing_label})"
     )
+
+
+def _smoothing_title_label(ds: xr.Dataset) -> str:
+    smoothing_window = ds.attrs.get("smoothing_window")
+    if smoothing_window is None:
+        return ""
+    return f", {int(smoothing_window)}-hour running mean"
