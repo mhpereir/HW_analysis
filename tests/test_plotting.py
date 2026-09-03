@@ -819,6 +819,34 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
         plt.close(fig)
 
 
+def test_extended_top_event_anomaly_uses_delta_labels_and_baseline_title():
+    event_window = _make_top_event_window()
+    composite = _make_composite()
+    anomaly_attrs = {
+        "data_representation": "climatological_anomaly",
+        "climatology_start_year": 1940,
+        "climatology_end_year": 2024,
+    }
+    event_window.attrs.update(anomaly_attrs)
+    composite.attrs.update(anomaly_attrs)
+
+    fig = plotting.plot_top_event_timeseries(
+        event_window,
+        _make_top_event(),
+        reference_composite=composite,
+        plot_extended_variables=True,
+    )
+    try:
+        _assert_extended_anomaly_axis_labels(fig)
+        title = fig._suptitle.get_text()
+        assert "climatological-anomaly" in title
+        assert "1940-2024 baseline" in title
+        assert "absolute peak tas=305.00" in title
+        assert fig.axes[11].get_ylim() != (0.0, 1.0)
+    finally:
+        plt.close(fig)
+
+
 def test_plot_top_event_timeseries_presentation_uses_requested_six_panel_layout():
     event_window = _make_top_event_window()
     composite = _make_composite()
@@ -863,6 +891,31 @@ def test_plot_top_event_timeseries_presentation_uses_requested_six_panel_layout(
         plt.close(fig)
 
 
+def test_presentation_top_event_anomaly_uses_delta_axis_labels():
+    event_window = _make_top_event_window()
+    composite = _make_composite()
+    event_window.attrs["data_representation"] = "climatological_anomaly"
+    composite.attrs["data_representation"] = "climatological_anomaly"
+
+    fig = plotting.plot_top_event_timeseries(
+        event_window,
+        _make_top_event(),
+        reference_composite=composite,
+        layout="presentation",
+    )
+    try:
+        assert [ax.get_ylabel() for ax in fig.axes] == [
+            "ΔLWA [m hPa]",
+            "Δ [K hr-1]",
+            "ΔT_mean [K]",
+            "Δ [K hr-1]",
+            "Δ [K hr-1]",
+            "Δ [K hr-1]",
+        ]
+    finally:
+        plt.close(fig)
+
+
 def test_plot_top_event_timeseries_presentation_rejects_extended_panels():
     with pytest.raises(ValueError, match="cannot be combined"):
         plotting.plot_top_event_timeseries(
@@ -873,9 +926,27 @@ def test_plot_top_event_timeseries_presentation_rejects_extended_panels():
         )
 
 
-def test_top_event_surface_fluxes_use_atmospheric_sign_for_event_and_reference():
+def test_top_event_rejects_mixed_absolute_and_anomaly_representations():
+    event_window = _make_top_event_window()
+    event_window.attrs["data_representation"] = "climatological_anomaly"
+
+    with pytest.raises(ValueError, match="same data representation"):
+        plotting.plot_top_event_timeseries(
+            event_window,
+            _make_top_event(),
+            reference_composite=_make_composite(),
+        )
+
+
+@pytest.mark.parametrize("climatological_anomaly", [False, True])
+def test_top_event_surface_fluxes_use_atmospheric_sign_for_event_and_reference(
+    climatological_anomaly,
+):
     event_window = _make_top_event_window()
     composite = _make_composite()
+    if climatological_anomaly:
+        event_window.attrs["data_representation"] = "climatological_anomaly"
+        composite.attrs["data_representation"] = "climatological_anomaly"
     event_sources = {
         name: event_window[name].values.copy()
         for name in ("sshf_heating_rate_approx", "slhf_heating_rate_approx")

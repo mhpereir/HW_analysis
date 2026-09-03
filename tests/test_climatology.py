@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 import xarray as xr
-
 from HW_analysis.src import climatology
 
 
@@ -35,7 +34,6 @@ def test_build_regional_hourly_climatology_computes_mean_std_and_count():
         source,
         variables=("T_mean",),
     )
-
     np.testing.assert_allclose(climate["T_mean"], [2.0, 4.0])
     np.testing.assert_allclose(climate["T_mean_std"], [np.sqrt(2.0), np.sqrt(8.0)])
     np.testing.assert_array_equal(climate["T_mean_count"], [2, 2])
@@ -96,6 +94,8 @@ def test_apply_regional_hourly_climatology_matches_before_event_stacking():
         source,
         variables=("T_mean",),
     )
+    source_values = source["T_mean"].values.copy()
+    source_attrs = dict(source.attrs)
 
     anomalies = climatology.apply_regional_hourly_climatology(
         source,
@@ -106,6 +106,8 @@ def test_apply_regional_hourly_climatology_matches_before_event_stacking():
     np.testing.assert_allclose(anomalies["T_mean"], [-1.0, -2.0, 1.0, 2.0])
     assert anomalies.attrs["data_representation"] == "climatological_anomaly"
     assert anomalies["T_mean"].attrs["climatology_baseline_variable"] == "T_mean"
+    np.testing.assert_allclose(source["T_mean"], source_values)
+    assert source.attrs == source_attrs
 
 
 def test_apply_regional_hourly_climatology_rejects_missing_key():
@@ -122,6 +124,37 @@ def test_apply_regional_hourly_climatology_rejects_missing_key():
     with pytest.raises(ValueError, match="missing calendar-hour keys"):
         climatology.apply_regional_hourly_climatology(
             target,
+            climate,
+            variables=("T_mean",),
+        )
+
+
+@pytest.mark.parametrize(
+    ("climatology_attr", "mismatched_value"),
+    [
+        ("region", "alaska"),
+        ("heat_budget_bottom_boundary", "850hPa"),
+        ("heat_budget_top_boundary", "500hPa"),
+        ("source_stage1_contract_version", 1),
+    ],
+)
+def test_apply_regional_hourly_climatology_rejects_mismatched_source_metadata(
+    climatology_attr,
+    mismatched_value,
+):
+    source = _source_dataset(
+        ["1999-05-01T00:00", "2000-05-01T00:00"],
+        values=[1.0, 3.0],
+    )
+    climate = climatology.build_regional_hourly_climatology(
+        source,
+        variables=("T_mean",),
+    )
+    climate.attrs[climatology_attr] = mismatched_value
+
+    with pytest.raises(ValueError, match="does not match Stage-1 source"):
+        climatology.apply_regional_hourly_climatology(
+            source,
             climate,
             variables=("T_mean",),
         )

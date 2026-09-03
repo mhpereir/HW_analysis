@@ -19,11 +19,16 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-
 TIME_DIM = "time"
 CLIMATOLOGY_DIM = "climatology_time"
 REFERENCE_YEAR = 2000
 PIPELINE_STAGE = "stage_1_regional_hourly_climatology"
+SOURCE_COMPATIBILITY_ATTRS: tuple[tuple[str, str], ...] = (
+    ("region", "region"),
+    ("heat_budget_bottom_boundary", "heat_budget_bottom_boundary"),
+    ("heat_budget_top_boundary", "heat_budget_top_boundary"),
+    ("stage1_contract_version", "source_stage1_contract_version"),
+)
 DEFAULT_VARIABLES: tuple[str, ...] = (
     "T_mean",
     "volume",
@@ -159,13 +164,16 @@ def apply_regional_hourly_climatology(
         climatology,
         required_variables=tuple(dict.fromkeys((*names, *baseline_names.values()))),
     )
+    validate_climatology_source_compatibility(ds, climatology)
     keys = calendar_hour_keys(ds[time_dim], time_dim=time_dim)
     available = set(np.asarray(climatology[CLIMATOLOGY_DIM].values))
     missing = sorted(set(np.asarray(keys.values)).difference(available))
     if missing:
         preview = ", ".join(str(value) for value in missing[:5])
         suffix = "" if len(missing) <= 5 else f", ... ({len(missing)} total)"
-        raise ValueError(f"Climatology is missing calendar-hour keys: {preview}{suffix}.")
+        raise ValueError(
+            f"Climatology is missing calendar-hour keys: {preview}{suffix}."
+        )
 
     selector = xr.DataArray(
         keys.values,
@@ -188,9 +196,7 @@ def apply_regional_hourly_climatology(
                 "climatology_start_year": int(
                     climatology.attrs["climatology_start_year"]
                 ),
-                "climatology_end_year": int(
-                    climatology.attrs["climatology_end_year"]
-                ),
+                "climatology_end_year": int(climatology.attrs["climatology_end_year"]),
                 "climatology_baseline_variable": baseline_name,
             }
         )
@@ -211,6 +217,33 @@ def apply_regional_hourly_climatology(
         }
     )
     return out
+
+
+def validate_climatology_source_compatibility(
+    source: xr.Dataset,
+    climatology: xr.Dataset,
+) -> None:
+    """Require one climatology companion to describe the supplied Stage-1 source."""
+    if not isinstance(source, xr.Dataset):
+        raise TypeError("source must be an xarray.Dataset.")
+    if not isinstance(climatology, xr.Dataset):
+        raise TypeError("climatology must be an xarray.Dataset.")
+
+    mismatches: list[str] = []
+    for source_attr, climatology_attr in SOURCE_COMPATIBILITY_ATTRS:
+        source_value = source.attrs.get(source_attr)
+        climatology_value = climatology.attrs.get(climatology_attr)
+        if str(source_value) != str(climatology_value):
+            mismatches.append(
+                f"{source_attr}: source={source_value!r}, "
+                f"climatology={climatology_value!r}"
+            )
+    if mismatches:
+        raise ValueError(
+            "Climatology companion does not match Stage-1 source: "
+            + "; ".join(mismatches)
+            + "."
+        )
 
 
 def calendar_hour_keys(
@@ -268,9 +301,7 @@ def validate_regional_hourly_climatology(
     if not index.is_unique or not index.is_monotonic_increasing:
         raise ValueError("climatology_time must be unique and strictly increasing.")
     if np.any(index.year != REFERENCE_YEAR):
-        raise ValueError(
-            f"climatology_time must use reference year {REFERENCE_YEAR}."
-        )
+        raise ValueError(f"climatology_time must use reference year {REFERENCE_YEAR}.")
     missing: list[str] = []
     for name in tuple(required_variables):
         for required in (name, f"{name}_std", f"{name}_count"):
@@ -283,8 +314,7 @@ def validate_regional_hourly_climatology(
     for name in tuple(required_variables):
         if ds[name].dims != (CLIMATOLOGY_DIM,):
             raise ValueError(
-                f"Climatology variable {name!r} must have dims "
-                f"({CLIMATOLOGY_DIM!r},)."
+                f"Climatology variable {name!r} must have dims ({CLIMATOLOGY_DIM!r},)."
             )
         counts = np.asarray(ds[f"{name}_count"].values)
         if np.any(counts <= 0):

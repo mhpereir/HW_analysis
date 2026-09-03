@@ -162,7 +162,9 @@ def test_write_top_event_plots_writes_raw_and_smoothed_figures_per_event(tmp_pat
 
 def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp_path):
     ds = _make_plot_dataset()
+    ds.attrs["data_representation"] = "climatological_anomaly"
     selected = plot_top_events.select_top_tas_events(ds, n=2)
+    event_table = xr.Dataset()
     reference_composite = xr.Dataset()
     smoothed_reference_composite = xr.Dataset()
     captured = {
@@ -222,6 +224,7 @@ def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp
         ds,
         selected,
         output_dir=tmp_path,
+        event_table=event_table,
         window_days=1,
         smoothing_window=6,
     )
@@ -229,11 +232,15 @@ def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp
     assert len(written) == 4
     assert captured["composite_calls"] == 1
     assert captured["composite_source"] is ds
+    assert reference_composite.attrs["data_representation"] == (
+        "climatological_anomaly"
+    )
     assert captured["composite_kwargs"] == {
         "variables": plot_top_events.TOP_EVENT_VARIABLES,
         "pre_days": 1,
         "post_days": 1,
         "event_percentiles": plot_top_events.REFERENCE_EVENT_PERCENTILES,
+        "event_table": event_table,
     }
     assert captured["plot_references"] == [
         reference_composite,
@@ -396,6 +403,25 @@ def test_write_top_event_plots_uses_presentation_variables_and_filenames(
         "top_event_rank_01_event_0002_2000-05-02_presentation.png",
         "top_event_rank_01_event_0002_2000-05-02_presentation_smoothed.png",
     ]
+
+
+def test_top_event_anomaly_filenames_use_distinct_tag():
+    event = plot_top_events.select_top_tas_events(_make_plot_dataset(), n=1).isel(
+        event=0
+    )
+
+    assert (
+        plot_top_events._event_figure_filename(
+            event,
+            filename_tag="clim_anom",
+        )
+        == "top_event_rank_01_event_0002_2000-05-02_clim_anom.png"
+    )
+    assert plot_top_events._smoothed_event_figure_filename(
+        event,
+        "presentation",
+        filename_tag="clim_anom",
+    ) == ("top_event_rank_01_event_0002_2000-05-02_clim_anom_presentation_smoothed.png")
 
 
 def _make_plot_dataset() -> xr.Dataset:

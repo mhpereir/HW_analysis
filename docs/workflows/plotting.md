@@ -47,6 +47,7 @@ results/plots_<plot_name>/
 | Stage 1 plus regional hourly climatology | face-resolved advection climatological anomalies | `scripts/plot_advection_direction_exploration_clim_anom.py` |
 | Stage 1 plus regional hourly climatology, Stage 2 event features, and matching settings | matched face-resolved advection climatological anomalies | `scripts/plot_advection_direction_exploration_matched_clim_anom.py` |
 | Stage 1 | top-event traces | `scripts/plot_top_events.py` |
+| Stage 1 plus regional hourly climatology | top-event climatological-anomaly traces | `scripts/plot_top_events_clim_anom.py` |
 | Stage 1 | diurnal, threshold, and event-summary diagnostics | `scripts/plot_diurnal_cycle.py`, `scripts/plot_threshold_timeseries.py`, `scripts/plot_event_summary.py` |
 | Stage 1 run inventory | Northern Hemisphere regional-domain overview | `scripts/region_vis/plot_stage1_regions.py` |
 | Stage 2 event features | feature grids, splits, and combined comparisons | `event_feature_grid_plot.py`, `plot_event_feature.py`, `plot_event_feature_split.py`, `plot_event_feature_split_combined.py` under `scripts/event_features/` |
@@ -187,14 +188,16 @@ use a distinct `*_presentation` plot directory and filename by default, and
 must not overwrite the paper-layout products. `--layout presentation` and
 `--plot-extended-variables` are mutually exclusive.
 
-The top-event entrypoint accepts the same presentation layout and panel order.
-It preserves the selected event trace, the all-event mean and IQR reference,
-absolute-time x-axis, event start/end markers, event-peak marker, ranking, and
-raw plus 24-hour-smoothed output behavior. The temperature panel contains only
-`T_mean`, with the event trace and reference keys both retained. Presentation
-top-event outputs use a distinct `plots_top_events_presentation` directory and
-include `presentation` in each default filename, so they cannot overwrite the
-extended paper figures.
+The absolute and climatological-anomaly top-event entrypoints accept the same
+presentation layout and panel order. They preserve the selected event trace,
+the all-event mean and IQR reference, absolute-time x-axis, event start/end
+markers, event-peak marker, ranking, and raw plus 24-hour-smoothed output
+behavior. The temperature panel contains only `T_mean`, with the event trace
+and reference keys both retained. Climatological anomalies are constructed
+before the event trace, all-event reference, IQR, or smoothing is calculated,
+while selection and ranking remain absolute. Presentation and anomaly outputs
+use distinct plot directories and filename tokens so they cannot overwrite
+the extended absolute paper figures.
 
 ### Composite labels and surface-flux signs
 
