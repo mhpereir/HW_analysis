@@ -20,9 +20,11 @@ def test_stage2_scheduler_is_commit_pinned_and_publishes_atomically(kind):
     assert "status --porcelain --untracked-files=normal" in text
     assert 'test -s "${INPUT_PATH}"' in text
     assert 'STAGED_OUTPUT_PATH="${OUTPUT_PATH}.tmp.${PBS_JOBID}"' in text
+    assert 'test ! -e "${OUTPUT_PATH}"' in text
     assert 'trap \'rm -f -- "${STAGED_OUTPUT_PATH}"\' EXIT' in text
     assert '--output-path "${STAGED_OUTPUT_PATH}"' in text
-    assert 'mv -f -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"' in text
+    assert 'mv --no-clobber -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"' in text
+    assert 'test ! -e "${STAGED_OUTPUT_PATH}"' in text
     assert "--overwrite" not in text
 
 
