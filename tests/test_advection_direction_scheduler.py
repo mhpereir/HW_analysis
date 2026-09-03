@@ -17,12 +17,34 @@ def test_plot_only_scheduler_reuses_explicit_stage1_without_overwriting():
     assert 'REGION="${REGION:?REGION is required}"' in text
     assert 'INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"' in text
     assert 'OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"' in text
+    expected_defaults = {
+        "BOTTOM_BOUNDARY": "surface",
+        "TOP_BOUNDARY": "700",
+        "THRESHOLD_VARIABLE": "tas",
+        "QUANTILE": "90",
+        "TIME_START": "1940",
+        "TIME_END": "2024",
+        "WINDOW_DAYS": "7",
+    }
+    for variable, default in expected_defaults.items():
+        assert f'{variable}="${{{variable}:-{default}}}"' in text
     assert 'SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"' in text
     assert (
         'SMOOTHED_OUTPUT_PATH="${OUTPUT_PATH%.*}_smoothed.${OUTPUT_PATH##*.}"' in text
     )
     assert 'LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"' in text
     assert '--region "${REGION}"' in text
+    expected_arguments = {
+        "bottom-boundary": "BOTTOM_BOUNDARY",
+        "top-boundary": "TOP_BOUNDARY",
+        "threshold-variable": "THRESHOLD_VARIABLE",
+        "quantile": "QUANTILE",
+        "start-year": "TIME_START",
+        "end-year": "TIME_END",
+        "window-days": "WINDOW_DAYS",
+    }
+    for argument, variable in expected_arguments.items():
+        assert f'--{argument} "${{{variable}}}"' in text
     assert '--input-path "${INPUT_PATH}"' in text
     assert '--output-path "${STAGED_OUTPUT}"' in text
     assert '--smoothing-window "${SMOOTHING_WINDOW}"' in text

@@ -10,9 +10,17 @@ cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
+REGION="${REGION:?REGION is required}"
 INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"
 CLIMATOLOGY_PATH="${CLIMATOLOGY_PATH:?CLIMATOLOGY_PATH is required}"
 OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"
+BOTTOM_BOUNDARY="${BOTTOM_BOUNDARY:-surface}"
+TOP_BOUNDARY="${TOP_BOUNDARY:-700}"
+THRESHOLD_VARIABLE="${THRESHOLD_VARIABLE:-tas}"
+QUANTILE="${QUANTILE:-90}"
+TIME_START="${TIME_START:-1940}"
+TIME_END="${TIME_END:-2024}"
+WINDOW_DAYS="${WINDOW_DAYS:-7}"
 SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"
 LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
 SMOOTHED_OUTPUT_PATH="${OUTPUT_PATH%.*}_smoothed.${OUTPUT_PATH##*.}"
@@ -54,13 +62,24 @@ export PYTHONWARNINGS=error
 export MAMBA_ROOT_PREFIX="${MAMBA_ROOT_PREFIX:-/home/mhpereir/miniconda3}"
 source "${MAMBA_ROOT_PREFIX}/etc/profile.d/mamba.sh"
 mamba activate "${VENUS_MAMBA_ENV:-dev_env}"
+python_executable=$(command -v python)
+test -x "${python_executable}"
 
 echo "[info] job_id=${PBS_JOBID}"
 echo "[info] host=$(hostname)"
 echo "[info] commit=${actual_commit}"
-echo "[info] python=$(command -v python)"
+echo "[info] environment=${VENUS_MAMBA_ENV:-dev_env}"
+echo "[info] conda_prefix=${CONDA_PREFIX}"
+echo "[info] python=${python_executable}"
+echo "[info] region=${REGION}"
+echo "[info] boundaries=${BOTTOM_BOUNDARY}-${TOP_BOUNDARY}hPa"
+echo "[info] threshold=${THRESHOLD_VARIABLE}_q${QUANTILE}"
+echo "[info] years=${TIME_START}-${TIME_END}"
+echo "[info] window_days=${WINDOW_DAYS}"
 echo "[info] input_path=${INPUT_PATH}"
+echo "[info] input_sha256=$(sha256sum "${INPUT_PATH}" | cut -d ' ' -f 1)"
 echo "[info] climatology_path=${CLIMATOLOGY_PATH}"
+echo "[info] climatology_sha256=$(sha256sum "${CLIMATOLOGY_PATH}" | cut -d ' ' -f 1)"
 echo "[info] output_path=${OUTPUT_PATH}"
 echo "[info] smoothed_output_path=${SMOOTHED_OUTPUT_PATH}"
 echo "[info] smoothing_window=${SMOOTHING_WINDOW}"
@@ -69,18 +88,19 @@ echo "[info] staged_smoothed_output=${STAGED_SMOOTHED_OUTPUT}"
 echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
-/usr/bin/time -v python scripts/plot_advection_direction_exploration_clim_anom.py \
-  --region pnw_bartusek \
-  --bottom-boundary surface \
-  --top-boundary 700 \
-  --threshold-variable tas \
-  --quantile 90 \
-  --start-year 1940 \
-  --end-year 2024 \
+/usr/bin/time -v "${python_executable}" \
+  scripts/plot_advection_direction_exploration_clim_anom.py \
+  --region "${REGION}" \
+  --bottom-boundary "${BOTTOM_BOUNDARY}" \
+  --top-boundary "${TOP_BOUNDARY}" \
+  --threshold-variable "${THRESHOLD_VARIABLE}" \
+  --quantile "${QUANTILE}" \
+  --start-year "${TIME_START}" \
+  --end-year "${TIME_END}" \
   --input-path "${INPUT_PATH}" \
   --climatology-path "${CLIMATOLOGY_PATH}" \
   --output-path "${STAGED_OUTPUT}" \
-  --window-days 7 \
+  --window-days "${WINDOW_DAYS}" \
   --smoothing-window "${SMOOTHING_WINDOW}" \
   --season-months 6 7 8 \
   --require-full-event

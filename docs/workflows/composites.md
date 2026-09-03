@@ -106,6 +106,10 @@ inside plotting jobs.
 
 The three face-resolved advection schedulers preflight, stage, validate, and
 publish both the unsmoothed and smoothed PNGs as one no-overwrite operation.
+They require an explicit region and accept the pressure boundaries, threshold
+definition, analysis years, lag window, and smoothing window as runtime
+configuration so one exact deployed revision can render multiple accepted
+Stage-1 regions without source edits.
 
 The production split-composite schedulers render the same complete
 split-variable matrix. The five numeric split variables are `duration`,

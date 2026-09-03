@@ -134,6 +134,30 @@ def test_matched_advection_scheduler_requires_stage2_settings_and_atomic_output(
 def test_advection_anomaly_schedulers_publish_raw_and_smoothed_outputs():
     for scheduler in SCHEDULERS[3:]:
         text = scheduler.read_text()
+        assert 'REGION="${REGION:?REGION is required}"' in text
+        expected_defaults = {
+            "BOTTOM_BOUNDARY": "surface",
+            "TOP_BOUNDARY": "700",
+            "THRESHOLD_VARIABLE": "tas",
+            "QUANTILE": "90",
+            "TIME_START": "1940",
+            "TIME_END": "2024",
+            "WINDOW_DAYS": "7",
+        }
+        for variable, default in expected_defaults.items():
+            assert f'{variable}="${{{variable}:-{default}}}"' in text
+        expected_arguments = {
+            "region": "REGION",
+            "bottom-boundary": "BOTTOM_BOUNDARY",
+            "top-boundary": "TOP_BOUNDARY",
+            "threshold-variable": "THRESHOLD_VARIABLE",
+            "quantile": "QUANTILE",
+            "start-year": "TIME_START",
+            "end-year": "TIME_END",
+            "window-days": "WINDOW_DAYS",
+        }
+        for argument, variable in expected_arguments.items():
+            assert f'--{argument} "${{{variable}}}"' in text
         assert 'SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"' in text
         assert (
             'SMOOTHED_OUTPUT_PATH="${OUTPUT_PATH%.*}_smoothed.${OUTPUT_PATH##*.}"'
@@ -148,6 +172,10 @@ def test_advection_anomaly_schedulers_publish_raw_and_smoothed_outputs():
         )
         assert 'test -s "${SMOOTHED_OUTPUT_PATH}"' in text
         assert 'echo "[info] smoothed_output_sha256=' in text
+        assert "pnw_bartusek" not in text
+        assert "python_executable=$(command -v python)" in text
+        assert 'test -x "${python_executable}"' in text
+        assert '/usr/bin/time -v "${python_executable}"' in text
 
 
 def test_split_anomaly_scheduler_matches_absolute_production_split_matrix():
