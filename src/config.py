@@ -26,6 +26,7 @@ EARTH_RADIUS_M: float = 6.371e6
 REGIONS: dict[str, tuple[slice, slice]] = {
     "alaska": (slice(59.5, 69.5), slice(-160, -150)),
     "central_china": (slice(25, 35), slice(105, 115)),
+    "central_usa": (slice(36, 46), slice(-105, -95)),
     "eastern_canada": (slice(42, 52), slice(-83, -73)),
     "gulf_usa": (slice(31, 41), slice(-90, -80)),
     "pnw_bartusek": (slice(40, 60), slice(-130.0, -110.0)),

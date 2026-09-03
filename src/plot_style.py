@@ -109,6 +109,7 @@ FACE_COLORS = {
 REGION_NAME_MAPPING = {
     "alaska": "Alaska",
     "central_china": "Central China",
+    "central_usa": "Central USA",
     "eastern_canada": "Eastern Canada",
     "gulf_usa": "Gulf USA",
     "pnw_bartusek": "Pacific Northwest (Bartusek)",
@@ -119,6 +120,7 @@ REGION_NAME_MAPPING = {
 REGION_COLORS = {
     "alaska": "#0072B2",
     "central_china": "#D55E00",
+    "central_usa": "#4D4D4D",
     "eastern_canada": "#009E73",
     "gulf_usa": "#CC79A7",
     "pnw_bartusek": "#E69F00",

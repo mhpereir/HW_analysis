@@ -1,9 +1,7 @@
 from pathlib import Path
 
 import pytest
-
 from HW_analysis.src import config
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULER = (
@@ -22,6 +20,7 @@ def test_eastern_canada_region_matches_ehb_domain():
     ("region", "expected_lat", "expected_lon"),
     [
         ("alaska", (59.5, 69.5), (-160, -150)),
+        ("central_usa", (36, 46), (-105, -95)),
         ("gulf_usa", (31, 41), (-90, -80)),
         ("western_eu", (43, 53), (-2, 8)),
         ("central_china", (25, 35), (105, 115)),

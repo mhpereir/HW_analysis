@@ -35,6 +35,11 @@ stable save/open behavior and validates the product marker on read.
 - Eulerian heat-budget diagnostics
 - optional surface radiation, turbulent flux, soil-moisture, and cloud-cover inputs
 
+Configured regional bounds live in `src/config.py` and must match the geometry
+used by the corresponding threshold and EHB inputs. The Central USA extension
+uses 36-46 N and 105-95 W; see
+[decision 010](../decisions/010_central_usa_region.md).
+
 ## Dimensions
 
 | Dimension | Meaning |
