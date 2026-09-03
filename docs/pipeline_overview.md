@@ -59,6 +59,9 @@ Product Stage 1: harmonized regional time series
 Product Stage 1
   `-> temporal composites, top events, threshold, diurnal, and event summaries
 
+Product Stage 1 + regional hourly climatology
+  `-> all-event-reference plus top-event face-advection anomaly figures
+
 Product Stage 2: event-feature table + tracked matching settings
   |-> in-memory I_dyn_pre sign matching -> matched-population diagnostics
   `-> matched event IDs + Stage 1 + regional hourly climatology

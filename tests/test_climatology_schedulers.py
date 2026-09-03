@@ -24,10 +24,15 @@ TEMPORAL_COMPOSITE_SCHEDULERS = (
     SCHEDULERS[1],
     SCHEDULERS[2],
 )
+TOP_EVENT_ADVECTION_SCHEDULER = (
+    REPO_ROOT
+    / "schedulers"
+    / "schedule_plot_advection_direction_exploration_top_events_clim_anom.sh"
+)
 
 
 def test_climatology_schedulers_are_commit_verified_and_syntax_valid():
-    for scheduler in SCHEDULERS:
+    for scheduler in (*SCHEDULERS, TOP_EVENT_ADVECTION_SCHEDULER):
         text = scheduler.read_text()
         assert 'PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"' in text
         assert (

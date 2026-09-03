@@ -20,6 +20,7 @@ scripts/plot_composite_timeseries_all_clim_anom.py
 scripts/plot_composite_timeseries_split_clim_anom.py
 scripts/plot_advection_direction_exploration_clim_anom.py
 scripts/plot_advection_direction_exploration_matched_clim_anom.py
+scripts/plot_advection_direction_exploration_top_events_clim_anom.py
 ```
 
 ## Expected Behavior
@@ -89,6 +90,31 @@ matching, climatology subtraction, or any Stage-1 or Stage-2 product. The
 running-mean window remains configurable through `--smoothing-window`, and the
 smoothed figure title identifies the applied window.
 
+The top-event face-advection climatological-anomaly entrypoint ranks events by
+the absolute Stage-1 `tas_peak`, using the same deterministic descending-rank
+semantics as `scripts/plot_top_events.py`. The default is the top 10 events.
+Optional seasonal and complete-event filtering is applied before ranking, and
+the filtered event table is also the population for the all-event reference
+composite. Climatology subtraction never changes event membership or rank.
+
+For each selected event, the entrypoint writes an hourly and a centered
+display-smoothed two-panel figure on the common peak-relative lag axis. Each
+component keeps its face or grouped-component color. Solid lines show the
+all-event climatological-anomaly mean and dashed lines show the selected top
+event. The smoothed figure applies the same configurable running-mean window,
+defaulting to 24 hourly samples, independently to the all-event mean and the
+individual event trace. Face tendencies are smoothed before grouped curves are
+derived, preserving the grouped identities. Titles identify the rank, event
+ID, peak date, reference population size, climatological-anomaly
+representation, lag range, and smoothing window when present.
+
+Top-event face-advection outputs use the isolated
+`plots_advection_direction_exploration_top_events_clim_anom` namespace. The
+corresponding Venus scheduler publishes the complete `2 * TOP_N` PNG directory
+atomically and refuses to overwrite an existing output directory. This variant
+does not change the existing absolute, all-event climatological-anomaly, or
+matched-population face-advection figures.
+
 The Venus scheduler wrappers are likewise one operation per PBS job:
 
 ```text
@@ -96,6 +122,7 @@ schedulers/schedule_plot_composite_timeseries_all_clim_anom.sh
 schedulers/schedule_plot_composite_timeseries_split_clim_anom.sh
 schedulers/schedule_plot_advection_direction_exploration_clim_anom.sh
 schedulers/schedule_plot_advection_direction_exploration_matched_clim_anom.sh
+schedulers/schedule_plot_advection_direction_exploration_top_events_clim_anom.sh
 ```
 
 They require explicit Stage-1, climatology, and output paths plus a verified

@@ -119,6 +119,7 @@ a figure.
 | Plot Stage 1 | `scripts/plot_*.py` |
 | Plot Stage 1 region inventory | `scripts/region_vis/plot_stage1_regions.py` |
 | Plot matched Stage-1 composites | `scripts/plot_advection_direction_exploration_matched_clim_anom.py` |
+| Plot top-event face-advection anomalies | `scripts/plot_advection_direction_exploration_top_events_clim_anom.py` |
 | Plot Stage 2 | active plotting scripts in `scripts/event_features/` |
 | Prepare spatial ERA5 | `scripts/spatial_composites/build_era5_daily_spatial_data.sh`, `scripts/spatial_composites/build_era5_daily_doy_climatology.sh` |
 | Build and plot spatial composites | `scripts/spatial_composites/build_dyn_net_spatial_composites.py`, `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |

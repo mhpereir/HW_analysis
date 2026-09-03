@@ -34,6 +34,12 @@ MATCHED_SIGN_LINESTYLES = {
     "positive": "-",
     "negative": "--",
 }
+TOP_EVENT_LINESTYLES = {
+    "reference": "-",
+    "top_event": "--",
+}
+TOP_EVENT_REFERENCE_LABEL = "All-event anomaly mean"
+TOP_EVENT_SELECTED_LABEL = "Top event"
 LEGEND_HEADROOM_FRACTION = 0.30
 DEFAULT_SMOOTHING_WINDOW = 24
 
@@ -130,6 +136,152 @@ def write_advection_direction_exploration_outputs(
         )
     )
     return written
+
+
+def plot_top_event_advection_direction_exploration(
+    reference_composite: xr.Dataset,
+    event_window: xr.Dataset,
+) -> Figure:
+    """Return a two-panel anomaly overlay for one ranked top event."""
+    reference = _advection_direction_diagnostics(reference_composite)
+    top_event = _advection_direction_diagnostics(event_window)
+    _validate_top_event_composites(reference, top_event)
+
+    fig, axes = plt.subplots(
+        nrows=2,
+        ncols=1,
+        figsize=plot_style.publication_figsize(
+            "full",
+            aspect=plot_style.TWO_PANEL_STACK_ASPECT,
+        ),
+        sharex=True,
+        constrained_layout=True,
+    )
+    face_ax, grouped_ax = axes
+    lag_days = np.asarray(reference["lag_hour"].values, dtype=float) / 24.0
+
+    _plot_top_event_face_timeseries(
+        face_ax,
+        reference=reference,
+        top_event=top_event,
+        lag_days=lag_days,
+    )
+    _plot_top_event_grouped_timeseries(
+        grouped_ax,
+        reference=reference,
+        top_event=top_event,
+        lag_days=lag_days,
+    )
+
+    for ax in axes:
+        ax.axvline(
+            0,
+            color=plot_style.COLORS["zero"],
+            linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
+            linestyle=":",
+            zorder=1,
+        )
+        plot_style.style_axis(ax)
+        plot_style.format_integer_axis(ax.xaxis, spacing=1)
+        ax.set_xlim(float(lag_days.min()), float(lag_days.max()))
+    grouped_ax.set_xlabel("Days relative to event peak")
+    fig.suptitle(_top_event_figure_title(reference, top_event))
+    return fig
+
+
+def write_top_event_advection_direction_exploration_plot(
+    reference_composite: xr.Dataset,
+    event_window: xr.Dataset,
+    output_path: str | Path,
+) -> Path:
+    """Write one ranked top-event face-advection anomaly overlay."""
+    path = Path(output_path).expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig = plot_top_event_advection_direction_exploration(
+        reference_composite,
+        event_window,
+    )
+    try:
+        plot_style.save_figure(fig, path)
+    finally:
+        plt.close(fig)
+    return path
+
+
+def write_top_event_advection_direction_exploration_outputs(
+    reference_composite: xr.Dataset,
+    event_windows: xr.Dataset,
+    output_dir: str | Path,
+    *,
+    smoothing_window: int = DEFAULT_SMOOTHING_WINDOW,
+) -> list[Path]:
+    """Write hourly and smoothed anomaly overlays for all ranked top events."""
+    if smoothing_window < 1:
+        raise ValueError("smoothing_window must be >= 1.")
+    if "event" not in event_windows.dims:
+        raise ValueError("event_windows must contain the 'event' dimension.")
+    n_events = event_windows.sizes["event"]
+    if n_events < 1:
+        raise ValueError("event_windows must contain at least one event.")
+
+    path = Path(output_dir).expanduser().resolve()
+    if path.exists():
+        raise FileExistsError(f"Top-event output directory already exists: {path}.")
+
+    raw_windows = [
+        event_windows.isel(event=index, drop=True) for index in range(n_events)
+    ]
+    for event_window in raw_windows:
+        _validate_top_event_composites(reference_composite, event_window)
+    raw_names = [
+        top_event_output_filename(event_window) for event_window in raw_windows
+    ]
+    if len(set(raw_names)) != len(raw_names):
+        raise ValueError("Top-event output filenames must be unique.")
+
+    smoothed_reference = _smooth_advection_composite_for_display(
+        reference_composite,
+        smoothing_window=smoothing_window,
+    )
+    smoothed_event_windows = _smooth_advection_composite_for_display(
+        event_windows,
+        smoothing_window=smoothing_window,
+    )
+
+    path.mkdir(parents=True)
+    written: list[Path] = []
+    for index, (event_window, raw_name) in enumerate(
+        zip(raw_windows, raw_names, strict=True)
+    ):
+        raw_path = path / raw_name
+        written.append(
+            write_top_event_advection_direction_exploration_plot(
+                reference_composite,
+                event_window,
+                raw_path,
+            )
+        )
+        smoothed_event = smoothed_event_windows.isel(event=index, drop=True)
+        written.append(
+            write_top_event_advection_direction_exploration_plot(
+                smoothed_reference,
+                smoothed_event,
+                smoothed_output_path(raw_path),
+            )
+        )
+    return written
+
+
+def top_event_output_filename(event_window: xr.Dataset) -> str:
+    """Return the stable hourly filename for one ranked top event."""
+    rank = _top_event_scalar_int(event_window, "selection_rank")
+    event_id = _top_event_scalar_int(event_window, "event_id")
+    peak_time = _top_event_peak_time(event_window)
+    peak_day = np.datetime_as_string(peak_time, unit="D")
+    return (
+        "advection_face_contributions_clim_anom_"
+        f"top_event_rank_{rank:02d}_event_{event_id:04d}_{peak_day}.png"
+    )
 
 
 def plot_matched_advection_direction_exploration(
@@ -348,6 +500,103 @@ def _plot_matched_face_timeseries(
     )
 
 
+def _plot_top_event_face_timeseries(
+    ax,
+    *,
+    reference: xr.Dataset,
+    top_event: xr.Dataset,
+    lag_days: np.ndarray,
+) -> None:
+    faces = advection_direction.available_stage1_faces(reference)
+    for role, ds in (("reference", reference), ("top_event", top_event)):
+        for face in faces:
+            name = advection_direction.stage1_face_variable(face)
+            ax.plot(
+                lag_days,
+                ds[name].values,
+                color=plot_style.FACE_COLORS[face],
+                linestyle=TOP_EVENT_LINESTYLES[role],
+                label="_nolegend_",
+                gid=f"top_event_{role}_{name}",
+            )
+    plot_style.zero_line(ax)
+    ax.set_ylabel("Δ [K hr-1]")
+    ax.set_title("Signed face contributions")
+    _add_upper_axis_headroom(ax)
+    component_handles = [
+        Line2D(
+            [0],
+            [0],
+            color=plot_style.FACE_COLORS[face],
+            linestyle="-",
+            label=face.capitalize(),
+        )
+        for face in faces
+    ]
+    ax.legend(
+        handles=[*component_handles, *_top_event_role_legend_handles()],
+        ncol=4,
+        loc="upper center",
+        **plot_style.legend_kwargs(),
+    )
+
+
+def _plot_top_event_grouped_timeseries(
+    ax,
+    *,
+    reference: xr.Dataset,
+    top_event: xr.Dataset,
+    lag_days: np.ndarray,
+) -> None:
+    for role, ds in (("reference", reference), ("top_event", top_event)):
+        for name in GROUP_NAMES:
+            ax.plot(
+                lag_days,
+                ds[name].values,
+                color=GROUP_COLORS[name],
+                linestyle=TOP_EVENT_LINESTYLES[role],
+                label="_nolegend_",
+                gid=f"top_event_{role}_{name}",
+            )
+    plot_style.zero_line(ax)
+    ax.set_ylabel("Δ [K hr-1]")
+    ax.set_title("Grouped advective contributions")
+    _add_upper_axis_headroom(ax)
+    component_handles = [
+        Line2D(
+            [0],
+            [0],
+            color=GROUP_COLORS[name],
+            linestyle="-",
+            label=GROUP_LABELS[name],
+        )
+        for name in GROUP_NAMES
+    ]
+    ax.legend(
+        handles=[*component_handles, *_top_event_role_legend_handles()],
+        ncol=4,
+        loc="upper center",
+        **plot_style.legend_kwargs(),
+    )
+
+
+def _top_event_role_legend_handles() -> list[Line2D]:
+    """Return population line-style handles independent of component color."""
+    return [
+        Line2D(
+            [0],
+            [0],
+            color=plot_style.COLORS["zero"],
+            linestyle=TOP_EVENT_LINESTYLES[role],
+            label=label,
+        )
+        for role, label in (
+            ("reference", TOP_EVENT_REFERENCE_LABEL),
+            ("top_event", TOP_EVENT_SELECTED_LABEL),
+        )
+    ]
+
+
 def _plot_matched_grouped_timeseries(
     ax,
     *,
@@ -476,6 +725,31 @@ def _validate_matched_composites(
         )
 
 
+def _validate_top_event_composites(
+    reference: xr.Dataset,
+    top_event: xr.Dataset,
+) -> None:
+    if "lag_hour" not in reference.coords or "lag_hour" not in top_event.coords:
+        raise ValueError("Top-event inputs must contain a lag_hour coordinate.")
+    if not reference["lag_hour"].equals(top_event["lag_hour"]):
+        raise ValueError("Top-event inputs must use identical lag_hour coordinates.")
+    reference_faces = advection_direction.available_stage1_faces(reference)
+    top_event_faces = advection_direction.available_stage1_faces(top_event)
+    if reference_faces != top_event_faces:
+        raise ValueError("Top-event inputs must contain identical face variables.")
+    if reference.attrs.get("data_representation") != "climatological_anomaly":
+        raise ValueError("Top-event reference must use climatological anomalies.")
+    if top_event.attrs.get("data_representation") != "climatological_anomaly":
+        raise ValueError("Top-event trace must use climatological anomalies.")
+    if int(reference.attrs.get("n_events", 0)) < 1:
+        raise ValueError("Top-event reference must contain at least one event.")
+    for name in ("event_id", "selection_rank", "peak_time"):
+        if name not in top_event:
+            raise ValueError(f"Top-event trace is missing metadata variable {name!r}.")
+        if top_event[name].size != 1:
+            raise ValueError(f"Top-event metadata variable {name!r} must be scalar.")
+
+
 def _matched_figure_title(
     negative: xr.Dataset,
     positive: xr.Dataset,
@@ -500,6 +774,46 @@ def _matched_figure_title(
         f"{caliper_label} pooled SD, "
         f"-{pre_days} to +{post_days} days{smoothing_label})"
     )
+
+
+def _top_event_figure_title(
+    reference: xr.Dataset,
+    top_event: xr.Dataset,
+) -> str:
+    region = reference.attrs.get("region", "unknown region")
+    n_events = int(reference.attrs["n_events"])
+    pre_days = reference.attrs.get("pre_days", "?")
+    post_days = reference.attrs.get("post_days", "?")
+    rank = _top_event_scalar_int(top_event, "selection_rank")
+    event_id = _top_event_scalar_int(top_event, "event_id")
+    peak_day = np.datetime_as_string(_top_event_peak_time(top_event), unit="D")
+    smoothing_label = _smoothing_title_label(reference) or ", hourly"
+    return (
+        "Top-event face-resolved advection climatological anomalies "
+        f"for {region} (rank {rank}, event {event_id}, peak {peak_day}, "
+        f"reference n={n_events}, -{pre_days} to +{post_days} days"
+        f"{smoothing_label})"
+    )
+
+
+def _top_event_scalar_int(ds: xr.Dataset, name: str) -> int:
+    value = np.asarray(ds[name].values)
+    if value.size != 1:
+        raise ValueError(f"Top-event metadata variable {name!r} must be scalar.")
+    result = int(value.reshape(-1)[0])
+    if result < 1:
+        raise ValueError(f"Top-event metadata variable {name!r} must be positive.")
+    return result
+
+
+def _top_event_peak_time(ds: xr.Dataset) -> np.datetime64:
+    value = np.asarray(ds["peak_time"].values).astype("datetime64[ns]")
+    if value.size != 1:
+        raise ValueError("Top-event peak_time must be scalar.")
+    result = value.reshape(-1)[0]
+    if np.isnat(result):
+        raise ValueError("Top-event peak_time must be finite.")
+    return result
 
 
 def _figure_title(ds: xr.Dataset) -> str:
