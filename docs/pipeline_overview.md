@@ -58,10 +58,10 @@ Product Stage 1: harmonized regional time series
 
 Product Stage 1
   |-> temporal composites, top events, threshold, diurnal, and event summaries
-  `-> all-event-reference plus top-event face-advection absolute figures
-
-Product Stage 1 + regional hourly climatology
-  `-> all-event-reference plus top-event face-advection anomaly figures
+  |-> all-event-reference plus top-event face-advection absolute figures
+  `-> regional hourly climatology
+        |-> climatological-anomaly composites and top events
+        `-> all-event-reference plus top-event face-advection anomaly figures
 
 Product Stage 2: event-feature table + tracked matching settings
   |-> in-memory I_dyn_pre sign matching -> matched-population diagnostics
@@ -72,7 +72,7 @@ Product Stage 2: event-feature table + tracked matching settings
 | Product stage | Durable artifact | Producer | Main consumers |
 | --- | --- | --- | --- |
 | Stage 1 | `results/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_stage1_harmonized_timeseries.py` | event features, baseline features, composites, top-event plots |
-| Stage 1 companion | `results/stage1_climatology/regional_hourly_climatology_*.nc` | `scripts/build_stage1_hourly_climatology.py` | climatological-anomaly composites and face-advection diagnostics |
+| Stage 1 companion | `results/stage1_climatology/regional_hourly_climatology_*.nc` | `scripts/build_stage1_hourly_climatology.py` | climatological-anomaly composites, top-event traces, and face-advection diagnostics |
 | Stage 2 | event-feature table | `scripts/event_features/build_stage2_event_features.py` | feature plots, event comparisons, exploratory diagnostics |
 | Stage 2 | baseline-day feature table | `scripts/event_features/build_stage2_baseline_features.py` | event/baseline comparisons, exploratory diagnostics |
 
@@ -140,6 +140,7 @@ HW_analysis/
 |   |-- build_stage1_hourly_climatology.py
 |   |-- plot_composite_timeseries_all_clim_anom.py
 |   |-- plot_composite_timeseries_split_clim_anom.py
+|   |-- plot_top_events_clim_anom.py
 |   |-- plot_advection_direction_exploration_clim_anom.py
 |   |-- plot_advection_direction_exploration_matched_clim_anom.py
 |   |-- plot_advection_direction_exploration_top_events.py

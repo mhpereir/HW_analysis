@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 import xarray as xr
-
 from HW_analysis.scripts.spatial_composites import (
     plot_dyn_net_spatial_composites as plotter,
 )

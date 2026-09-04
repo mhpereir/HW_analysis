@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 import xarray as xr
-
 from HW_analysis.src import config, diagnostics
 
 

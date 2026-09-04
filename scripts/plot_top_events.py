@@ -1,8 +1,8 @@
 """Plot top-event diagnostics from the saved Stage-1 harmonized dataset.
 
 This script consumes the harmonized regional time-series product written by
-``build_stage1_harmonized_timeseries.py``. Event ranking and plotting will be layered on
-top of this Stage-2 entrypoint.
+``build_stage1_harmonized_timeseries.py``. It selects ranked events from the
+saved Stage-1 event table and renders their absolute-time traces.
 """
 
 from __future__ import annotations
@@ -87,6 +87,18 @@ def parse_args() -> argparse.Namespace:
         description="Plot top-event diagnostics from a harmonized Stage-1 dataset."
     )
     plot_paths.add_stage1_path_arguments(parser)
+    add_top_event_plot_arguments(parser)
+    args = parser.parse_args()
+    plot_name = _default_plot_name(args.layout)
+    return plot_paths.finalize_stage1_plot_paths(
+        args,
+        parser,
+        plot_name=plot_name,
+    )
+
+
+def add_top_event_plot_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add output, ranking, window, smoothing, and layout arguments."""
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -121,13 +133,6 @@ def parse_args() -> argparse.Namespace:
         choices=plotting.COMPOSITE_LAYOUTS,
         default=plotting.PAPER_COMPOSITE_LAYOUT,
         help="Figure layout. Presentation uses a widescreen six-panel grid.",
-    )
-    args = parser.parse_args()
-    plot_name = _default_plot_name(args.layout)
-    return plot_paths.finalize_stage1_plot_paths(
-        args,
-        parser,
-        plot_name=plot_name,
     )
 
 
@@ -188,10 +193,12 @@ def write_top_event_plots(
     selected_events: xr.Dataset,
     *,
     output_dir: Path,
+    event_table: xr.Dataset | None = None,
     window_days: int = DEFAULT_WINDOW_DAYS,
     smoothing_window: int = DEFAULT_SMOOTHING_WINDOW,
     plot_extended_variables: bool = False,
     layout: str = plotting.PAPER_COMPOSITE_LAYOUT,
+    filename_tag: str | None = None,
 ) -> list[Path]:
     """Write raw and display-smoothed time-series figures per selected event."""
     if window_days < 0:
@@ -209,13 +216,19 @@ def write_top_event_plots(
         plot_extended_variables,
         layout,
     )
+    reference_kwargs: dict[str, object] = {
+        "variables": variables,
+        "pre_days": window_days,
+        "post_days": window_days,
+        "event_percentiles": REFERENCE_EVENT_PERCENTILES,
+    }
+    if event_table is not None:
+        reference_kwargs["event_table"] = event_table
     reference_composite = composites.all_event_peak_aligned_composite(
         ds,
-        variables=variables,
-        pre_days=window_days,
-        post_days=window_days,
-        event_percentiles=REFERENCE_EVENT_PERCENTILES,
+        **reference_kwargs,
     )
+    reference_composite.attrs.update(ds.attrs)
     smoothed_reference_composite = plotting.smooth_composite_for_display(
         reference_composite,
         variables=smoothed_variables,
@@ -231,7 +244,11 @@ def write_top_event_plots(
             plot_extended_variables=plot_extended_variables,
             layout=layout,
         )
-        path = output_dir / _event_figure_filename(event, layout)
+        path = output_dir / _event_figure_filename(
+            event,
+            layout,
+            filename_tag=filename_tag,
+        )
         plot_style.save_figure(fig, path)
         plt.close(fig)
         written.append(path)
@@ -245,7 +262,11 @@ def write_top_event_plots(
             plot_extended_variables=plot_extended_variables,
             layout=layout,
         )
-        path = output_dir / _smoothed_event_figure_filename(event, layout)
+        path = output_dir / _smoothed_event_figure_filename(
+            event,
+            layout,
+            filename_tag=filename_tag,
+        )
         plot_style.save_figure(fig, path)
         plt.close(fig)
         written.append(path)
@@ -294,6 +315,8 @@ def _event_time_value(event: xr.Dataset, name: str) -> np.datetime64:
 def _event_figure_filename(
     event: xr.Dataset,
     layout: str = plotting.PAPER_COMPOSITE_LAYOUT,
+    *,
+    filename_tag: str | None = None,
 ) -> str:
     """Return a stable filename for one selected event figure."""
     event_id = int(event["event_id"].item())
@@ -302,21 +325,32 @@ def _event_figure_filename(
     )
     peak_time = _event_time_value(event, "peak_time")
     peak_day = np.datetime_as_string(peak_time, unit="D")
+    tag_suffix = (
+        f"_{plot_paths.filename_token(filename_tag)}"
+        if filename_tag is not None
+        else ""
+    )
     presentation_suffix = (
         "_presentation" if layout == plotting.PRESENTATION_COMPOSITE_LAYOUT else ""
     )
     return (
         f"top_event_rank_{rank:02d}_event_{event_id:04d}_{peak_day}"
-        f"{presentation_suffix}.png"
+        f"{tag_suffix}{presentation_suffix}.png"
     )
 
 
 def _smoothed_event_figure_filename(
     event: xr.Dataset,
     layout: str = plotting.PAPER_COMPOSITE_LAYOUT,
+    *,
+    filename_tag: str | None = None,
 ) -> str:
     """Return a stable filename for one display-smoothed selected event figure."""
-    raw_name = _event_figure_filename(event, layout)
+    raw_name = _event_figure_filename(
+        event,
+        layout,
+        filename_tag=filename_tag,
+    )
     stem = Path(raw_name).stem
     return f"{stem}_smoothed.png"
 

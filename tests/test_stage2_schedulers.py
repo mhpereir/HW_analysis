@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULERS = {
     "event": REPO_ROOT / "schedulers" / "schedule_build_stage2_event_features.sh",

@@ -11,7 +11,6 @@ from typing import Any
 import numpy as np
 import xarray as xr
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -19,7 +18,6 @@ if str(REPO_ROOT) not in sys.path:
 from scripts.event_features import event_feature_config as config
 from scripts.event_features import fixed_window_features as fixed
 from src import analysis_io, selectors
-
 
 SURFACE_FLUX_FEATURES = frozenset({"I_sshf_pre", "I_slhf_pre"})
 

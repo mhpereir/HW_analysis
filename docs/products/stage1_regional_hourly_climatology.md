@@ -114,6 +114,11 @@ it must mark the dataset and variables explicitly as climatological anomalies.
 PBL variables are excluded from the active climatology contract under
 [decision 008](../decisions/008_retire_pbl_diagnostics.md).
 
+Before application, consumers must verify that the Stage-1 source and
+climatology companion agree on region, heat-budget boundaries, and Stage-1
+contract version. A companion from another region must be rejected even when
+it happens to contain the same calendar-hour keys and variables.
+
 ## Required metadata
 
 ```text
@@ -137,6 +142,8 @@ product path.
 - `climatology_time` is unique, strictly increasing, and contains every source
   month-day-hour key exactly once.
 - Every source timestamp maps to one climatology key.
+- The source and companion region, heat-budget boundaries, and Stage-1
+  contract version agree.
 - No source year contains duplicate values for a calendar-hour key.
 - Counts are positive. The current production input has count 85 for every
   required variable and key.

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import matplotlib
 import xarray as xr
@@ -12,16 +12,16 @@ import xarray as xr
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.spatial_composites import (  # noqa: E402
+from scripts.spatial_composites import (
     build_matched_dyn_pre_spatial_composites as matched_builder,
+)
+from scripts.spatial_composites import (
     plot_dyn_net_spatial_composites as spatial_plotter,
 )
-
 
 DEFAULT_INPUT_PATH = matched_builder.DEFAULT_OUTPUT_PATH
 DEFAULT_OUTPUT_PATH = (

@@ -5,10 +5,10 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from matplotlib.axes import Axes
 
 import matplotlib
 import numpy as np
+from matplotlib.axes import Axes
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

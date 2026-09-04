@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
-
 from HW_analysis.scripts.spatial_composites import (
     build_dyn_net_spatial_composites as builder,
 )

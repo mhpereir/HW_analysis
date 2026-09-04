@@ -16,6 +16,7 @@ trajectories. They are workflows and diagnostics, not product stages.
 scripts/plot_composite_timeseries_all.py
 scripts/plot_composite_timeseries_split.py
 scripts/plot_top_events.py
+scripts/plot_top_events_clim_anom.py
 scripts/plot_composite_timeseries_all_clim_anom.py
 scripts/plot_composite_timeseries_split_clim_anom.py
 scripts/plot_advection_direction_exploration_clim_anom.py
@@ -57,15 +58,18 @@ Across all presentation temporal plots, the left column is ordered as
 anticyclonic and cyclonic LWA, temperature, then temperature tendency. The
 right column remains advection, adiabatic heating, then diabatic heating.
 
-The top-event entrypoint supports the same `paper` and `presentation` layout
-choices. Its presentation view preserves top-event ranking, absolute-time
-event windows, event-boundary and peak markers, the all-event mean and IQR
-reference, and raw plus 24-hour-smoothed output semantics. It changes only the
-variables and panel arrangement used for rendering. Presentation top-event
-figures use a separate `top_events_presentation` output namespace and include
-`presentation` in their default filenames.
+The absolute and climatological-anomaly top-event entrypoints support the same
+`paper` and `presentation` layout choices. Their presentation views preserve
+top-event ranking, absolute-time event windows, event-boundary and peak
+markers, the all-event mean and IQR reference, and raw plus 24-hour-smoothed
+output semantics. They change only the data representation, variables, and
+panel arrangement used for rendering. Climatological-anomaly top-event
+figures retain ranking and event metadata from absolute Stage 1, while both
+the individual traces and all-event reference are calculated from anomalies.
+Every layout and representation uses a separate output namespace and filename
+token.
 
-The five temporal plotting Venus schedulers expose the same choice through
+The six temporal plotting Venus schedulers expose the same choice through
 `PLOT_LAYOUT`. Its default is `paper`, which retains the extended ten-panel
 production figures. Set `PLOT_LAYOUT=presentation` to pass the six-panel
 layout without the mutually exclusive extended-panel flag.
@@ -125,6 +129,7 @@ The Venus scheduler wrappers are likewise one operation per PBS job:
 ```text
 schedulers/schedule_plot_composite_timeseries_all_clim_anom.sh
 schedulers/schedule_plot_composite_timeseries_split_clim_anom.sh
+schedulers/schedule_plot_top_events_clim_anom.sh
 schedulers/schedule_plot_advection_direction_exploration.sh
 schedulers/schedule_plot_advection_direction_exploration_clim_anom.sh
 schedulers/schedule_plot_advection_direction_exploration_matched_clim_anom.sh
@@ -138,6 +143,11 @@ The two all-event schedulers and the two split-event schedulers
 accept the same regional, boundary, threshold, year, lag-window, smoothing, and
 output/log configuration at submission time. They do not build prerequisites
 inside plotting jobs.
+
+The climatological-anomaly top-event scheduler likewise requires explicit
+Stage-1, climatology, output-directory, and log paths. It defaults to the full
+5x2 paper layout and writes one raw and one 24-hour-smoothed figure for every
+selected event without overwriting the absolute top-event namespace.
 
 The five face-resolved advection schedulers preflight, stage, validate, and
 publish both the unsmoothed and smoothed PNGs as one no-overwrite operation.

@@ -4,7 +4,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 import xarray as xr
-
 from HW_analysis.scripts.event_features import plot_event_feature_split as plot_split
 
 

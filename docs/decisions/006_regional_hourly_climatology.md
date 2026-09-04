@@ -29,6 +29,12 @@ Dedicated `_clim_anom.py` entrypoints consume the climatology companion and
 write separate anomaly figures. Stage 1 remains a single standard product and
 does not receive appended climatology or anomaly variables.
 
+Top-event climatological-anomaly figures retain event membership, ranking,
+event boundaries, and peak timestamps from the absolute Stage-1 event table.
+Only the plotted timestamp-level variables and their all-event reference
+distribution are anomalized. The figure title identifies the climatology
+period and makes clear that the displayed rank and peak TAS are absolute.
+
 ## Deferred sensitivity analyses
 
 - a centered evolving climate-normal baseline;

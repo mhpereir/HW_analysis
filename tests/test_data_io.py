@@ -1,7 +1,6 @@
 import numpy as np
-import xarray as xr
 import pytest
-
+import xarray as xr
 from HW_analysis.src import data_io
 
 

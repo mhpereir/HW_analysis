@@ -28,7 +28,6 @@ import xarray as xr
 
 from . import config
 
-
 DEFAULT_TAS_CHUNKS: dict[str, int] = {"time": 365}
 DEFAULT_LWA_CHUNKS: dict[str, int] = {"time": 3650, "lat": 35, "lon": 180}
 DEFAULT_THRESHOLD_CHUNKS: dict[str, int] = {"dayofyear": 365}
@@ -98,7 +97,7 @@ def open_era5_lwa(
 def open_era5_lwa_threshold(
     *,
     region: str,
-    quantile: str | int | float,
+    quantile: str | float,
     zg_level: int = 500,
     chunks: Mapping[str, int] | None = None,
 ) -> xr.Dataset:
@@ -116,7 +115,7 @@ def open_era5_lwa_threshold(
 def open_era5_hw_threshold(
     *,
     region: str,
-    quantile: str | int | float,
+    quantile: str | float,
     method: str = "evolving",
     years: Sequence[int] | None = None,
     chunks: Mapping[str, int] | None = None,
@@ -362,13 +361,13 @@ def open_era5_total_cloud_cover(
     return ds
 
 
-def _normalize_quantile_token(quantile: str | int | float) -> str:
+def _normalize_quantile_token(quantile: str | float) -> str:
     """Return the quantile token used in filenames."""
     if isinstance(quantile, str):
         token = quantile.strip()
         if not token:
             raise ValueError("Quantile token cannot be empty.")
-        return token[1:] if token.startswith("q") else token
+        return token.removeprefix("q")
 
     if isinstance(quantile, int):
         return str(quantile)

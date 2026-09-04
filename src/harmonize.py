@@ -27,7 +27,6 @@ import xarray as xr
 
 from . import advection_direction, diagnostics, preprocess
 
-
 HEAT_BUDGET_VARIABLE_MAP: dict[str, str] = {
     "T_domain_avg": "T_mean",
     "domain_volume": "volume",

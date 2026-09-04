@@ -378,6 +378,7 @@ def plot_top_event_timeseries(
 ) -> Figure:
     """Return an absolute-time figure for one selected event."""
     _validate_composite_layout(layout, plot_extended_variables)
+    _validate_top_event_reference_representation(event_window, reference_composite)
     if layout == PRESENTATION_COMPOSITE_LAYOUT:
         return _plot_presentation_top_event_timeseries(
             event_window,
@@ -819,9 +820,36 @@ def _set_top_event_title(
         if smoothing_window is not None
         else ""
     )
+    representation_label = ""
+    baseline_label = ""
+    peak_label = "peak tas"
+    if _is_climatological_anomaly(event_window):
+        representation_label = " climatological-anomaly"
+        peak_label = "absolute peak tas"
+        start_year = event_window.attrs.get("climatology_start_year")
+        end_year = event_window.attrs.get("climatology_end_year")
+        if start_year is not None and end_year is not None:
+            baseline_label = f" ({int(start_year)}-{int(end_year)} baseline)"
     fig.suptitle(
-        f"Rank {rank} HW event {event_id}: peak tas={peak_value:.2f}{smoothing_label}"
+        f"Rank {rank} HW event {event_id}{representation_label}{baseline_label}: "
+        f"{peak_label}={peak_value:.2f}{smoothing_label}"
     )
+
+
+def _validate_top_event_reference_representation(
+    event_window: xr.Dataset,
+    reference_composite: xr.Dataset | None,
+) -> None:
+    """Prevent absolute and anomaly traces from being rendered together."""
+    if reference_composite is None:
+        return
+    if _is_climatological_anomaly(event_window) != _is_climatological_anomaly(
+        reference_composite
+    ):
+        raise ValueError(
+            "Top-event trace and all-event reference must use the same data "
+            "representation."
+        )
 
 
 def _plot_line(
@@ -1075,7 +1103,10 @@ def _plot_top_event_temperature_volume_panel(
             "T_mean",
             color=VARIABLE_COLORS["T_mean"],
         )
-    ax.set_ylabel("T_mean [K]", color=VARIABLE_COLORS["T_mean"])
+    ax.set_ylabel(
+        _anomaly_axis_label(event_window, "T_mean [K]"),
+        color=VARIABLE_COLORS["T_mean"],
+    )
     ax.tick_params(axis="y", labelcolor=VARIABLE_COLORS["T_mean"])
 
     ax_volume = ax.twinx()
@@ -1096,7 +1127,10 @@ def _plot_top_event_temperature_volume_panel(
             "volume",
             color=VARIABLE_COLORS["volume"],
         )
-    ax_volume.set_ylabel("volume [m2 Pa]", color=VARIABLE_COLORS["volume"])
+    ax_volume.set_ylabel(
+        _anomaly_axis_label(event_window, "volume [m2 Pa]"),
+        color=VARIABLE_COLORS["volume"],
+    )
     ax_volume.tick_params(axis="y", labelcolor=VARIABLE_COLORS["volume"])
 
     lines, labels = ax.get_legend_handles_labels()
@@ -1272,8 +1306,8 @@ def _plot_top_event_single_variable_panel(
         )
     if zero_reference:
         plot_style.zero_line(ax)
-    ax.set_ylabel(ylabel)
-    if absolute_ylim is not None:
+    ax.set_ylabel(_anomaly_axis_label(event_window, ylabel))
+    if absolute_ylim is not None and not _is_climatological_anomaly(event_window):
         ax.set_ylim(*absolute_ylim)
     ax.legend(loc="upper left")
 
@@ -1309,7 +1343,7 @@ def _plot_top_event_multi_variable_panel(
                 color=color,
             )
     plot_style.zero_line(ax)
-    ax.set_ylabel(ylabel)
+    ax.set_ylabel(_anomaly_axis_label(event_window, ylabel))
     ax.legend(loc="upper left")
 
 
@@ -1417,7 +1451,7 @@ def _plot_top_event_tendency_panel(
                 color=color,
             )
     plot_style.zero_line(ax)
-    ax.set_ylabel("[K hr-1]")
+    ax.set_ylabel(_anomaly_axis_label(event_window, "[K hr-1]"))
     _expand_yaxis(ax, factor=1.5)
     ax.legend(loc="upper left", ncol=3)
 
@@ -1493,7 +1527,7 @@ def _plot_top_event_lwa_panel(
                 name,
                 color=color,
             )
-    ax.set_ylabel("LWA [m hPa]")
+    ax.set_ylabel(_anomaly_axis_label(event_window, "LWA [m hPa]"))
     ax.legend(loc="upper left")
 
 

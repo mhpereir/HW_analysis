@@ -3,22 +3,20 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections import defaultdict
 from collections.abc import Mapping
 from pathlib import Path
-import sys
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src import config  # noqa: E402
-
+from src import config
 
 DEFAULT_EVENT_FEATURES_PATH = (
     REPO_ROOT

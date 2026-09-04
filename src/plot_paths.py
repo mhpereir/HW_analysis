@@ -7,7 +7,6 @@ from pathlib import Path
 
 from . import analysis_io, data_io
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 

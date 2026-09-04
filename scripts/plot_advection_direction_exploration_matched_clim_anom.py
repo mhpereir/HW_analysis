@@ -15,8 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-
-from scripts.Idyn_matching_exploration import matching_settings
+from scripts.idyn_matching_exploration import matching_settings
 from src import (
     advection_direction,
     advection_direction_plotting,

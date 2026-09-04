@@ -3,16 +3,32 @@ import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCHEDULERS = (
-    REPO_ROOT / "schedulers" / "schedule_build_stage1_hourly_climatology.sh",
+CLIMATOLOGY_BUILDER_SCHEDULER = (
+    REPO_ROOT / "schedulers" / "schedule_build_stage1_hourly_climatology.sh"
+)
+COMPOSITE_ANOMALY_SCHEDULERS = (
     REPO_ROOT / "schedulers" / "schedule_plot_composite_timeseries_all_clim_anom.sh",
     REPO_ROOT / "schedulers" / "schedule_plot_composite_timeseries_split_clim_anom.sh",
+)
+ADVECTION_ANOMALY_SCHEDULERS = (
     REPO_ROOT
     / "schedulers"
     / "schedule_plot_advection_direction_exploration_clim_anom.sh",
     REPO_ROOT
     / "schedulers"
     / "schedule_plot_advection_direction_exploration_matched_clim_anom.sh",
+)
+TOP_EVENT_ANOMALY_SCHEDULER = (
+    REPO_ROOT / "schedulers" / "schedule_plot_top_events_clim_anom.sh"
+)
+ANOMALY_PLOT_SCHEDULERS = (
+    *COMPOSITE_ANOMALY_SCHEDULERS,
+    *ADVECTION_ANOMALY_SCHEDULERS,
+    TOP_EVENT_ANOMALY_SCHEDULER,
+)
+SCHEDULERS = (
+    CLIMATOLOGY_BUILDER_SCHEDULER,
+    *ANOMALY_PLOT_SCHEDULERS,
 )
 ABSOLUTE_PLOT_SCHEDULERS = (
     REPO_ROOT / "schedulers" / "schedule_composite_timeseries_all.sh",
@@ -21,8 +37,8 @@ ABSOLUTE_PLOT_SCHEDULERS = (
 )
 TEMPORAL_COMPOSITE_SCHEDULERS = (
     *ABSOLUTE_PLOT_SCHEDULERS,
-    SCHEDULERS[1],
-    SCHEDULERS[2],
+    *COMPOSITE_ANOMALY_SCHEDULERS,
+    TOP_EVENT_ANOMALY_SCHEDULER,
 )
 TOP_EVENT_ADVECTION_SCHEDULER = (
     REPO_ROOT
@@ -91,7 +107,7 @@ def test_temporal_composite_schedulers_support_presentation_layout():
 
 
 def test_climatology_builder_requires_explicit_products():
-    text = SCHEDULERS[0].read_text()
+    text = CLIMATOLOGY_BUILDER_SCHEDULER.read_text()
 
     assert 'INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"' in text
     assert 'OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"' in text
@@ -99,21 +115,33 @@ def test_climatology_builder_requires_explicit_products():
     assert "refusing to overwrite" in text
 
 
-def test_anomaly_plot_schedulers_require_stage1_climatology_and_output():
-    for scheduler in SCHEDULERS[1:]:
+def test_anomaly_plot_schedulers_require_stage1_and_climatology():
+    for scheduler in ANOMALY_PLOT_SCHEDULERS:
         text = scheduler.read_text()
         assert 'INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"' in text
         assert (
             'CLIMATOLOGY_PATH="${CLIMATOLOGY_PATH:?CLIMATOLOGY_PATH is required}"'
             in text
         )
-        assert 'OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"' in text
         assert '--input-path "${INPUT_PATH}"' in text
         assert '--climatology-path "${CLIMATOLOGY_PATH}"' in text
 
 
+def test_anomaly_plot_schedulers_require_non_overwriting_outputs():
+    for scheduler in (*COMPOSITE_ANOMALY_SCHEDULERS, *ADVECTION_ANOMALY_SCHEDULERS):
+        text = scheduler.read_text()
+        assert 'OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"' in text
+
+    text = TOP_EVENT_ANOMALY_SCHEDULER.read_text()
+    assert 'OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR is required}"' in text
+    assert 'test ! -e "${OUTPUT_DIR}"' in text
+    assert 'test -d "${OUTPUT_DIR}"' in text
+    assert "expected_png_count=$((2 * TOP_N))" in text
+    assert 'test "${actual_png_count}" -eq "${expected_png_count}"' in text
+
+
 def test_matched_advection_scheduler_requires_stage2_settings_and_atomic_output():
-    text = SCHEDULERS[4].read_text()
+    text = ADVECTION_ANOMALY_SCHEDULERS[1].read_text()
 
     assert (
         'EVENT_FEATURES_PATH="${EVENT_FEATURES_PATH:?EVENT_FEATURES_PATH is required}"'
@@ -137,7 +165,7 @@ def test_matched_advection_scheduler_requires_stage2_settings_and_atomic_output(
 
 
 def test_advection_anomaly_schedulers_publish_raw_and_smoothed_outputs():
-    for scheduler in SCHEDULERS[3:]:
+    for scheduler in ADVECTION_ANOMALY_SCHEDULERS:
         text = scheduler.read_text()
         assert 'REGION="${REGION:?REGION is required}"' in text
         expected_defaults = {
@@ -184,7 +212,7 @@ def test_advection_anomaly_schedulers_publish_raw_and_smoothed_outputs():
 
 
 def test_split_anomaly_scheduler_matches_absolute_production_split_matrix():
-    text = SCHEDULERS[2].read_text()
+    text = COMPOSITE_ANOMALY_SCHEDULERS[1].read_text()
     absolute_text = (
         REPO_ROOT / "schedulers" / "schedule_composite_timeseries_split.sh"
     ).read_text()
@@ -203,7 +231,7 @@ def test_split_anomaly_scheduler_matches_absolute_production_split_matrix():
 
 
 def test_split_anomaly_scheduler_accepts_regional_plot_configuration():
-    text = SCHEDULERS[2].read_text()
+    text = COMPOSITE_ANOMALY_SCHEDULERS[1].read_text()
 
     expected_defaults = {
         "REGION": "pnw_bartusek",
@@ -235,7 +263,7 @@ def test_split_anomaly_scheduler_accepts_regional_plot_configuration():
 
 
 def test_all_anomaly_scheduler_accepts_regional_plot_configuration():
-    text = SCHEDULERS[1].read_text()
+    text = COMPOSITE_ANOMALY_SCHEDULERS[0].read_text()
 
     expected_defaults = {
         "REGION": "pnw_bartusek",
@@ -271,8 +299,45 @@ def test_all_anomaly_scheduler_accepts_regional_plot_configuration():
     assert 'test -s "${SMOOTHED_OUTPUT_PATH}"' in text
 
 
+def test_top_event_anomaly_scheduler_accepts_regional_plot_configuration():
+    text = TOP_EVENT_ANOMALY_SCHEDULER.read_text()
+
+    expected_defaults = {
+        "REGION": "pnw_bartusek",
+        "BOTTOM_BOUNDARY": "surface",
+        "TOP_BOUNDARY": "700",
+        "THRESHOLD_VARIABLE": "tas",
+        "QUANTILE": "90",
+        "TIME_START": "1940",
+        "TIME_END": "2024",
+        "TOP_N": "10",
+        "WINDOW_DAYS": "7",
+        "SMOOTHING_WINDOW": "24",
+    }
+    for variable, default in expected_defaults.items():
+        assert f'{variable}="${{{variable}:-{default}}}"' in text
+
+    expected_arguments = {
+        "region": "REGION",
+        "bottom-boundary": "BOTTOM_BOUNDARY",
+        "top-boundary": "TOP_BOUNDARY",
+        "threshold-variable": "THRESHOLD_VARIABLE",
+        "quantile": "QUANTILE",
+        "start-year": "TIME_START",
+        "end-year": "TIME_END",
+        "top-n": "TOP_N",
+        "window-days": "WINDOW_DAYS",
+        "smoothing-window": "SMOOTHING_WINDOW",
+    }
+    for argument, variable in expected_arguments.items():
+        assert f'--{argument} "${{{variable}}}"' in text
+
+    assert "plot_top_events_clim_anom.py" in text
+    assert "export PYTHONWARNINGS=error" in text
+
+
 def test_split_anomaly_scheduler_preflights_and_validates_all_outputs():
-    text = SCHEDULERS[2].read_text()
+    text = COMPOSITE_ANOMALY_SCHEDULERS[1].read_text()
 
     assert 'for split_variable in "${split_variable_list[@]}" peak_time; do' in text
     assert 'for split_variable in "${split_variable_list[@]}"; do' in text

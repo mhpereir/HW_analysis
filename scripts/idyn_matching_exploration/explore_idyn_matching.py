@@ -8,12 +8,12 @@ unmatched sign populations with deterministic one-to-one optimal matches.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import hashlib
 import json
-from pathlib import Path
 import sys
-from typing import Mapping
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
 
 import matplotlib
 
@@ -23,14 +23,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.Idyn_matching_exploration import matching_settings  # noqa: E402
-from src import plot_style, selectors  # noqa: E402
-
+from scripts.idyn_matching_exploration import matching_settings
+from src import plot_style, selectors
 
 DEFAULT_INPUT_PATH = (
     REPO_ROOT
