@@ -1,4 +1,5 @@
-"""Plot ranked top-event face-advection climatological-anomaly overlays."""
+#!/usr/bin/env python3
+"""Plot ranked top-event face-advection values against an all-event mean."""
 
 from __future__ import annotations
 
@@ -17,28 +18,23 @@ from src import (
     advection_direction_plotting,
     advection_direction_top_events,
     analysis_io,
-    climatology,
     plot_paths,
 )
 
-PLOT_NAME = "advection_direction_exploration_top_events_clim_anom"
+PLOT_NAME = "advection_direction_exploration_top_events"
 DEFAULT_TOP_N = advection_direction_top_events.DEFAULT_TOP_N
 DEFAULT_WINDOW_DAYS = advection_direction_top_events.DEFAULT_WINDOW_DAYS
 DEFAULT_RANK_METRIC = advection_direction_top_events.DEFAULT_RANK_METRIC
-select_reference_events = advection_direction_top_events.select_reference_events
-select_top_tas_events = advection_direction_top_events.select_top_tas_events
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse Stage-1, climatology, event-selection, and output arguments."""
+    """Parse Stage-1, event-selection, and output arguments."""
     parser = argparse.ArgumentParser(
         description=(
-            "Plot ranked top-event face-advection climatological anomalies "
-            "against the all-event anomaly mean."
+            "Plot ranked top-event face-advection values against the all-event mean."
         )
     )
     plot_paths.add_stage1_path_arguments(parser)
-    parser.add_argument("--climatology-path", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument(
         "--top-n",
@@ -62,21 +58,13 @@ def parse_args() -> argparse.Namespace:
         parser,
         plot_name=PLOT_NAME,
     )
-    if args.climatology_path is None:
-        args.climatology_path = analysis_io.default_regional_hourly_climatology_path(
-            region=args.region,
-            bottom_boundary=args.bottom_boundary,
-            top_boundary=args.top_boundary,
-            start_year=args.start_year,
-            end_year=args.end_year,
-        )
-    args.climatology_path = args.climatology_path.expanduser().resolve()
+    args.input_path = args.input_path.expanduser().resolve()
     args.output_dir = args.output_dir.expanduser().resolve()
     return args
 
 
 def validate_args(args: argparse.Namespace) -> None:
-    """Validate top-event anomaly plotting arguments."""
+    """Validate raw top-event plotting arguments."""
     advection_direction_top_events.validate_options(
         top_n=args.top_n,
         window_days=args.window_days,
@@ -86,26 +74,19 @@ def validate_args(args: argparse.Namespace) -> None:
     )
 
 
-def build_top_event_anomaly_inputs(
+def build_top_event_inputs(
     stage1: xr.Dataset,
-    climate: xr.Dataset,
     *,
     top_n: int = DEFAULT_TOP_N,
     window_days: int = DEFAULT_WINDOW_DAYS,
     season_months: list[int] | None = None,
     require_full_event: bool = False,
 ) -> tuple[xr.Dataset, xr.Dataset]:
-    """Build the all-event anomaly mean and ranked event anomaly windows."""
-    variables = advection_direction_top_events.top_event_variables(stage1)
-    anomaly_source = climatology.apply_regional_hourly_climatology(
-        stage1,
-        climate,
-        variables=variables,
-    )
+    """Build the all-event mean and ranked raw Stage-1 event windows."""
     return advection_direction_top_events.build_top_event_inputs(
-        anomaly_source,
         stage1,
-        data_representation="climatological_anomaly",
+        stage1,
+        data_representation="absolute",
         top_n=top_n,
         window_days=window_days,
         season_months=season_months,
@@ -114,23 +95,19 @@ def build_top_event_anomaly_inputs(
 
 
 def main() -> int:
-    """Build anomaly overlays and write hourly and smoothed top-event figures."""
+    """Build raw overlays and write hourly and smoothed top-event figures."""
     args = parse_args()
     validate_args(args)
     _require_new_output_dir(args.output_dir)
     stage1 = analysis_io.open_harmonized_timeseries(args.input_path)
-    climate = analysis_io.open_regional_hourly_climatology(args.climatology_path)
     try:
-        reference, event_windows = build_top_event_anomaly_inputs(
+        reference, event_windows = build_top_event_inputs(
             stage1,
-            climate,
             top_n=args.top_n,
             window_days=args.window_days,
             season_months=args.season_months,
             require_full_event=args.require_full_event,
         )
-        reference.attrs["climatology_path"] = str(args.climatology_path)
-        event_windows.attrs["climatology_path"] = str(args.climatology_path)
         written = advection_direction_plotting.write_top_event_advection_direction_exploration_outputs(
             reference,
             event_windows,
@@ -138,12 +115,9 @@ def main() -> int:
             smoothing_window=args.smoothing_window,
         )
     finally:
-        climate.close()
         stage1.close()
 
-    print(
-        f"Wrote {len(written)} top-event face-advection climatological-anomaly plots:"
-    )
+    print(f"Wrote {len(written)} top-event face-advection absolute plots:")
     for path in written:
         print(f"  {path}")
     return 0
@@ -152,7 +126,7 @@ def main() -> int:
 def _require_new_output_dir(output_dir: Path) -> None:
     if output_dir.exists():
         raise FileExistsError(
-            f"Top-event anomaly output directory already exists: {output_dir}."
+            f"Top-event absolute output directory already exists: {output_dir}."
         )
 
 

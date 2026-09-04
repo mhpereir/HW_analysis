@@ -57,7 +57,8 @@ Product Stage 1: harmonized regional time series
         `-> dynamical-sign spatial composites
 
 Product Stage 1
-  `-> temporal composites, top events, threshold, diurnal, and event summaries
+  |-> temporal composites, top events, threshold, diurnal, and event summaries
+  `-> all-event-reference plus top-event face-advection absolute figures
 
 Product Stage 1 + regional hourly climatology
   `-> all-event-reference plus top-event face-advection anomaly figures
@@ -141,6 +142,8 @@ HW_analysis/
 |   |-- plot_composite_timeseries_split_clim_anom.py
 |   |-- plot_advection_direction_exploration_clim_anom.py
 |   |-- plot_advection_direction_exploration_matched_clim_anom.py
+|   |-- plot_advection_direction_exploration_top_events.py
+|   |-- plot_advection_direction_exploration_top_events_clim_anom.py
 |   |-- region_vis/
 |   |   |-- plot_stage1_regions.py
 |   |   `-- schedule_plot_stage1_regions.sh

@@ -89,7 +89,6 @@ def test_build_inputs_uses_filtered_absolute_events_for_rank_and_reference(
 ):
     stage1 = _make_stage1()
     climate = xr.Dataset()
-    filtered = stage1.isel(event=[0, 2])
     anomaly_source = stage1.copy(deep=True)
     anomaly_source.attrs["data_representation"] = "climatological_anomaly"
     reference = xr.Dataset(attrs={"n_events": 2})
@@ -102,37 +101,23 @@ def test_build_inputs_uses_filtered_absolute_events_for_rank_and_reference(
     )
     captured = {}
 
-    def fake_season(source, months, *, require_full_event):
-        captured["season"] = (source, months, require_full_event)
-        return filtered
-
     def fake_apply(source, climatology, *, variables):
         captured["apply"] = (source, climatology, variables)
         return anomaly_source
 
-    def fake_reference(source, **kwargs):
-        captured["reference"] = (source, kwargs)
-        return reference
+    def fake_build(plot_source, absolute_stage1, **kwargs):
+        captured["build"] = (plot_source, absolute_stage1, kwargs)
+        return reference, stacked
 
-    def fake_stack(source, event_table, **kwargs):
-        captured["stack"] = (source, event_table, kwargs)
-        return stacked
-
-    monkeypatch.setattr(script.selectors, "select_events_by_season", fake_season)
     monkeypatch.setattr(
         script.climatology,
         "apply_regional_hourly_climatology",
         fake_apply,
     )
     monkeypatch.setattr(
-        script.composites,
-        "all_event_peak_aligned_composite",
-        fake_reference,
-    )
-    monkeypatch.setattr(
-        script.composites,
-        "stack_events_centered_on_peak",
-        fake_stack,
+        script.advection_direction_top_events,
+        "build_top_event_inputs",
+        fake_build,
     )
 
     out_reference, out_events = script.build_top_event_anomaly_inputs(
@@ -144,7 +129,6 @@ def test_build_inputs_uses_filtered_absolute_events_for_rank_and_reference(
         require_full_event=True,
     )
 
-    assert captured["season"] == (stage1, [6, 7, 8], True)
     apply_source, apply_climate, variables = captured["apply"]
     assert apply_source is stage1
     assert apply_climate is climate
@@ -156,21 +140,18 @@ def test_build_inputs_uses_filtered_absolute_events_for_rank_and_reference(
         "advection_north",
         "advection_top",
     )
-    reference_source, reference_kwargs = captured["reference"]
-    assert reference_source is anomaly_source
-    assert reference_kwargs["event_table"] is filtered
-    assert reference_kwargs["event_percentiles"] is None
-    assert reference_kwargs["pre_days"] == 5
-    stack_source, ranked_events, stack_kwargs = captured["stack"]
-    assert stack_source is anomaly_source
-    np.testing.assert_array_equal(ranked_events["event_id"].values, [3, 1])
-    np.testing.assert_array_equal(ranked_events["selection_rank"].values, [1, 2])
-    assert stack_kwargs["pre_days"] == 5
+    plot_source, absolute_source, build_kwargs = captured["build"]
+    assert plot_source is anomaly_source
+    assert absolute_source is stage1
+    assert build_kwargs == {
+        "data_representation": "climatological_anomaly",
+        "top_n": 2,
+        "window_days": 5,
+        "season_months": [6, 7, 8],
+        "require_full_event": True,
+    }
     assert out_reference is reference
     assert out_events is stacked
-    assert out_reference.attrs["data_representation"] == "climatological_anomaly"
-    assert out_events.attrs["top_event_reference_event_count"] == 2
-    assert out_events.attrs["top_event_selected_count"] == 2
 
 
 def test_require_new_output_dir_rejects_existing_directory(tmp_path):

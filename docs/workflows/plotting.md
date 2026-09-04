@@ -45,6 +45,7 @@ results/plots_<plot_name>/
 | Stage 1 | all-event and split temporal composites | `scripts/plot_composite_timeseries_all.py`, `scripts/plot_composite_timeseries_split.py` |
 | Stage 1 plus regional hourly climatology | all-event and split climatological-anomaly composites | `scripts/plot_composite_timeseries_all_clim_anom.py`, `scripts/plot_composite_timeseries_split_clim_anom.py` |
 | Stage 1 plus regional hourly climatology | face-resolved advection climatological anomalies | `scripts/plot_advection_direction_exploration_clim_anom.py` |
+| Stage 1 | top-event face-resolved advection values against an all-event reference | `scripts/plot_advection_direction_exploration_top_events.py` |
 | Stage 1 plus regional hourly climatology | top-event face-resolved advection climatological anomalies against an all-event reference | `scripts/plot_advection_direction_exploration_top_events_clim_anom.py` |
 | Stage 1 plus regional hourly climatology, Stage 2 event features, and matching settings | matched face-resolved advection climatological anomalies | `scripts/plot_advection_direction_exploration_matched_clim_anom.py` |
 | Stage 1 | top-event traces | `scripts/plot_top_events.py` |
@@ -94,11 +95,13 @@ figure entrypoints.
   title. Smooth signed face tendencies before deriving grouped curves. For the
   matched figure, smooth each sign population independently. Do not alter event
   membership, climatology subtraction, matching, or source composites.
-- The top-event face-advection climatological-anomaly entrypoint ranks the
-  filtered absolute Stage-1 event table by descending `tas_peak`, with a
-  default of 10 events. For every selected event it overlays the all-event
-  anomaly mean as solid lines and the individual top-event anomaly trace as
-  dashed lines in the existing two-panel face/grouped layout. Component color
+- The raw and climatological-anomaly top-event face-advection entrypoints rank
+  the filtered absolute Stage-1 event table by descending `tas_peak`, with a
+  default of 10 events. For every selected event they overlay the corresponding
+  all-event mean as solid lines and the individual top-event trace as dashed
+  lines in the existing two-panel face/grouped layout. The raw entrypoint plots
+  Stage-1 tendencies directly in `K hr-1`; the anomaly entrypoint subtracts the
+  timestamp-matched hourly climatology and uses anomaly labels. Component color
   remains the identity channel. Hourly and centered 24-hour-smoothed figures
   use separate filenames; smooth the reference and event face tendencies
   independently before deriving grouped curves. Titles and a line-style legend
@@ -255,8 +258,9 @@ For a production figure change, also render a representative product through
 PBS on Venus and inspect the saved artifact, labels, units, panel ordering,
 legibility, and output path.
 
-Synthetic tests for the top-event face-advection variant must verify ranking,
-season-filter propagation, timestamp-level anomaly application, peak-relative
-event extraction, solid-reference and dashed-event line semantics, independent
-display smoothing, grouped-component identities, stable filenames, source-data
-immutability, no-overwrite behavior, and complete scheduler publication.
+Synthetic tests for both top-event face-advection variants must verify ranking,
+season-filter propagation, peak-relative event extraction, solid-reference and
+dashed-event line semantics, independent display smoothing,
+grouped-component identities, stable filenames, source-data immutability,
+no-overwrite behavior, and complete scheduler publication. The anomaly variant
+must additionally verify timestamp-level climatology subtraction.

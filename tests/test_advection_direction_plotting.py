@@ -275,6 +275,53 @@ def test_top_event_plot_uses_solid_reference_and_dashed_event_lines():
         plt.close(fig)
 
 
+def test_raw_top_event_plot_uses_absolute_labels_and_stable_filename():
+    reference, event_windows = _make_top_event_composites(
+        data_representation="absolute"
+    )
+    top_event = event_windows.isel(event=0, drop=True)
+
+    fig = advection_direction_plotting.plot_top_event_advection_direction_exploration(
+        reference,
+        top_event,
+    )
+    try:
+        assert [ax.get_ylabel() for ax in fig.axes] == ["K hr-1", "K hr-1"]
+        for ax in fig.axes:
+            legend_labels = {text.get_text() for text in ax.get_legend().get_texts()}
+            assert "All-event mean" in legend_labels
+            assert "All-event anomaly mean" not in legend_labels
+        assert "absolute values" in fig._suptitle.get_text()
+        assert advection_direction_plotting.top_event_output_filename(top_event) == (
+            "advection_face_contributions_top_event_rank_01_event_0042_2000-07-02.png"
+        )
+    finally:
+        plt.close(fig)
+
+
+def test_top_event_plot_rejects_mismatched_representations():
+    reference, event_windows = _make_top_event_composites()
+    top_event = event_windows.isel(event=0, drop=True)
+    top_event.attrs["data_representation"] = "absolute"
+
+    with np.testing.assert_raises_regex(ValueError, "same data representation"):
+        advection_direction_plotting._validate_top_event_composites(
+            reference,
+            top_event,
+        )
+
+
+def test_top_event_plot_rejects_unsupported_representation():
+    reference, event_windows = _make_top_event_composites()
+    reference.attrs["data_representation"] = "raw-ish"
+
+    with np.testing.assert_raises_regex(ValueError, "supported"):
+        advection_direction_plotting._validate_top_event_composites(
+            reference,
+            event_windows.isel(event=0, drop=True),
+        )
+
+
 def test_top_event_plot_ignores_unrelated_lag_auxiliary_coordinates():
     reference, event_windows = _make_top_event_composites()
     reference = reference.assign_coords(
@@ -402,6 +449,25 @@ def test_top_event_writer_writes_hourly_and_smoothed_pngs(tmp_path):
 
     assert len(written) == 2
     assert written[1].stem.endswith("_smoothed")
+    assert all(path.stat().st_size > 0 for path in written)
+
+
+def test_raw_top_event_writer_writes_hourly_and_smoothed_pngs(tmp_path):
+    reference, event_windows = _make_top_event_composites(
+        data_representation="absolute"
+    )
+
+    written = advection_direction_plotting.write_top_event_advection_direction_exploration_outputs(
+        reference,
+        event_windows,
+        tmp_path / "top-events-raw",
+        smoothing_window=24,
+    )
+
+    assert [path.name for path in written] == [
+        "advection_face_contributions_top_event_rank_01_event_0042_2000-07-02.png",
+        "advection_face_contributions_top_event_rank_01_event_0042_2000-07-02_smoothed.png",
+    ]
     assert all(path.stat().st_size > 0 for path in written)
 
 
@@ -557,9 +623,10 @@ def _make_matched_composites() -> tuple[xr.Dataset, xr.Dataset]:
 def _make_top_event_composites(
     *,
     n_top_events: int = 1,
+    data_representation: str = "climatological_anomaly",
 ) -> tuple[xr.Dataset, xr.Dataset]:
     reference = _make_composite()
-    reference.attrs["data_representation"] = "climatological_anomaly"
+    reference.attrs["data_representation"] = data_representation
 
     event_windows = []
     for index in range(n_top_events):
