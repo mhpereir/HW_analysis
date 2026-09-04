@@ -1,9 +1,7 @@
 from pathlib import Path
 
 import pytest
-
 from HW_analysis.src import config
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULER = (

@@ -130,7 +130,7 @@ def complete_anchor_mask(
 
 
 class WindowReducer:
-    """Compute inclusive timestamp-window reductions with cached prefix arrays."""
+    """Compute inclusive timestamp-window reductions from cached source values."""
 
     def __init__(self, ds: xr.Dataset, *, time_dim: str = config.TIME_DIM) -> None:
         if time_dim not in ds.coords:
@@ -146,7 +146,7 @@ class WindowReducer:
         self.ds = ds
         self.time_dim = time_dim
         self.time_values = times
-        self._prefix_cache: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        self._source_cache: dict[str, np.ndarray] = {}
 
     def complete_anchor_mask(
         self,
@@ -243,40 +243,42 @@ class WindowReducer:
         *,
         operation: str,
     ) -> np.ndarray:
-        prefix_sum, prefix_count = self._prefix_arrays(source_name)
-        sums = prefix_sum[right] - prefix_sum[left]
-        counts = prefix_count[right] - prefix_count[left]
-        out = np.full(sums.shape, np.nan, dtype=float)
-        valid = counts > 0
-        if operation == "sum":
-            out[valid] = sums[valid]
-        elif operation == "mean":
-            out[valid] = sums[valid] / counts[valid]
-        else:
+        if operation not in {"sum", "mean"}:
             raise ValueError(f"Unsupported reduction operation {operation!r}.")
+
+        values = self._source_values(source_name)
+        out = np.full(left.shape, np.nan, dtype=float)
+        bounds = zip(left.flat, right.flat, strict=True)
+        for index, (start, stop) in enumerate(bounds):
+            # Full-record float prefix differences lose precision after long,
+            # high-magnitude histories, so reduce each short window directly.
+            window = values[start:stop]
+            finite_values = window[np.isfinite(window)]
+            if finite_values.size == 0:
+                continue
+            if operation == "sum":
+                out.flat[index] = np.sum(finite_values, dtype=np.float64)
+            else:
+                out.flat[index] = np.mean(finite_values, dtype=np.float64)
         return out
 
-    def _prefix_arrays(self, source_name: str) -> tuple[np.ndarray, np.ndarray]:
-        if source_name not in self._prefix_cache:
-            values = self._source_values(source_name)
-            finite = np.isfinite(values)
-            sums = np.where(finite, values, 0.0)
-            self._prefix_cache[source_name] = (
-                np.concatenate(([0.0], np.cumsum(sums, dtype=float))),
-                np.concatenate(([0], np.cumsum(finite, dtype=np.int64))),
-            )
-        return self._prefix_cache[source_name]
-
     def _source_values(self, source_name: str) -> np.ndarray:
-        if source_name not in self.ds:
-            raise ValueError(f"Input dataset is missing source variable {source_name!r}.")
-        source = self.ds[source_name]
-        if source.dims != (self.time_dim,):
-            raise ValueError(
-                f"Source variable {source_name!r} must have dims "
-                f"({self.time_dim!r},); got {source.dims!r}."
+        if source_name not in self._source_cache:
+            if source_name not in self.ds:
+                raise ValueError(
+                    f"Input dataset is missing source variable {source_name!r}."
+                )
+            source = self.ds[source_name]
+            if source.dims != (self.time_dim,):
+                raise ValueError(
+                    f"Source variable {source_name!r} must have dims "
+                    f"({self.time_dim!r},); got {source.dims!r}."
+                )
+            self._source_cache[source_name] = np.asarray(
+                source.compute().values,
+                dtype=float,
             )
-        return np.asarray(source.compute().values, dtype=float)
+        return self._source_cache[source_name]
 
 
 def add_window_features(
