@@ -11,6 +11,7 @@ cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
+CLIMATOLOGY_PATH="${CLIMATOLOGY_PATH:?CLIMATOLOGY_PATH is required}"
 REGION="${REGION:-pnw_bartusek}"
 THRESHOLD_VARIABLES=(tas lwa_a)
 ARRAY_INDEX="${PBS_ARRAY_INDEX:?PBS_ARRAY_INDEX is required}"
@@ -35,6 +36,8 @@ actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
 test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
 test -s "${INPUT_PATH}"
+test -s "${CLIMATOLOGY_PATH}"
+test ! -e "${OUTPUT_PATH}"
 test ! -e "${STAGED_OUTPUT_PATH}"
 
 mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
@@ -63,11 +66,12 @@ echo "[info] started=$(date -Is)"
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v python scripts/event_features/build_stage2_event_features.py \
     --input-path "${INPUT_PATH}" \
+    --climatology-path "${CLIMATOLOGY_PATH}" \
     --output-path "${STAGED_OUTPUT_PATH}" \
     --season-months 6 7 8 \
     --require-full-event
 
 test -s "${STAGED_OUTPUT_PATH}"
-mv -f -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"
+ln -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"
 test -s "${OUTPUT_PATH}"
 echo "[info] finished=$(date -Is)"

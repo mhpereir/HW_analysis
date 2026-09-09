@@ -2,15 +2,91 @@
 
 from __future__ import annotations
 
+import json
 import warnings
 from collections.abc import Callable, Mapping, Sequence
+from numbers import Integral
+from pathlib import Path
 
 import numpy as np
 import xarray as xr
 
 from scripts.event_features import event_feature_config as config
+from src.climatology import (
+    SOURCE_COMPATIBILITY_ATTRS,
+    apply_regional_hourly_climatology,
+)
 
 SURFACE_FLUX_FEATURES = frozenset({"I_sshf_pre", "I_slhf_pre"})
+ANTECEDENT_WINDOW = "antecedent_temperature"
+TEMPERATURE_FEATURES = {
+    "tas_anom_antecedent_mean": ("tas_anom", ANTECEDENT_WINDOW),
+    "tas_anom_at_budget_start": ("tas_anom", "budget_start"),
+    "T_mean_anom_antecedent_mean": ("T_mean_anom", ANTECEDENT_WINDOW),
+    "T_mean_anom_at_budget_start": ("T_mean_anom", "budget_start"),
+    "tas_anom_at_anchor": ("tas_anom", "anchor"),
+}
+
+
+def temperature_window_lags() -> tuple[int, int]:
+    """Resolve the half-open interval from the current budget configuration."""
+    start, end = config.WINDOWS["heat_budget_pre"]
+    duration = config.ANTECEDENT_TEMPERATURE_DURATION_HOURS
+    if any(
+        isinstance(value, bool) or not isinstance(value, Integral)
+        for value in (start, end, duration)
+    ):
+        raise ValueError("Budget lags and antecedent duration must be integer hours.")
+    if start >= 0 or end != 0:
+        raise ValueError(
+            "heat_budget_pre must start before the anchor and end at zero."
+        )
+    if duration <= 0:
+        raise ValueError("Antecedent temperature duration must be positive.")
+    return int(start - duration), int(start)
+
+
+def window_lags(name: str) -> tuple[int, int]:
+    """Resolve legacy windows and the new derived temperature windows."""
+    if name == ANTECEDENT_WINDOW:
+        return temperature_window_lags()
+    if name == "budget_start":
+        lag = temperature_window_lags()[1]
+        return lag, lag
+    if name == "anchor":
+        return 0, 0
+    return config.WINDOWS[name]
+
+
+def window_endpoint_inclusion(name: str) -> str:
+    if name == ANTECEDENT_WINDOW:
+        return "left_closed_right_open"
+    if name in {"budget_start", "anchor"}:
+        return "exact_timestamp"
+    return "inclusive"
+
+
+def prepare_temperature_sources(ds: xr.Dataset, climatology: xr.Dataset) -> xr.Dataset:
+    """Add anomaly sources without replacing any absolute budget variables."""
+    if ds.attrs.get("data_representation") == "climatological_anomaly":
+        raise ValueError("Stage-2 builders require absolute Stage-1 input.")
+    for source_attr, climate_attr in SOURCE_COMPATIBILITY_ATTRS:
+        if ds.attrs.get(source_attr) in (None, ""):
+            raise ValueError(f"Stage-1 source is missing {source_attr} metadata.")
+        if climatology.attrs.get(climate_attr) in (None, ""):
+            raise ValueError(f"Climatology is missing {climate_attr} metadata.")
+    out = ensure_tas_anom(ds).copy(deep=False)
+    if "tas_anom" not in out:
+        raise ValueError(
+            "Stage-1 source requires tas_anom or tas_region and tas_climatology."
+        )
+    anomaly_view = apply_regional_hourly_climatology(
+        ds,
+        climatology,
+        variables=["T_mean"],
+    )
+    out["T_mean_anom"] = anomaly_view["T_mean"].reset_coords(drop=True)
+    return out
 
 
 def ensure_tas_anom(ds: xr.Dataset) -> xr.Dataset:
@@ -53,12 +129,7 @@ def active_feature_spec(
         "change": dict(config.EXTENDED_CHANGE_FEATURES),
     }
     missing = sorted(
-        {
-            name
-            for group in extended.values()
-            for name in group
-            if name not in ds
-        }
+        {name for group in extended.values() for name in group if name not in ds}
     )
     if missing and not allow_missing_extended:
         raise ValueError(
@@ -106,7 +177,10 @@ def active_window_names(
         for mapping in feature_spec.values()
         for window_name in mapping.values()
     }
-    return tuple(name for name in config.WINDOWS if name in active)
+    return (
+        *tuple(name for name in config.WINDOWS if name in active),
+        ANTECEDENT_WINDOW,
+    )
 
 
 def complete_anchor_mask(
@@ -122,7 +196,7 @@ def complete_anchor_mask(
 
     keep = np.ones(anchors.shape, dtype=bool)
     for window_name in window_names:
-        start_lag, end_lag = config.WINDOWS[window_name]
+        start_lag, end_lag = window_lags(window_name)
         starts = anchors + np.timedelta64(start_lag, "h")
         ends = anchors + np.timedelta64(end_lag, "h")
         keep &= (starts >= times[0]) & (ends <= times[-1])
@@ -139,9 +213,13 @@ class WindowReducer:
         if times.ndim != 1 or times.size == 0:
             raise ValueError("Input dataset time coordinate must be non-empty and 1D.")
         if np.isnat(times).any():
-            raise ValueError("Input dataset time coordinate contains missing timestamps.")
+            raise ValueError(
+                "Input dataset time coordinate contains missing timestamps."
+            )
         if np.any(times[1:] <= times[:-1]):
-            raise ValueError("Input dataset time coordinate must be strictly increasing.")
+            raise ValueError(
+                "Input dataset time coordinate must be strictly increasing."
+            )
 
         self.ds = ds
         self.time_dim = time_dim
@@ -220,20 +298,55 @@ class WindowReducer:
         anchor_times: np.ndarray,
         window_name: str,
     ) -> tuple[np.ndarray, np.ndarray]:
-        return self._bounds_for_lags(anchor_times, *config.WINDOWS[window_name])
+        return self._bounds_for_lags(
+            anchor_times,
+            *window_lags(window_name),
+            end_inclusive=window_name != ANTECEDENT_WINDOW,
+        )
 
     def _bounds_for_lags(
         self,
         anchor_times: np.ndarray,
         start_lag: int,
         end_lag: int,
+        *,
+        end_inclusive: bool = True,
     ) -> tuple[np.ndarray, np.ndarray]:
         anchors = np.asarray(anchor_times, dtype="datetime64[ns]")
         starts = anchors + np.timedelta64(start_lag, "h")
         ends = anchors + np.timedelta64(end_lag, "h")
         left = np.searchsorted(self.time_values, starts, side="left")
-        right = np.searchsorted(self.time_values, ends, side="right")
+        right = np.searchsorted(
+            self.time_values,
+            ends,
+            side="right" if end_inclusive else "left",
+        )
         return left, right
+
+    def strict_temperature_values(
+        self,
+        source_name: str,
+        anchor_times: np.ndarray,
+        window_name: str,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Return strict hourly mean/exact point, timestamp count, finite count."""
+        start, end = window_lags(window_name)
+        lags = np.arange(start, end if window_name == ANTECEDENT_WINDOW else end + 1)
+        left, right = self._bounds_for_window(anchor_times, window_name)
+        source = self._source_values(source_name)
+        values = np.full(left.shape, np.nan, dtype=float)
+        finite_counts = np.zeros(left.shape, dtype=np.int64)
+        anchors = np.asarray(anchor_times, dtype="datetime64[ns]")
+        for i, (lo, hi) in enumerate(zip(left.flat, right.flat, strict=True)):
+            selected = source[lo:hi]
+            finite_counts.flat[i] = np.isfinite(selected).sum()
+            expected = anchors.flat[i] + lags.astype("timedelta64[h]")
+            if (
+                np.array_equal(self.time_values[lo:hi], expected)
+                and finite_counts.flat[i] == lags.size
+            ):
+                values.flat[i] = np.mean(selected, dtype=np.float64)
+        return values, (right - left).astype(np.int64), finite_counts
 
     def _reduce(
         self,
@@ -365,9 +478,109 @@ def add_window_features(
             window_name=window_name,
             operation="change",
         )
-        out[feature_name].attrs["change_method"] = (
-            "final_24h_mean_minus_first_24h_mean"
+        out[feature_name].attrs["change_method"] = "final_24h_mean_minus_first_24h_mean"
+
+
+def add_temperature_features(
+    out: xr.Dataset,
+    reducer: WindowReducer,
+    anchor_times: np.ndarray,
+    *,
+    row_dim: str,
+    anchor_variable: str,
+    climatology: xr.Dataset,
+    climatology_path: str | Path | None,
+) -> None:
+    """Write the shared strict temperature features and their provenance."""
+    start, end = temperature_window_lags()
+    for name, (source, window) in TEMPERATURE_FEATURES.items():
+        values, counts, finite = reducer.strict_temperature_values(
+            source, anchor_times, window
         )
+        out[name] = (row_dim, values)
+        add_feature_attrs(
+            out[name],
+            source_variable=source,
+            window_name=window,
+            operation="mean" if window == ANTECEDENT_WINDOW else "sample",
+            units="K",
+        )
+        expected = end - start if window == ANTECEDENT_WINDOW else 1
+        out[name].attrs.update(
+            {
+                "anchor_variable": anchor_variable,
+                "expected_sample_count": expected,
+                "missing_value_policy": "require complete hourly timestamps and all finite values",
+                "climatology_source": (
+                    "Stage-1 tas_anom or tas_region minus tas_climatology"
+                    if source == "tas_anom"
+                    else "regional_hourly_climatology:T_mean"
+                ),
+            }
+        )
+        if source == "T_mean_anom":
+            out[name].attrs.update(
+                {
+                    "climatology_path": ""
+                    if climatology_path is None
+                    else str(climatology_path),
+                    "climatology_matching": climatology.attrs["climatology_matching"],
+                    "climatology_start_year": climatology.attrs[
+                        "climatology_start_year"
+                    ],
+                    "climatology_end_year": climatology.attrs["climatology_end_year"],
+                }
+            )
+        count_name = f"n_samples_{window}"
+        out[count_name] = (row_dim, counts)
+        add_feature_attrs(
+            out[count_name],
+            source_variable=config.TIME_DIM,
+            window_name=window,
+            operation="count",
+            units="samples",
+        )
+        out[count_name].attrs["expected_sample_count"] = expected
+        finite_name = f"n_finite_{name}"
+        out[finite_name] = (row_dim, finite)
+        add_feature_attrs(
+            out[finite_name],
+            source_variable=source,
+            window_name=window,
+            operation="finite_count",
+            units="samples",
+        )
+        out[finite_name].attrs["expected_sample_count"] = expected
+    out.attrs.update(
+        {
+            "antecedent_temperature_contract_version": 1,
+            "temperature_anchor_variable": anchor_variable,
+            "antecedent_temperature_window_hours": f"{start},{end}",
+            "antecedent_temperature_duration_hours": end - start,
+            "budget_start_lag_hours": end,
+            "temperature_point_sampling": "exact_timestamp",
+            "antecedent_temperature_endpoint_inclusion": "left_closed_right_open",
+            "temperature_climatology_path": ""
+            if climatology_path is None
+            else str(climatology_path),
+            "temperature_climatology_metadata": json.dumps(
+                dict(climatology.attrs), default=str, sort_keys=True
+            ),
+            "tas_anomaly_source_metadata": json.dumps(
+                dict(reducer.ds["tas_anom"].attrs), default=str, sort_keys=True
+            ),
+        }
+    )
+    for key in (
+        "region",
+        "heat_budget_bottom_boundary",
+        "heat_budget_top_boundary",
+        "stage1_contract_version",
+        "threshold_variable",
+        "quantile_threshold",
+    ):
+        if key in reducer.ds.attrs:
+            out.attrs[key] = reducer.ds.attrs[key]
 
 
 def add_integrated_dynamical_feature(out: xr.Dataset, *, row_dim: str) -> None:
@@ -459,13 +672,13 @@ def add_feature_attrs(
     units: str | None = None,
 ) -> None:
     """Add common fixed-window feature metadata."""
-    start_lag, end_lag = config.WINDOWS[window_name]
+    start_lag, end_lag = window_lags(window_name)
     attrs = {
         "source_variable": source_variable,
         "window_name": window_name,
         "window_lag_hours": f"{start_lag},{end_lag}",
         "operation": operation,
-        "window_endpoint_inclusion": "inclusive",
+        "window_endpoint_inclusion": window_endpoint_inclusion(window_name),
     }
     if units is not None:
         attrs["units"] = units

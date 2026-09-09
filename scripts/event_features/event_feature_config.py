@@ -42,6 +42,10 @@ WINDOWS = {
     "decay": (0, 72),
 }
 
+# Only the duration is configurable. End the half-open antecedent interval at
+# the current heat_budget_pre start, resolved at runtime by the shared reducer.
+ANTECEDENT_TEMPERATURE_DURATION_HOURS = 72
+
 DEFAULT_INTEGRAL_FEATURES = {
     "dTdt": "heat_budget_pre",
     "advection": "heat_budget_pre",

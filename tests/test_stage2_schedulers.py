@@ -20,9 +20,12 @@ def test_stage2_scheduler_is_commit_pinned_and_publishes_atomically(kind):
     assert "status --porcelain --untracked-files=normal" in text
     assert 'test -s "${INPUT_PATH}"' in text
     assert 'STAGED_OUTPUT_PATH="${OUTPUT_PATH}.tmp.${PBS_JOBID}"' in text
-    assert 'trap \'rm -f -- "${STAGED_OUTPUT_PATH}"\' EXIT' in text
+    assert "trap 'rm -f -- \"${STAGED_OUTPUT_PATH}\"' EXIT" in text
     assert '--output-path "${STAGED_OUTPUT_PATH}"' in text
-    assert 'mv -f -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"' in text
+    assert 'ln -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"' in text
+    assert 'test ! -e "${OUTPUT_PATH}"' in text
+    assert 'test -s "${CLIMATOLOGY_PATH}"' in text
+    assert '--climatology-path "${CLIMATOLOGY_PATH}"' in text
     assert "--overwrite" not in text
 
 
@@ -61,3 +64,28 @@ def test_baseline_scheduler_preserves_canonical_pnw_selection():
 
     assert "non_event_day_features_fixed_windows_${REGION}" in text
     assert "--season-months 6 7 8" in text
+
+
+def test_antecedent_campaign_checks_inputs_provenance_and_no_overwrite():
+    text = (
+        REPO_ROOT / "schedulers/schedule_stage2_antecedent_temperature.sh"
+    ).read_text()
+    for required in (
+        "PROJECT_ROOT",
+        "EXPECTED_COMMIT",
+        "INPUT_PATH",
+        "CLIMATOLOGY_PATH",
+        "RUN_DIR",
+    ):
+        assert f"${{{required}:?" in text
+    assert 'test ! -e "${RUN_DIR}"' in text
+    assert 'mkdir "${RUN_DIR}"' in text
+    assert "status --porcelain --untracked-files=normal" in text
+    assert "select=1:ncpus=1:mem=4gb" in text
+    assert "validate_stage2_temperature.py" in text
+    assert text.index("validate_stage2_temperature.py") < text.index(
+        "plot_antecedent_temperature.py"
+    )
+    assert "--layout presentation" in text
+    assert "sha256sum" in text
+    assert "--overwrite" not in text

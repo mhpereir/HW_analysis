@@ -122,7 +122,7 @@ figure entrypoints.
   heating, and the fourth panel, diabatic heating versus `I_dyn,net`, in a
   2-row by 1-column figure. Both retained panels show their own x-axis label
   because their x variables differ. Point populations, finite-value masks,
-  reference lines, titles, count annotations, event-severity colors, shared
+  reference lines, titles, event-severity colors, shared
   colorbar, and baseline-versus-event layering retain their full-layout
   meanings. When no output path is supplied, presentation figures use a
   distinct `_presentation.png` filename so they cannot overwrite the default
@@ -131,6 +131,33 @@ figure entrypoints.
   height so the scatter panels and shared colorbar have more horizontal space.
   Synthetic plot tests must confirm both layouts, presentation dimensions, and
   their CLI routing.
+- The baseline-comparison presentation layout uses one common finite
+  population across its retained panels and one shared count annotation.
+  Its lower panel identifies diabatic heating as a residual and adds
+  `x+y=c` references for total integrated budget warming. The full four-panel
+  diagnostic remains unchanged.
+- `scripts/event_features/plot_antecedent_temperature.py` consumes only the
+  rebuilt Stage-2 event table. Its 2x2 panels compare anchor TAS anomaly against
+  antecedent means (left) and budget-start values (right), with TAS on top and
+  atmospheric temperature below. One common finite mask covers all four x
+  variables, anchor anomaly, and stored `I_dTdt_pre` color values. Report
+  included/excluded counts and highlight the largest stored `tas_anom_peak`.
+  Read lags from product metadata, not current plotting configuration.
+  Top-row `y=x+c` lines at visible 2 K increments represent surface anomaly
+  differences, not `I_dTdt_pre`; omit them below. Use one shared colorbar for
+  integrated atmospheric budget warming. Reject old products with missing
+  fields or timing metadata with a clear rebuild instruction. See
+  [decision 009](../decisions/009_antecedent_temperature.md).
+  The tracked Venus entrypoint
+  `schedulers/schedule_stage2_antecedent_temperature.sh` requires
+  `PROJECT_ROOT`, `EXPECTED_COMMIT`, `INPUT_PATH`, `CLIMATOLOGY_PATH`, and a
+  fresh `RUN_DIR`. It builds JJA event (full-event selection) and baseline
+  NetCDF/CSV tables, independently validates them against Stage 1, then writes
+  `antecedent_temperature.png` and `event_vs_clean_baseline_presentation.png`.
+  The run directory contains `validation.json`, checksums, and its production
+  log. Run the PNW Hotz canary before repeating the unchanged protocol for
+  PNW Bartusek; retrieve only named outputs and inspect both PNGs at original
+  resolution before acceptance.
 - Event-versus-clean-baseline figures pad each finite plotted data range by 5%
   on both sides while keeping zero reference lines inside the padded range.
   Shared x-axes use the combined plotted x-data, while each panel derives its

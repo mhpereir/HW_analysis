@@ -32,6 +32,8 @@ scripts/event_features/event_feature_config.py
 
 - Stage-1 harmonized regional time series
 - Stage-1 event-summary variables
+- Matching Stage-1 regional hourly climatology companion, supplied explicitly
+  with `--climatology-path` (scheduler `CLIMATOLOGY_PATH`).
 
 The producer must not rebuild thresholds, event IDs, or the harmonized time
 series, and must not modify the Stage-1 product.
@@ -44,7 +46,7 @@ series, and must not modify the Stage-1 product.
 
 ## Fixed Windows
 
-Timestamp slices are inclusive. Current defaults are:
+Legacy timestamp slices are inclusive. Current defaults are:
 
 | Window | Lags relative to `peak_time` |
 | --- | --- |
@@ -56,6 +58,33 @@ Timestamp slices are inclusive. Current defaults are:
 | `decay` | `(0, 72)` hours |
 
 See [decision 001](../decisions/001_event_feature_windows.md).
+
+### Antecedent-temperature additions
+
+Both Stage-2 products also contain the following fields (K):
+
+| Field | Definition relative to the row anchor |
+| --- | --- |
+| `tas_anom_antecedent_mean` | Mean TAS anomaly on `[b-72,b)` |
+| `tas_anom_at_budget_start` | Exact TAS anomaly at lag `b` |
+| `T_mean_anom_antecedent_mean` | Mean atmospheric temperature anomaly on `[b-72,b)` |
+| `T_mean_anom_at_budget_start` | Exact atmospheric temperature anomaly at lag `b` |
+| `tas_anom_at_anchor` | Exact TAS anomaly at lag zero |
+
+`b` is derived at runtime from `WINDOWS["heat_budget_pre"][0]`, never
+independently configured. Only the preceding duration (default 72 hours) is
+configured. See [decision 009](../decisions/009_antecedent_temperature.md) for
+sources, strict coverage, migration, and scientific interpretation.
+
+`n_samples_antecedent_temperature`, `n_samples_budget_start`, and
+`n_samples_anchor` count timestamps. Each new field also has an
+`n_finite_<field>` count. A mean requires every expected hourly timestamp and
+finite value; an exact point requires that timestamp and a finite value.
+Missing coverage produces NaN, not partial means or interpolation.
+
+TAS retains its Stage-1 anomaly baseline. Only atmospheric temperature uses the
+calendar-hour companion; all original absolute fields and integrals are
+unchanged. The new anomaly at the anchor is distinct from `tas_anom_peak`.
 
 ## Default Variables
 
@@ -145,9 +174,14 @@ require_full_event = 0 or 1
 dropped_boundary_events = integer count
 ```
 
-Each feature variable should carry `source_variable`, `window_name`,
-`window_lag_hours`, `operation`, units where known, and
-`window_endpoint_inclusion="inclusive"` for window-derived variables.
+Each feature variable carries `source_variable`, `window_name`,
+`window_lag_hours`, `operation`, units where known, and its actual
+`window_endpoint_inclusion`: legacy `inclusive`, new antecedent
+`left_closed_right_open`, or point `exact_timestamp`.
+The global endpoint description is mixed, not universally inclusive.
+New metadata includes the resolved antecedent interval, budget-start lag,
+expected sample counts, climatology path and baseline provenance, and anchor
+variable. CSV exports values and counts, with NetCDF the metadata authority.
 
 ## Validation Expectations
 

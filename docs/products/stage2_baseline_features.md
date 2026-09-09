@@ -44,7 +44,7 @@ event-adjacent rows are retained.
 
 ## Fixed-window Features
 
-The product uses the same inclusive fixed-window definitions and source
+The product uses the same legacy inclusive fixed-window definitions and source
 variables as the Stage-2 event-feature product. Default output includes:
 
 ```text
@@ -62,6 +62,16 @@ n_samples_heat_budget_pre(baseline_day)
 n_samples_lwa_pre_reference(baseline_day)
 n_samples_antecedent_state(baseline_day)
 ```
+
+It also requires `--climatology-path` and writes all five new temperature
+fields and coverage counts defined in the
+[event-feature contract](stage2_event_features.md#antecedent-temperature-additions).
+Their anchor is `reference_time`, not an event maximum. The strict half-open
+antecedent interval moves with the configured budget start and is included in
+the boundary and event-adjacency checks. New exact samples never interpolate.
+These fields do not replace `T_anom_mean_ant` or any original integrals.
+Global endpoint metadata describes the mixed rules; each field records its
+own interval, sampling, and climatology provenance.
 
 `I_dyn_pre` is calculated identically to the event product:
 

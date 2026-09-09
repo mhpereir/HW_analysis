@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Mapping, Sequence
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=config.DEFAULT_INPUT_PATH,
         help="Stage-1 harmonized regional time-series dataset.",
+    )
+    parser.add_argument(
+        "--climatology-path",
+        type=Path,
+        required=True,
+        help="Matching Stage-1 regional hourly climatology companion.",
     )
     parser.add_argument(
         "--output-path",
@@ -105,6 +112,8 @@ def validate_args(args: argparse.Namespace) -> None:
 def build_baseline_features(
     ds: xr.Dataset,
     *,
+    climatology: xr.Dataset,
+    climatology_path: str | Path | None = None,
     use_extended_variables: bool = False,
     allow_missing_extended: bool = False,
     season_months: Sequence[int] | None = None,
@@ -125,6 +134,7 @@ def build_baseline_features(
     )
     fixed.validate_required_time_variables(ds, feature_spec)
     event_id_source = selected_event_id_source(ds)
+    ds = fixed.prepare_temperature_sources(ds, climatology)
     reducer = fixed.WindowReducer(ds)
 
     reference_times, reference_event_ids, n_calendar_days = daily_reference_rows(
@@ -138,7 +148,9 @@ def build_baseline_features(
         reference_times = reference_times[month_mask(reference_times, season_months)]
     n_selected_before_boundary = int(reference_times.size)
     if n_selected_before_boundary == 0:
-        raise ValueError("No selected-source non-event days remain after season selection.")
+        raise ValueError(
+            "No selected-source non-event days remain after season selection."
+        )
 
     window_names = fixed.active_window_names(feature_spec)
     keep = reducer.complete_anchor_mask(reference_times, window_names)
@@ -207,6 +219,15 @@ def build_baseline_features(
         dropped_boundary_days=dropped_boundary_days,
         feature_spec=feature_spec,
     )
+    fixed.add_temperature_features(
+        out,
+        reducer,
+        reference_times,
+        row_dim=BASELINE_DIM,
+        anchor_variable=REFERENCE_TIME_NAME,
+        climatology=climatology,
+        climatology_path=climatology_path,
+    )
     return out
 
 
@@ -214,7 +235,9 @@ def selected_event_id_source(ds: xr.Dataset) -> str:
     """Return and validate the Stage-1 event-ID source defining baseline days."""
     source = ds.attrs.get("event_id_source")
     if not isinstance(source, str) or not source:
-        raise ValueError("Stage-1 dataset is missing required event_id_source metadata.")
+        raise ValueError(
+            "Stage-1 dataset is missing required event_id_source metadata."
+        )
     if source not in ds:
         raise ValueError(
             f"Stage-1 event_id_source {source!r} is not present in the dataset."
@@ -317,8 +340,8 @@ def add_global_attrs(
 ) -> None:
     """Attach baseline-table provenance, population, and method metadata."""
     window_names = fixed.active_window_names(feature_spec)
-    adjacency_start = min(config.WINDOWS[name][0] for name in window_names)
-    adjacency_end = max(config.WINDOWS[name][1] for name in window_names)
+    adjacency_start = min(fixed.window_lags(name)[0] for name in window_names)
+    adjacency_end = max(fixed.window_lags(name)[1] for name in window_names)
     attrs: dict[str, Any] = {
         "pipeline_stage": PIPELINE_STAGE,
         "feature_method": FEATURE_METHOD,
@@ -334,7 +357,7 @@ def add_global_attrs(
         "allow_missing_extended": int(allow_missing_extended),
         "adaptive_windows_used": 0,
         "integral_method": config.INTEGRAL_METHOD,
-        "window_endpoint_inclusion": "inclusive",
+        "window_endpoint_inclusion": "mixed; see per-variable metadata",
         "all_seasons": int(all_seasons),
         "n_calendar_days": int(n_calendar_days),
         "n_non_event_days": int(n_non_event_days),
@@ -352,7 +375,7 @@ def add_global_attrs(
     if season_months is not None:
         attrs["season_months"] = ",".join(str(month) for month in season_months)
     for name in window_names:
-        start_lag, end_lag = config.WINDOWS[name]
+        start_lag, end_lag = fixed.window_lags(name)
         attrs[f"{baseline_window_name(name)}_window_hours"] = f"{start_lag},{end_lag}"
     out.attrs.update(attrs)
 
@@ -387,7 +410,9 @@ def _validate_season_months(months: Sequence[int]) -> None:
     invalid = [month for month in months if month < 1 or month > 12]
     if invalid:
         values = ", ".join(str(month) for month in invalid)
-        raise ValueError(f"--season-months values must be between 1 and 12; got {values}.")
+        raise ValueError(
+            f"--season-months values must be between 1 and 12; got {values}."
+        )
 
 
 def _display_path(path: Path) -> str:
@@ -402,10 +427,17 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
 
-    ds = analysis_io.open_harmonized_timeseries(args.input_path)
-    try:
+    with ExitStack() as stack:
+        ds = stack.enter_context(
+            analysis_io.open_harmonized_timeseries(args.input_path)
+        )
+        climatology = stack.enter_context(
+            analysis_io.open_regional_hourly_climatology(args.climatology_path)
+        )
         features = build_baseline_features(
             ds,
+            climatology=climatology,
+            climatology_path=args.climatology_path,
             use_extended_variables=args.use_extended_variables,
             allow_missing_extended=args.allow_missing_extended,
             season_months=args.season_months,
@@ -420,8 +452,6 @@ def main() -> int:
         print("Wrote baseline-day feature table:")
         for path in written:
             print(f"  {_display_path(path)}")
-    finally:
-        ds.close()
     return 0
 
 

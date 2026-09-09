@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Mapping, Sequence
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=config.DEFAULT_INPUT_PATH,
         help="Stage-1 harmonized regional time-series dataset.",
+    )
+    parser.add_argument(
+        "--climatology-path",
+        type=Path,
+        required=True,
+        help="Matching Stage-1 regional hourly climatology companion.",
     )
     parser.add_argument(
         "--output-path",
@@ -98,6 +105,8 @@ def validate_args(args: argparse.Namespace) -> None:
 def build_event_features(
     ds: xr.Dataset,
     *,
+    climatology: xr.Dataset,
+    climatology_path: str | Path | None = None,
     use_extended_variables: bool = False,
     allow_missing_extended: bool = False,
     season_months: Sequence[int] | None = None,
@@ -135,6 +144,7 @@ def build_event_features(
         fixed.active_window_names(feature_spec),
     )
     peak_times = event_peak_values(event_table)
+    ds = fixed.prepare_temperature_sources(ds, climatology)
     reducer = fixed.WindowReducer(ds)
 
     out = xr.Dataset(coords={config.EVENT_DIM: event_table[config.EVENT_DIM]})
@@ -169,10 +179,21 @@ def build_event_features(
         dropped_boundary_events=dropped_boundary_events,
         feature_spec=feature_spec,
     )
+    fixed.add_temperature_features(
+        out,
+        reducer,
+        peak_times,
+        row_dim=config.EVENT_DIM,
+        anchor_variable=config.PEAK_TIME_NAME,
+        climatology=climatology,
+        climatology_path=climatology_path,
+    )
     return out
 
 
-def event_summary_table(ds: xr.Dataset, event_dim: str = config.EVENT_DIM) -> xr.Dataset:
+def event_summary_table(
+    ds: xr.Dataset, event_dim: str = config.EVENT_DIM
+) -> xr.Dataset:
     """Return variables that belong only to the event dimension."""
     names = [
         name
@@ -224,7 +245,9 @@ def validate_required_variables(
     if missing_event:
         missing.append("event-summary variables: " + ", ".join(missing_event))
     if missing:
-        raise ValueError("Input dataset is missing required " + "; ".join(missing) + ".")
+        raise ValueError(
+            "Input dataset is missing required " + "; ".join(missing) + "."
+        )
 
 
 def require_finite_peak_times(event_table: xr.Dataset) -> xr.Dataset:
@@ -320,7 +343,9 @@ def add_integral_features(
         if source_name in {"lwa_a_region", "lwa_c_region"}:
             out[feature_name].attrs["description"] = "LWA exposure over fixed window."
         if feature_name in SURFACE_FLUX_FEATURES:
-            out[feature_name].attrs["sign_convention"] = "native Stage-1/source signs retained"
+            out[feature_name].attrs["sign_convention"] = (
+                "native Stage-1/source signs retained"
+            )
 
 
 def add_mean_features(
@@ -384,7 +409,9 @@ def add_days_from_solstice(out: xr.Dataset, event_table: xr.Dataset) -> None:
     )
 
 
-def window_for_peak(ds: xr.Dataset, peak_time: np.datetime64, window_name: str) -> xr.Dataset:
+def window_for_peak(
+    ds: xr.Dataset, peak_time: np.datetime64, window_name: str
+) -> xr.Dataset:
     """Return an inclusive timestamp window for one event peak."""
     start_lag, end_lag = config.WINDOWS[window_name]
     start = peak_time + np.timedelta64(start_lag, "h")
@@ -412,7 +439,9 @@ def event_peak_values(event_table: xr.Dataset) -> np.ndarray:
     )
 
 
-def active_window_names(feature_spec: Mapping[str, Mapping[str, str]]) -> tuple[str, ...]:
+def active_window_names(
+    feature_spec: Mapping[str, Mapping[str, str]],
+) -> tuple[str, ...]:
     """Return active window names in config order."""
     return fixed.active_window_names(feature_spec)
 
@@ -456,7 +485,7 @@ def add_global_attrs(
         "allow_missing_extended": int(allow_missing_extended),
         "adaptive_windows_used": 0,
         "integral_method": config.INTEGRAL_METHOD,
-        "window_endpoint_inclusion": "inclusive",
+        "window_endpoint_inclusion": "mixed; see per-variable metadata",
         "all_seasons": int(all_seasons),
         "require_full_event": int(require_full_event),
         "dropped_boundary_events": int(dropped_boundary_events),
@@ -526,7 +555,9 @@ def _validate_season_months(months: Sequence[int]) -> None:
     invalid = [month for month in months if month < 1 or month > 12]
     if invalid:
         values = ", ".join(str(month) for month in invalid)
-        raise ValueError(f"--season-months values must be between 1 and 12; got {values}.")
+        raise ValueError(
+            f"--season-months values must be between 1 and 12; got {values}."
+        )
 
 
 def _display_path(path: Path) -> str:
@@ -541,10 +572,17 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
 
-    ds = analysis_io.open_harmonized_timeseries(args.input_path)
-    try:
+    with ExitStack() as stack:
+        ds = stack.enter_context(
+            analysis_io.open_harmonized_timeseries(args.input_path)
+        )
+        climatology = stack.enter_context(
+            analysis_io.open_regional_hourly_climatology(args.climatology_path)
+        )
         features = build_event_features(
             ds,
+            climatology=climatology,
+            climatology_path=args.climatology_path,
             use_extended_variables=args.use_extended_variables,
             allow_missing_extended=args.allow_missing_extended,
             season_months=args.season_months,
@@ -560,8 +598,6 @@ def main() -> int:
         print("Wrote event feature table:")
         for path in written:
             print(f"  {_display_path(path)}")
-    finally:
-        ds.close()
     return 0
 
 

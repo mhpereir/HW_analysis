@@ -66,6 +66,10 @@ Product Stage 2: event-feature table + tracked matching settings
         -> matched face-advection climatological-anomaly composite figure
 ```
 
+Both Stage-2 builders also require the matching regional hourly climatology
+companion for the antecedent and budget-start atmospheric-temperature anomaly
+features. Existing absolute budget integrals do not use that anomaly view.
+
 | Product stage | Durable artifact | Producer | Main consumers |
 | --- | --- | --- | --- |
 | Stage 1 | `results/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_stage1_harmonized_timeseries.py` | event features, baseline features, composites, top-event plots |
@@ -199,6 +203,7 @@ the diagnostic they make rather than a product stage they produce.
 - [006: regional hourly climatology baseline](decisions/006_regional_hourly_climatology.md)
 - [007: in-memory I_dyn sign matching](decisions/007_idyn_sign_matching.md)
 - [008: retire PBL diagnostics from active products](decisions/008_retire_pbl_diagnostics.md)
+- [009: antecedent temperature and budget initial state](decisions/009_antecedent_temperature.md)
 
 PCA and clustering decisions are indexed under
 [legacy documentation](legacy/README.md).

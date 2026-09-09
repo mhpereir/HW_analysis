@@ -22,7 +22,7 @@ def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
         plot_axes = fig.axes[:2]
         assert [ax.get_title() for ax in plot_axes] == [
             "Advection vs Adiabatic Heating",
-            r"Diabatic Heating vs $I_{dyn,net}$",
+            r"Diabatic Residual vs $I_{dyn,net}$",
         ]
         assert [ax.get_xlabel() for ax in plot_axes] == [
             plot_diag.variable_label(plot_diag.X_VARIABLE),
@@ -32,6 +32,17 @@ def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
         assert plot_axes[0].get_legend() is not None
         assert plot_axes[1].get_legend() is None
         assert fig.axes[-1].get_ylabel() == "Peak TAS Anomaly (K)"
+        assert "Clean baseline n = 4; events n = 3" in fig._suptitle.get_text()
+        assert not plot_axes[0].texts
+        references = [
+            line
+            for line in plot_axes[1].lines
+            if line.get_label().startswith("reference ")
+        ]
+        assert references
+        for line in references:
+            total = line.get_xdata() + line.get_ydata()
+            np.testing.assert_allclose(total, total[0])
         _assert_offsets(
             plot_axes[0].collections[0],
             np.array([1.0, 4.0, 5.0, 8.0]),

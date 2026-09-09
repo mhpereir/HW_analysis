@@ -6,6 +6,7 @@ import xarray as xr
 from HW_analysis.scripts.event_features import (
     build_stage2_baseline_features as build_baseline,
 )
+from HW_analysis.tests.stage2_fixtures import climatology_for, stage1_attrs
 
 
 def test_parse_args_requires_explicit_baseline_universe(monkeypatch):
@@ -46,7 +47,7 @@ def test_validate_args_rejects_allow_missing_without_extended(tmp_path):
 def test_build_baseline_uses_selected_source_and_marks_event_adjacency():
     ds = _make_baseline_dataset(event_id_source="lwa_a_event_id")
 
-    out = build_baseline.build_baseline_features(ds, season_months=[6])
+    out = _build_baseline_features(ds, season_months=[6])
 
     assert out.sizes["baseline_day"] == 19
     reference_days = out["reference_time"].values.astype("datetime64[D]")
@@ -68,7 +69,7 @@ def test_build_baseline_uses_selected_source_and_marks_event_adjacency():
 
 
 def test_build_baseline_uses_tas_source_when_selected():
-    out = build_baseline.build_baseline_features(
+    out = _build_baseline_features(
         _make_baseline_dataset(event_id_source="hw_event_id"),
         season_months=[6],
     )
@@ -80,7 +81,7 @@ def test_build_baseline_uses_tas_source_when_selected():
 
 
 def test_build_baseline_writes_reference_features_without_event_peak_analogues():
-    out = build_baseline.build_baseline_features(
+    out = _build_baseline_features(
         _make_baseline_dataset(),
         season_months=[6],
     )
@@ -94,14 +95,14 @@ def test_build_baseline_writes_reference_features_without_event_peak_analogues()
         out["I_dyn_pre"],
         out["I_adiabatic_pre"] + out["I_advection_pre"],
     )
-    assert out["I_dyn_pre"].attrs["formula"] == (
-        "I_adiabatic_pre + I_advection_pre"
-    )
+    assert out["I_dyn_pre"].attrs["formula"] == ("I_adiabatic_pre + I_advection_pre")
     assert out["I_dyn_pre"].attrs["units"] == "K"
     assert out["I_lwa_a_pre_reference"].min().item() == 485.0
     assert out["I_lwa_c_pre_reference"].min().item() == 582.0
     assert out["I_lwa_a_pre_reference"].attrs["window_name"] == "lwa_pre_reference"
-    assert out["n_samples_lwa_pre_reference"].attrs["window_name"] == "lwa_pre_reference"
+    assert (
+        out["n_samples_lwa_pre_reference"].attrs["window_name"] == "lwa_pre_reference"
+    )
     assert out["T_anom_mean_ant"].min().item() == 10.0
     assert out.attrs["pipeline_stage"] == "stage_2_baseline_features"
     assert out.attrs["feature_method"] == "fixed_windows_relative_to_reference_time"
@@ -126,7 +127,7 @@ def test_build_baseline_writes_reference_features_without_event_peak_analogues()
 
 
 def test_build_baseline_applies_season_and_drops_boundary_days():
-    out = build_baseline.build_baseline_features(
+    out = _build_baseline_features(
         _make_baseline_dataset(),
         all_seasons=True,
     )
@@ -140,7 +141,7 @@ def test_build_baseline_applies_season_and_drops_boundary_days():
 
 
 def test_build_baseline_adds_extended_features():
-    out = build_baseline.build_baseline_features(
+    out = _build_baseline_features(
         _make_baseline_dataset(add_extended=True),
         season_months=[6],
         use_extended_variables=True,
@@ -156,7 +157,7 @@ def test_build_baseline_requires_event_id_source_metadata():
     del ds.attrs["event_id_source"]
 
     with pytest.raises(ValueError, match="event_id_source metadata"):
-        build_baseline.build_baseline_features(ds, season_months=[6])
+        _build_baseline_features(ds, season_months=[6])
 
 
 def test_build_baseline_requires_event_id_source_variable():
@@ -164,14 +165,14 @@ def test_build_baseline_requires_event_id_source_variable():
     ds.attrs["event_id_source"] = "missing_event_id"
 
     with pytest.raises(ValueError, match="not present"):
-        build_baseline.build_baseline_features(ds, season_months=[6])
+        _build_baseline_features(ds, season_months=[6])
 
 
 def test_build_baseline_requires_fixed_window_source_variables():
     ds = _make_baseline_dataset().drop_vars("dTdt")
 
     with pytest.raises(ValueError, match="required time-indexed variables: dTdt"):
-        build_baseline.build_baseline_features(ds, season_months=[6])
+        _build_baseline_features(ds, season_months=[6])
 
 
 def test_build_baseline_rejects_missing_event_ids():
@@ -179,7 +180,7 @@ def test_build_baseline_rejects_missing_event_ids():
     ds["hw_event_id"][0] = np.nan
 
     with pytest.raises(ValueError, match="contains missing values"):
-        build_baseline.build_baseline_features(ds, season_months=[6])
+        _build_baseline_features(ds, season_months=[6])
 
 
 def test_build_baseline_rejects_inconsistent_within_day_event_ids():
@@ -188,7 +189,7 @@ def test_build_baseline_rejects_inconsistent_within_day_event_ids():
     ds["hw_event_id"][idx] = 0
 
     with pytest.raises(ValueError, match="inconsistent within"):
-        build_baseline.build_baseline_features(ds, season_months=[6])
+        _build_baseline_features(ds, season_months=[6])
 
 
 def _make_baseline_dataset(
@@ -239,4 +240,13 @@ def _make_baseline_dataset(
             "surface_energy_heating_rate_approx",
         ):
             ds[name].attrs["units"] = "K hr-1"
+    ds.attrs.update(stage1_attrs())
+    ds["T_mean"] = ("time", np.full(time.size, 280.0))
     return ds
+
+
+def _build_baseline_features(ds, **kwargs):
+    """Supply a matching synthetic companion for existing builder regressions."""
+    return build_baseline.build_baseline_features(
+        ds, climatology=climatology_for(ds), **kwargs
+    )

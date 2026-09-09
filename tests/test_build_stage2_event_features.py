@@ -8,6 +8,7 @@ from HW_analysis.scripts.event_features import (
     build_stage2_event_features as build_event_features,
 )
 from HW_analysis.scripts.event_features import event_feature_config as feature_config
+from HW_analysis.tests.stage2_fixtures import climatology_for, stage1_attrs
 
 
 def test_config_uses_expected_default_windows():
@@ -36,6 +37,8 @@ def test_parse_args_accepts_all_seasons(monkeypatch, tmp_path):
             str(input_path),
             "--output-path",
             str(output_path),
+            "--climatology-path",
+            str(tmp_path / "climatology.nc"),
             "--all-seasons",
         ],
     )
@@ -84,7 +87,7 @@ def test_validate_args_rejects_existing_output_without_overwrite(tmp_path):
 def test_build_default_features_uses_inclusive_windows_and_derived_tas_anom():
     ds = _make_feature_dataset()
 
-    out = build_event_features.build_event_features(ds, all_seasons=True)
+    out = _build_event_features(ds, all_seasons=True)
 
     assert out.sizes["event"] == 1
     np.testing.assert_array_equal(out["event_id"].values, [1])
@@ -121,7 +124,7 @@ def test_build_default_features_uses_inclusive_windows_and_derived_tas_anom():
 def test_build_features_drops_boundary_events_when_required_window_is_outside_data():
     ds = _make_feature_dataset(include_boundary_event=True)
 
-    out = build_event_features.build_event_features(ds, all_seasons=True)
+    out = _build_event_features(ds, all_seasons=True)
 
     np.testing.assert_array_equal(out["event_id"].values, [1])
     assert out.attrs["dropped_boundary_events"] == 1
@@ -132,13 +135,13 @@ def test_build_features_rejects_inconsistent_dynamical_component_units():
     ds["advection"].attrs["units"] = "m s-1"
 
     with pytest.raises(ValueError, match="different units"):
-        build_event_features.build_event_features(ds, all_seasons=True)
+        _build_event_features(ds, all_seasons=True)
 
 
 def test_build_features_applies_season_selection_and_full_event_requirement():
     ds = _make_feature_dataset(include_cross_month_event=True)
 
-    out = build_event_features.build_event_features(
+    out = _build_event_features(
         ds,
         season_months=[6],
         require_full_event=True,
@@ -152,7 +155,7 @@ def test_build_features_applies_season_selection_and_full_event_requirement():
 def test_build_extended_features_adds_optional_diagnostics():
     ds = _make_feature_dataset(add_extended=True)
 
-    out = build_event_features.build_event_features(
+    out = _build_event_features(
         ds,
         all_seasons=True,
         use_extended_variables=True,
@@ -166,14 +169,17 @@ def test_build_extended_features_adds_optional_diagnostics():
     assert out["soil_moisture_mean_ant"].item() == pytest.approx(154.0 / 145.0)
     assert out["cloud_cover_mean_ant"].item() == 0.5
     assert out["soil_moisture_change"].item() == 9.0
-    assert out["I_sshf_pre"].attrs["sign_convention"] == "native Stage-1/source signs retained"
+    assert (
+        out["I_sshf_pre"].attrs["sign_convention"]
+        == "native Stage-1/source signs retained"
+    )
 
 
 def test_build_extended_features_raises_for_missing_extended_variables():
     ds = _make_feature_dataset()
 
     with pytest.raises(ValueError, match="missing required extended variables"):
-        build_event_features.build_event_features(
+        _build_event_features(
             ds,
             all_seasons=True,
             use_extended_variables=True,
@@ -184,7 +190,7 @@ def test_build_extended_features_can_skip_missing_extended_variables():
     ds = _make_feature_dataset()
 
     with pytest.warns(RuntimeWarning, match="Skipping missing extended variables"):
-        out = build_event_features.build_event_features(
+        out = _build_event_features(
             ds,
             all_seasons=True,
             use_extended_variables=True,
@@ -197,7 +203,10 @@ def test_build_extended_features_can_skip_missing_extended_variables():
 
 def test_write_feature_outputs_writes_netcdf_and_optional_csv(tmp_path):
     features = xr.Dataset(
-        data_vars={"event_id": ("event", np.array([1])), "I_dTdt_pre": ("event", np.array([1.0]))},
+        data_vars={
+            "event_id": ("event", np.array([1])),
+            "I_dTdt_pre": ("event", np.array([1.0])),
+        },
         coords={"event": np.array([0])},
     )
     output_path = tmp_path / "features.nc"
@@ -234,17 +243,35 @@ def test_main_orchestrates_open_build_and_write(monkeypatch, tmp_path):
         captured["csv_output_path"] = csv_output_path
         return [Path(output_path)]
 
-    monkeypatch.setattr("sys.argv", ["build_stage2_event_features.py", "--all-seasons"])
-    monkeypatch.setattr(build_event_features.analysis_io, "open_harmonized_timeseries", fake_open)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "build_stage2_event_features.py",
+            "--all-seasons",
+            "--climatology-path",
+            "climate.nc",
+        ],
+    )
+    monkeypatch.setattr(
+        build_event_features.analysis_io, "open_harmonized_timeseries", fake_open
+    )
     monkeypatch.setattr(build_event_features, "build_event_features", fake_build)
     monkeypatch.setattr(build_event_features, "write_feature_outputs", fake_write)
 
+    climate = climatology_for(opened)
+    monkeypatch.setattr(
+        build_event_features.analysis_io,
+        "open_regional_hourly_climatology",
+        lambda path: climate,
+    )
     result = build_event_features.main()
 
     assert result == 0
     assert captured["input_path"] == feature_config.DEFAULT_INPUT_PATH
     assert captured["build_ds"] is opened
     assert captured["build_kwargs"] == {
+        "climatology": climate,
+        "climatology_path": Path("climate.nc"),
         "use_extended_variables": False,
         "allow_missing_extended": False,
         "season_months": None,
@@ -337,4 +364,13 @@ def _make_feature_dataset(
             "surface_energy_heating_rate_approx",
         ):
             ds[name].attrs["units"] = "K hr-1"
+    ds.attrs.update(stage1_attrs())
+    ds["T_mean"] = ("time", np.full(time.size, 280.0))
     return ds
+
+
+def _build_event_features(ds, **kwargs):
+    """Supply a matching synthetic companion for existing builder regressions."""
+    return build_event_features.build_event_features(
+        ds, climatology=climatology_for(ds), **kwargs
+    )

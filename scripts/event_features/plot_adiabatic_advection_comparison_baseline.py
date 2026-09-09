@@ -28,6 +28,7 @@ from matplotlib.collections import PathCollection
 from matplotlib.colors import Normalize
 
 from src import plot_style
+from src.temperature_diagnostics import add_temperature_reference_lines
 
 REGION = "pnw_hotz"
 THRESHOLD_VARIABLE = "tas"
@@ -425,6 +426,17 @@ def plot_presentation_tendency_scatter(
     event_alpha: float,
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return the presentation 2x1 event-versus-baseline comparison."""
+    clean = clean & np.logical_and.reduce([np.isfinite(v) for v in baseline.values()])
+    event_keep = np.isfinite(event_color_values) & np.logical_and.reduce(
+        [np.isfinite(v) for v in events.values()]
+    )
+    if not clean.any() or not event_keep.any():
+        raise ValueError(
+            "Presentation layout requires common finite baseline and event rows."
+        )
+    events = {name: values[event_keep] for name, values in events.items()}
+    event_color_values = event_color_values[event_keep]
+    event_color_norm = plot_style.finite_range_color_norm(event_color_values)
     fig, axes = plt.subplots(
         nrows=2,
         ncols=1,
@@ -447,6 +459,7 @@ def plot_presentation_tendency_scatter(
         event_point_size=event_point_size,
         event_alpha=event_alpha,
         show_legend=True,
+        show_counts=False,
     )
     add_one_to_negative_one_line_from_panel(axes[0])
     axes[0].set_title("Advection vs Adiabatic Heating")
@@ -467,17 +480,26 @@ def plot_presentation_tendency_scatter(
         event_point_size=event_point_size,
         event_alpha=event_alpha,
         show_legend=False,
+        show_counts=False,
     )
-    axes[1].set_title(r"Diabatic Heating vs $I_{dyn,net}$")
+    axes[1].set_title(r"Diabatic Residual vs $I_{dyn,net}$")
     axes[1].set_ylabel(variable_label(DIABATIC_VARIABLE))
     axes[1].set_xlabel(NET_DYNAMICAL_LABEL)
 
     for ax in axes:
         set_shared_x_data_limits(np.array([ax]), panel_x_values(np.array([ax])))
 
+    add_temperature_reference_lines(axes[1], slope=-1)
+    fig.supxlabel(
+        r"Lower-panel lines: $I_{dyn,net}+I_{diabatic}=I_{dT/dt}$ (K)",
+        fontsize=plot_style.LEGEND_FONT_SIZE_PT,
+    )
     colorbar = fig.colorbar(event_mappable, ax=axes, shrink=0.92)
     colorbar.set_label(variable_label(color_variable))
-    fig.suptitle("Events vs Clean Baseline-Day Tendencies")
+    fig.suptitle(
+        "Events vs Clean Baseline-Day Tendencies\n"
+        f"Clean baseline n = {int(clean.sum())}; events n = {int(event_keep.sum())}"
+    )
     return fig
 
 
@@ -496,6 +518,7 @@ def plot_comparison_panel(
     event_point_size: float,
     event_alpha: float,
     show_legend: bool,
+    show_counts: bool = True,
 ) -> PathCollection:
     """Plot clean baseline and selected event layers in one panel."""
     baseline_finite = clean & np.isfinite(baseline_x) & np.isfinite(baseline_y)
@@ -534,6 +557,20 @@ def plot_comparison_panel(
             loc="upper right",
             **plot_style.legend_kwargs(),
         )
+    if show_counts:
+        add_population_counts(ax, baseline_finite, event_finite)
+    plot_style.style_axis(ax)
+    set_y_data_limits(
+        ax,
+        np.concatenate((baseline_y[baseline_finite], event_y[event_finite])),
+    )
+    return event_scatter
+
+
+def add_population_counts(
+    ax: Axes, baseline_finite: np.ndarray, event_finite: np.ndarray
+) -> None:
+    """Add the legacy per-panel count annotation."""
     ax.text(
         0.03,
         0.97,
@@ -547,12 +584,6 @@ def plot_comparison_panel(
         fontsize=9,
         bbox={"facecolor": "white", "edgecolor": "0.8", "alpha": 0.85},
     )
-    plot_style.style_axis(ax)
-    set_y_data_limits(
-        ax,
-        np.concatenate((baseline_y[baseline_finite], event_y[event_finite])),
-    )
-    return event_scatter
 
 
 def validate_feature_variables(
