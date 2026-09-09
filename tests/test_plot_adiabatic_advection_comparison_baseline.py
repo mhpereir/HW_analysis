@@ -1,3 +1,4 @@
+from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
@@ -43,6 +44,7 @@ def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
         for line in references:
             total = line.get_xdata() + line.get_ydata()
             np.testing.assert_allclose(total, total[0])
+            assert total[0] / 5 == pytest.approx(round(total[0] / 5))
         _assert_offsets(
             plot_axes[0].collections[0],
             np.array([1.0, 4.0, 5.0, 8.0]),
@@ -81,6 +83,35 @@ def test_layout_defaults_use_distinct_output_paths_and_reject_unknown_layouts():
             _make_event_table(),
             layout="unknown",
         )
+
+
+def test_presentation_numeric_ticks_remain_legible_over_broad_signed_range():
+    baseline, events = _make_baseline_table(), _make_event_table()
+    baseline["I_dyn_pre"] = ("baseline_day", [-27.0, -18.0, -10.0, -4.0, 3.0, 8.0])
+    events["I_dyn_pre"] = ("event", [-20.0, 0.0, 9.0])
+    fig = plot_diag.plot_tendency_scatter(baseline, events, layout="presentation")
+    try:
+        plot_diag.plot_style.format_numeric_axes(fig)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        for ax in fig.axes[:2]:
+            left, right = ax.get_xlim()
+            boxes = [
+                label.get_window_extent(renderer)
+                for tick, label in zip(
+                    ax.get_xticks(), ax.get_xticklabels(), strict=True
+                )
+                if left <= tick <= right
+            ]
+            assert len(boxes) <= 6
+            assert all(a.x1 < b.x0 for a, b in pairwise(boxes))
+        for invalid in (0, -1, 2.5, True):
+            with pytest.raises(ValueError, match="positive integer"):
+                plot_diag.plot_style.limit_numeric_tick_density(
+                    fig.axes[0].xaxis, max_intervals=invalid
+                )
+    finally:
+        plot_diag.plt.close(fig)
 
 
 def test_plot_creates_four_panels_with_baseline_and_colored_event_layers():

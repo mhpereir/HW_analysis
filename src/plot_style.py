@@ -243,6 +243,19 @@ def format_integer_axis(axis, *, spacing: int = 1) -> None:
     use_default_numeric_formatter(axis)
 
 
+def limit_numeric_tick_density(axis, *, max_intervals: int = 5) -> None:
+    """Limit major intervals on a narrow numeric axis, retaining shared formatting."""
+    from matplotlib.ticker import MaxNLocator
+
+    if (
+        isinstance(max_intervals, bool)
+        or not isinstance(max_intervals, int)
+        or max_intervals < 1
+    ):
+        raise ValueError("max_intervals must be a positive integer.")
+    axis.set_major_locator(MaxNLocator(nbins=max_intervals))
+
+
 def style_axis(ax, *, grid: bool = True) -> None:
     if ax.get_xscale() == "linear" and not _is_date_axis(ax.xaxis):
         ax.xaxis.set_minor_locator(AutoMinorLocator())

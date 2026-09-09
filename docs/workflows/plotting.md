@@ -134,7 +134,9 @@ figure entrypoints.
 - The baseline-comparison presentation layout uses one common finite
   population across its retained panels and one shared count annotation.
   Its lower panel identifies diabatic heating as a residual and adds
-  `x+y=c` references for total integrated budget warming. The full four-panel
+  `x+y=c` references at 5 K increments for total integrated budget warming.
+  Limit presentation x axes to about five major intervals to keep the shared
+  fixed-decimal labels legible. The full four-panel
   diagnostic remains unchanged.
 - `scripts/event_features/plot_antecedent_temperature.py` consumes only the
   rebuilt Stage-2 event table. Its 2x2 panels compare anchor TAS anomaly against

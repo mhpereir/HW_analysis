@@ -488,8 +488,9 @@ def plot_presentation_tendency_scatter(
 
     for ax in axes:
         set_shared_x_data_limits(np.array([ax]), panel_x_values(np.array([ax])))
+        plot_style.limit_numeric_tick_density(ax.xaxis)
 
-    add_temperature_reference_lines(axes[1], slope=-1)
+    add_temperature_reference_lines(axes[1], slope=-1, spacing=5.0)
     fig.supxlabel(
         r"Lower-panel lines: $I_{dyn,net}+I_{diabatic}=I_{dT/dt}$ (K)",
         fontsize=plot_style.LEGEND_FONT_SIZE_PT,
