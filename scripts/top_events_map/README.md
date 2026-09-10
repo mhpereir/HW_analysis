@@ -75,7 +75,9 @@ clean checkout with the required environment variables passed explicitly via
 `qsub -v`. Do not use `qsub -V`.
 
 The job writes into a fresh staging directory, validates the NetCDF and PNGs,
-records `manifest.json`, then publishes the run directory without replacement.
+independently compares all six fields to direct daily-source sums, records
+`source_validation.json` and `manifest.json`, then publishes the run directory
+without replacement.
 Failed staging directories are retained for diagnosis. Its independent log is
 `LOG_DIR/<PBS_JOBID>_top_events_map.log`. A completed run contains:
 
@@ -83,6 +85,7 @@ Failed staging directories are retained for diagnosis. Its independent log is
 <RUN_DIR>/
   top_events_map.nc
   figures/top_events_map_<region>_rank01_event<id>_<YYYYMMDD>.png
+  source_validation.json
   manifest.json
 ```
 

@@ -15,6 +15,7 @@ from HW_analysis.scripts.top_events_map import plot_top_events_map as plot_cli
 from HW_analysis.src import analysis_io, config, data_io, plot_style
 from HW_analysis.src import top_events_map as maps
 from HW_analysis.src import top_events_map_plotting as plotting
+from HW_analysis.src.top_events_map_validation import validate_against_sources
 from matplotlib.colors import to_rgba
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -417,3 +418,31 @@ def test_pbs_script_parses_and_rejects_stale_commit_without_creating_outputs(tmp
     assert result.returncode != 0
     assert not (tmp_path / "run").exists()
     assert not (tmp_path / "logs").exists()
+
+
+def test_independent_validator_covers_multiple_years_and_detects_consistent_corruption(
+    tmp_path,
+):
+    features, kwargs = _inputs(tmp_path, ("2021-06-29", "2020-02-29", "2021-01-01"))
+    product = maps.build_top_event_maps(features, top_n=3, **kwargs)
+    report = validate_against_sources(product)
+    assert report["status"] == "passed"
+    assert len(report["events"]) == 3
+    assert max(report["max_absolute_errors"].values()) < 1e-10
+    # This corruption preserves the internal anomaly identity, so only the
+    # independent source comparison exposes the wrong physical field.
+    product.t2m_event_mean.values += 0.25
+    product.t2m_anomaly.values += 0.25
+    maps.validate_top_event_maps(product)
+    with pytest.raises(AssertionError, match="Independent source check"):
+        validate_against_sources(product)
+
+
+def test_independent_validator_rejects_changed_input_identity(tmp_path):
+    features, kwargs = _inputs(tmp_path)
+    product = maps.build_top_event_maps(features, **kwargs)
+    path = kwargs["event_features_path"]
+    stat = path.stat()
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1000))
+    with pytest.raises(ValueError, match="Source file identity changed"):
+        validate_against_sources(product)

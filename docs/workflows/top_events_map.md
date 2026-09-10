@@ -92,3 +92,13 @@ three-day sums from the annual files and matching climatology, confirm event
 selection, finite arrays, provenance and checksums, and inspect the exported
 PNG at original resolution. A local synthetic render is not a production
 2021 heatwave figure.
+
+`validate_top_events_map.py` performs that independent source comparison on a
+PBS worker before publication. It independently ranks the source event table,
+checks IDs and peak dates, selects source cells by the saved grid coordinates,
+matches climatology by month/day, and directly sums three daily samples. All
+six fields must agree with absolute tolerance `1e-10` and zero relative
+tolerance. It does not call the builder's field loader or reduction. Source
+file identities and the event-table checksum must still match the product.
+The immutable `source_validation.json` records maximum absolute errors and
+the validated events, input identities, product hash, and validator commit.

@@ -81,6 +81,10 @@ if [[ -n "${OUTLINE_REGIONS:-}" ]]; then
 fi
 /usr/bin/time -v python scripts/top_events_map/plot_top_events_map.py "${plot_args[@]}"
 
+/usr/bin/time -v python scripts/top_events_map/validate_top_events_map.py \
+    --input-path "${STAGING_DIR}/top_events_map.nc" \
+    --output-path "${STAGING_DIR}/source_validation.json"
+
 python - "${STAGING_DIR}" "${RUN_DIR}" "${LOGFILE}" <<'PY'
 import json
 import os
@@ -106,7 +110,7 @@ with analysis_io.open_top_event_maps(staging / "top_events_map.nc") as ds:
             image.load()
             assert min(image.size) > 100
             assert np.asarray(image.convert("RGB")).std() > 1, f"Blank figure: {path}"
-    artifacts = [staging / "top_events_map.nc", *figures]
+    artifacts = [staging / "top_events_map.nc", staging / "source_validation.json", *figures]
     manifest = {
         "pipeline_stage": "top_events_map",
         "commit": ds.attrs["source_commit"],
@@ -129,7 +133,7 @@ with analysis_io.open_top_event_maps(staging / "top_events_map.nc") as ds:
         "input_files": json.loads(ds.attrs["source_files"]),
         "event_features_sha256": ds.attrs["event_features_sha256"],
         "artifacts": {str(path.relative_to(staging)): sha256_file(path) for path in artifacts},
-        "validation": "product contract, finite arrays, anomaly identities, PNG decode and nonblank",
+        "validation": "product contract, independent ranking and daily-source sums, finite arrays, anomaly identities, PNG decode and nonblank",
         "created_utc": datetime.now(timezone.utc).isoformat(),
     }
 with (staging / "manifest.json").open("x") as stream:
