@@ -56,6 +56,7 @@ results/plots_<plot_name>/
 | Stage 2 event features plus tracked settings | matched positive/negative `I_dyn` diagnostics | `scripts/idyn_matching_exploration/explore_idyn_matching.py` |
 | Spatial composite product | sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |
 | Matched spatial composite product | matched positive/negative `I_dyn_pre` sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py` |
+| Prepared top-event spatial product | single-panel three-day T2m/Z500 anomaly maps with regional outlines | `scripts/top_events_map/plot_top_events_map.py` |
 
 Scripts under `scripts/event_features/old/` are legacy and are not active
 figure entrypoints.

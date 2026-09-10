@@ -262,6 +262,42 @@ def _prepare_for_netcdf(ds: xr.Dataset) -> xr.Dataset:
     return out
 
 
+def save_top_event_maps(ds: xr.Dataset, path: str | Path) -> Path:
+    """Publish a validated map product without replacing an existing file."""
+    from .top_events_map import validate_top_event_maps
+
+    validate_top_event_maps(ds)
+    output_path = Path(path).expanduser().resolve()
+    if output_path.exists():
+        raise FileExistsError(f"Output exists: {output_path}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = output_path.with_name(f".{output_path.name}.{uuid4().hex}.partial")
+    try:
+        prepared = _prepare_for_netcdf(ds)
+        encoding = {name: {"zlib": True, "complevel": 4}
+                    for name, da in prepared.data_vars.items() if da.ndim == 3}
+        prepared.to_netcdf(temporary_path, engine="h5netcdf", encoding=encoding)
+        with xr.open_dataset(temporary_path, engine="h5netcdf", decode_timedelta=True) as saved:
+            validate_top_event_maps(saved)
+        os.link(temporary_path, output_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+    return output_path
+
+
+def open_top_event_maps(path: str | Path) -> xr.Dataset:
+    """Return a validated map product; the caller owns the open dataset."""
+    from .top_events_map import validate_top_event_maps
+
+    ds = xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True)
+    try:
+        validate_top_event_maps(ds)
+    except Exception:
+        ds.close()
+        raise
+    return ds
+
+
 def _write_netcdf_atomically(ds: xr.Dataset, output_path: Path) -> None:
     """Write beside the destination and publish only a complete NetCDF file."""
     temporary_path = output_path.with_name(

@@ -230,6 +230,11 @@ audit consistency, and no unmatched-output replacement.
 
 ## Boundaries
 
+The separate [top-event map workflow](top_events_map.md) reuses the annual daily
+fields and climatology for a three-day mean around individual ranked peaks.
+It writes its own prepared product and single-panel figures under
+`results/top_events_map/`; sign-group composites are not inputs to those maps.
+
 - Do not load full spatial fields into Stage 1 or Stage 2.
 - Do not rebuild event definitions in the spatial workflow.
 - Do not compute hourly ERA5 daily means inside the Python composite builder.

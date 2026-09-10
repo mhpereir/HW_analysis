@@ -24,6 +24,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, TypeAlias
 
+import numpy as np
+import pandas as pd
 import xarray as xr
 
 from . import config
@@ -43,6 +45,127 @@ CLOUD_COVER_LAYOUTS: tuple[str, ...] = (
     CLOUD_COVER_LAYOUT_GLOBAL,
     CLOUD_COVER_LAYOUT_LEGACY_REGIONAL,
 )
+
+
+def load_daily_spatial_fields(
+    path: str | Path,
+    dates: pd.DatetimeIndex,
+    *,
+    lat_bounds: tuple[float, float],
+    lon_bounds: tuple[float, float],
+    climatology: bool = False,
+) -> xr.Dataset:
+    """Load only requested days/cells from prepared daily ERA5 T2m and Z500.
+
+    Climatology uses month/day keys, then receives the requested actual dates.
+    Returned arrays are in memory and own no open file resources.
+    """
+    path = Path(path).expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"Missing daily spatial input: {path}")
+    if dates.empty or dates.hasnans or not dates.equals(dates.normalize()):
+        raise ValueError("Requested dates must be nonempty finite UTC midnights.")
+    if dates.tz is not None or dates.has_duplicates:
+        raise ValueError("Requested dates must be unique and timezone-naive UTC.")
+    with xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True) as source:
+        ds = _normalize_daily_spatial_fields(source, lat_bounds, lon_bounds)
+        time = pd.DatetimeIndex(ds.time.values)
+        if time.hasnans or time.has_duplicates or not time.equals(time.normalize()):
+            raise ValueError(f"{path}: expected unique finite midnight timestamps.")
+        if climatology:
+            keys = list(zip(time.month, time.day, strict=True))
+            if len(keys) != 366 or len(set(keys)) != 366:
+                raise ValueError(f"{path}: climatology needs 366 unique month/day keys.")
+            lookup = {key: index for index, key in enumerate(keys)}
+            requested = list(zip(dates.month, dates.day, strict=True))
+        else:
+            lookup = {value: index for index, value in enumerate(time)}
+            requested = list(dates)
+        missing = [key for key in requested if key not in lookup]
+        if missing:
+            raise ValueError(f"{path}: missing required daily timestamps/keys: {missing}")
+        selected = ds.isel(time=[lookup[key] for key in requested]).load()
+        out = xr.Dataset(coords={
+            "time": dates.values,
+            "latitude": selected.latitude,
+            "longitude": selected.longitude,
+        }, attrs=dict(source.attrs))
+        out.latitude.attrs["units"] = "degrees_north"
+        out.longitude.attrs["units"] = "degrees_east"
+        for source_name, name, units, divisor in (
+            ("t2m", "t2m", "K", 1.0),
+            ("z", "z500", "m", config.G_M_S2),
+        ):
+            values = np.asarray(selected[source_name].values, dtype=np.float64)
+            if not np.isfinite(values).all():
+                raise ValueError(f"{path}: {source_name} contains non-finite selected fields.")
+            out[name] = (("time", "latitude", "longitude"), values / divisor)
+            out[name].attrs["units"] = units
+    return out
+
+
+def _normalize_daily_spatial_fields(
+    source: xr.Dataset,
+    lat_bounds: tuple[float, float],
+    lon_bounds: tuple[float, float],
+) -> xr.Dataset:
+    """Validate units/coordinates and crop lazily before any spatial reads."""
+    rename = {}
+    for canonical, aliases in (
+        ("time", ("time", "valid_time")),
+        ("latitude", ("latitude", "lat")),
+        ("longitude", ("longitude", "lon")),
+    ):
+        found = [name for name in aliases if name in source.coords]
+        if len(found) != 1 or source[found[0]].dims != (found[0],):
+            raise ValueError(f"Expected one one-dimensional {canonical} coordinate.")
+        rename[found[0]] = canonical
+    ds = source.rename(rename)
+    for name, allowed in (
+        ("t2m", {"k", "kelvin"}),
+        ("z", {"m**2s**-2", "m^2s^-2", "m2s-2", "m2/s2", "m^2/s^2"}),
+    ):
+        if name not in ds:
+            raise ValueError(f"Daily spatial input is missing {name!r}.")
+        units = str(ds[name].attrs.get("units", "")).lower().replace(" ", "")
+        if units not in allowed:
+            raise ValueError(f"Unexpected {name} units: {ds[name].attrs.get('units')!r}.")
+    levels = [name for name in ("pressure_level", "level", "isobaricInhPa") if name in ds.coords]
+    if len(levels) != 1:
+        raise ValueError("Daily Z500 needs an unambiguous 500 hPa pressure coordinate.")
+    level_name = levels[0]
+    level = ds[level_name]
+    pressure_units = str(level.attrs.get("units", "hPa" if level_name == "isobaricInhPa" else "")).lower()
+    if pressure_units not in {"pa", "hpa", "millibars", "mbar"}:
+        raise ValueError(f"Unsupported pressure units: {pressure_units!r}.")
+    values = np.asarray(level.values).reshape(-1)
+    expected = 50000.0 if pressure_units == "pa" else 500.0
+    if values.size != 1 or not np.isclose(values[0], expected):
+        raise ValueError("Daily spatial input must contain only 500 hPa geopotential.")
+    if level_name in ds.dims:
+        ds = ds.isel({level_name: 0}, drop=True)
+    for name in ("t2m", "z"):
+        if set(ds[name].dims) != {"time", "latitude", "longitude"}:
+            raise ValueError(f"{name} must have only time, latitude, longitude dimensions.")
+    if not np.issubdtype(ds.time.dtype, np.datetime64):
+        raise ValueError("Daily spatial input needs decoded Gregorian timestamps.")
+    lon = (np.asarray(ds.longitude.values, dtype=float) + 180.0) % 360.0 - 180.0
+    ds = ds.assign_coords(longitude=("longitude", lon)).sortby(["latitude", "longitude"])
+    for name, bounds, limits in (
+        ("latitude", lat_bounds, (-90.0, 90.0)),
+        ("longitude", lon_bounds, (-180.0, 180.0)),
+    ):
+        if not limits[0] <= bounds[0] < bounds[1] <= limits[1]:
+            raise ValueError(f"Invalid {name} bounds: {bounds}.")
+        axis = np.asarray(ds[name].values, dtype=float)
+        if not np.isfinite(axis).all() or axis.size < 2 or np.any(np.diff(axis) <= 0):
+            raise ValueError(f"{name} grid must be finite, unique, and increasing.")
+        if axis[0] > bounds[0] or axis[-1] < bounds[1]:
+            raise ValueError(f"Input {name} grid does not cover requested bounds {bounds}.")
+        ds = ds.sel({name: slice(*bounds)})
+        if ds.sizes[name] < 2:
+            raise ValueError(f"Requested {name} bounds select fewer than two cells.")
+    return ds[["t2m", "z"]].transpose("time", "latitude", "longitude")
 
 
 SURFACE_DIAGNOSTIC_ROOTS: dict[str, str] = {

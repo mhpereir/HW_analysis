@@ -94,6 +94,7 @@ annual daily fields + climatology + Stage 2 event features with I_dyn_pre
 | `results/spatial_composites/climatology/era5_daily_doy_climatology_*.nc` | `scripts/spatial_composites/build_era5_daily_doy_climatology.sh` | spatial composite builder |
 | `results/spatial_composites/dyn_net_daily_spatial_composites_*.nc` | `scripts/spatial_composites/build_dyn_net_spatial_composites.py` | spatial composite plotter |
 | `results/spatial_composites/matched_dyn_pre_daily_spatial_composites_*.nc` | `scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py` | matched spatial composite plotter |
+| `results/top_events_map/<run>/top_events_map.nc` | `scripts/top_events_map/build_top_events_map.py` | single-panel top-event map plotter |
 
 Stages 3 and 4 are inactive legacy workflows. Their PCA and clustering
 implementations are retained under `scripts/event_features/old/` for historical
@@ -120,6 +121,8 @@ products or plotting dependencies.
 | `src/plot_paths.py` | Structured default output paths for Stage-1-based figures. |
 | `scripts/region_vis/` | Inventory a Stage-1 run and render its configured regional domains on a Northern Hemisphere map. |
 | `scripts/spatial_composites/` | Prepare daily ERA5 fields, build lagged spatial products, and render maps. |
+| `src/top_events_map.py`, `src/top_events_map_plotting.py` | Build and render three-day single-event spatial products. |
+| `scripts/top_events_map/` | Thin build/plot CLIs and the dedicated Venus PBS entrypoint. |
 
 ## File And Directory Conventions
 
@@ -186,6 +189,7 @@ specifications.
 
 - [Composites](workflows/composites.md)
 - [Spatial composites](workflows/spatial_composites.md)
+- [Top-event maps](workflows/top_events_map.md)
 - [Plotting and shared style](workflows/plotting.md)
 
 Diagnostic and plotting scripts are workflow consumers, so their names describe

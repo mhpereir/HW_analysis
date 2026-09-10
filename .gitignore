@@ -6,3 +6,4 @@ logs/*
 results/stage1/*.nc
 *.old
 *.nc
+results/top_events_map/

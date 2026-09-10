@@ -106,6 +106,7 @@ a figure.
 | Stage 2 baseline features | [Baseline-day contract](products/stage2_baseline_features.md) |
 | Temporal composites | [Composite workflow](workflows/composites.md) |
 | Spatial ERA5 preparation and composites | [Spatial composite workflow](workflows/spatial_composites.md) |
+| Single-event T2m/Z500 anomaly maps | [Top-event maps](workflows/top_events_map.md) |
 | Figure conventions and shared style | [Plotting workflow](workflows/plotting.md) |
 | Scientific defaults | [Decision records](decisions/) |
 | Inactive PCA and clustering material | [Legacy index](legacy/README.md) |
@@ -123,7 +124,8 @@ a figure.
 | Prepare spatial ERA5 | `scripts/spatial_composites/build_era5_daily_spatial_data.sh`, `scripts/spatial_composites/build_era5_daily_doy_climatology.sh` |
 | Build and plot spatial composites | `scripts/spatial_composites/build_dyn_net_spatial_composites.py`, `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |
 | Build and plot matched spatial composites | `scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py`, `scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py` |
-| Run on Venus | matching scripts under `schedulers/`; the self-contained region-inventory diagnostic keeps its scheduler beside the plotter under `scripts/region_vis/` |
+| Build and plot top-event maps | `scripts/top_events_map/build_top_events_map.py`, `scripts/top_events_map/plot_top_events_map.py`; PBS entrypoint in the same folder |
+| Run on Venus | matching scripts under `schedulers/`; standalone region-inventory and top-event map workflows keep schedulers beside their scripts |
 
 Production inputs and results exist on Venus and remain outside Git. Local
 `dev_env` is for tests, compilation checks, and small synthetic prototypes.
