@@ -437,6 +437,11 @@ def plot_presentation_tendency_scatter(
         np.array([axes[1]]),
         net_dynamical_values[finite_diabatic],
     )
+    for ax in axes:
+        plot_style.limit_major_ticks(
+            ax.xaxis,
+            max_intervals=plot_style.PRESENTATION_SCATTER_X_INTERVALS,
+        )
 
     if color_variable is not None:
         cbar = fig.colorbar(mappable, ax=axes, shrink=0.92)
@@ -555,19 +560,12 @@ def feature_values(features: xr.Dataset, variable: str | None) -> np.ndarray:
 
 
 def set_shared_x_data_limits(axes: np.ndarray, x_values: np.ndarray) -> None:
-    """Limit shared x-axes to the finite extent of the plotted x-data."""
-    finite = np.asarray(x_values, dtype=float)
-    finite = finite[np.isfinite(finite)]
-    if finite.size == 0:
+    """Pad shared x-axes around plotted data and the zero reference."""
+    limits = plot_style.padded_data_limits(x_values, required_values=(0.0,))
+    if limits is None:
         return
-    xmin = float(np.nanmin(finite))
-    xmax = float(np.nanmax(finite))
-    if xmin == xmax:
-        padding = 0.5 if xmin == 0.0 else abs(xmin) * 0.05
-        xmin -= padding
-        xmax += padding
     for ax in axes:
-        ax.set_xlim(xmin, xmax)
+        ax.set_xlim(*limits)
 
 
 def variable_label(variable: str) -> str:

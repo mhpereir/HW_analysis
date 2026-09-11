@@ -131,6 +131,24 @@ figure entrypoints.
   height so the scatter panels and shared colorbar have more horizontal space.
   Synthetic plot tests must confirm both layouts, presentation dimensions, and
   their CLI routing.
+- In both adiabatic/advection comparison layouts, the event-only x-axes pad
+  the finite plotted range by 5% on either side, including zero in the range,
+  so extreme event markers are not cut in half. The presentation layout uses
+  the shared major-tick limiter with at most four intervals on each x-axis;
+  retain the shared two-decimal formatting and existing font and canvas sizes.
+- The adiabatic/advection baseline comparison uses a stable, visible Events
+  legend proxy sampled from the midpoint of the shared severity colormap,
+  with a contrasting outline. The proxy identifies the event population,
+  not an individual event or severity value; the unchanged colorbar remains
+  the quantitative severity key. Do not derive the legend marker from the
+  first event, whose color may be white. Keep the legend in the first panel.
+- These presentation repairs change only visual spacing and the legend key.
+  They must not change input products, plotted values, masks, counts, stored
+  `I_dyn_pre`, point colors/opacity, reference lines or layout routing. Test
+  extreme-marker clearance and non-overlapping ticks after the shared export
+  formatting at 300 DPI, including negative ranges and constant data, and
+  test legend visibility independently of input row order. Validate fresh,
+  non-overwriting Venus renders at original resolution before acceptance.
 - Event-versus-clean-baseline figures pad each finite plotted data range by 5%
   on both sides while keeping zero reference lines inside the padded range.
   Shared x-axes use the combined plotted x-data, while each panel derives its
@@ -238,3 +256,11 @@ python -m pytest -q \
 For a production figure change, also render a representative product through
 PBS on Venus and inspect the saved artifact, labels, units, panel ordering,
 legibility, and output path.
+
+For the presentation feature comparisons, first run the commit-pinned
+`schedulers/schedule_presentation_feature_smoke.sh` on Venus. It exercises the
+synthetic plotting/export regressions in `dev_env` with warnings treated as
+errors. Then render the unchanged accepted Stage-2 inputs through the existing
+event-only and baseline-comparison schedulers into fresh commit-scoped paths.
+Record input/output checksums, counts, clean logs and original-resolution
+inspection; a successful PBS job alone does not establish visual acceptance.

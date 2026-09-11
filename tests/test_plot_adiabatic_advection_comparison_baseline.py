@@ -1,3 +1,4 @@
+from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
@@ -6,6 +7,7 @@ import xarray as xr
 from HW_analysis.scripts.event_features import (
     plot_adiabatic_advection_comparison_baseline as plot_diag,
 )
+from matplotlib.colors import to_rgba
 
 
 def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
@@ -52,6 +54,71 @@ def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
             np.array([0.0, 0.0, 1.0]),
             np.array([1.0, 7.0, 11.0]),
         )
+    finally:
+        plot_diag.plt.close(fig)
+
+
+@pytest.mark.parametrize("layout", plot_diag.LAYOUT_CHOICES)
+@pytest.mark.parametrize("reverse_events", [False, True])
+def test_event_legend_key_is_visible_and_independent_of_first_event(
+    reverse_events, layout
+):
+    events = _make_event_table()
+    if reverse_events:
+        events = events.isel(event=slice(None, None, -1))
+    before = events.copy(deep=True)
+    fig = plot_diag.plot_tendency_scatter(
+        _make_baseline_table(),
+        events,
+        layout=layout,
+        event_alpha=0.7,
+    )
+    try:
+        fig.canvas.draw()
+        legend = fig.axes[0].get_legend()
+        handle = legend.legend_handles[1]
+        face = to_rgba(handle.get_markerfacecolor())
+        edge = to_rgba(handle.get_markeredgecolor())
+        expected = plot_diag.plt.get_cmap(plot_diag.COLOR_MAP)(0.5)
+        np.testing.assert_allclose(face, expected)
+        assert np.linalg.norm(np.asarray(face[:3]) - 1.0) > 0.5
+        assert np.linalg.norm(np.asarray(edge[:3]) - 1.0) > 0.5
+        assert handle.get_alpha() == 0.7
+        assert handle.get_label() == "Events"
+        np.testing.assert_allclose(
+            fig.axes[0].collections[1].get_array(),
+            events["tas_anom_peak"],
+        )
+        xr.testing.assert_identical(events, before)
+    finally:
+        plot_diag.plt.close(fig)
+
+
+@pytest.mark.parametrize("scale", [1.0, 1e-5, 1e5])
+def test_presentation_ticks_do_not_overlap_after_export(tmp_path, scale):
+    baseline = _make_baseline_table()
+    events = _make_event_table()
+    baseline["I_adiabatic_pre"][:] = np.linspace(-45.0, 28.0, 6) * scale
+    baseline["I_dyn_pre"][:] = np.linspace(-26.0, 10.0, 6) * scale
+    events["I_adiabatic_pre"][:] = np.array([-14.0, 4.0, 27.0]) * scale
+    events["I_dyn_pre"][:] = np.array([-9.5, 0.0, 9.0]) * scale
+    fig = plot_diag.plot_tendency_scatter(baseline, events, layout="presentation")
+    try:
+        plot_diag.plot_style.save_figure(fig, tmp_path / "ticks.png")
+        fig.set_dpi(plot_diag.plot_style.DPI)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        for ax in fig.axes[:2]:
+            labels = [
+                label
+                for label in ax.get_xticklabels()
+                if label.get_visible()
+                and ax.get_xlim()[0] <= label.get_position()[0] <= ax.get_xlim()[1]
+            ]
+            assert 2 <= len(labels) <= 5
+            boxes = [label.get_window_extent(renderer) for label in labels]
+            assert all(left.x1 + 2 < right.x0 for left, right in pairwise(boxes))
+            assert all(len(label.get_text().split(".")[-1]) == 2 for label in labels)
     finally:
         plot_diag.plt.close(fig)
 

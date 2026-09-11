@@ -48,6 +48,31 @@ def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
         plot_diag.plt.close(fig)
 
 
+@pytest.mark.parametrize("layout", plot_diag.LAYOUT_CHOICES)
+@pytest.mark.parametrize("constant", [False, True])
+def test_event_markers_have_x_clearance_after_export(tmp_path, layout, constant):
+    features = _make_feature_table()
+    if constant:
+        features["I_adiabatic_pre"][:] = 0.0
+        features["I_dyn_pre"][:] = -4.0
+    before = features.copy(deep=True)
+    fig = plot_diag.plot_tendency_scatter(features, layout=layout, point_size=24.0)
+    try:
+        plot_diag.plot_style.save_figure(fig, tmp_path / "clearance.png")
+        fig.set_dpi(plot_diag.plot_style.DPI)
+        fig.canvas.draw()
+        for ax in fig.axes[:-1]:
+            scatter = ax.collections[0]
+            centers = ax.transData.transform(scatter.get_offsets())
+            radius = np.sqrt(scatter.get_sizes().max()) * fig.dpi / 144.0
+            assert np.all(centers[:, 0] - radius > ax.bbox.x0)
+            assert np.all(centers[:, 0] + radius < ax.bbox.x1)
+            assert ax.get_xlim()[0] < 0.0 < ax.get_xlim()[1]
+        xr.testing.assert_identical(features, before)
+    finally:
+        plot_diag.plt.close(fig)
+
+
 def test_layout_defaults_use_distinct_output_paths_and_reject_unknown_layouts():
     assert plot_diag.default_output_path(plot_diag.FULL_LAYOUT) == (
         plot_diag.DEFAULT_OUTPUT_PATH

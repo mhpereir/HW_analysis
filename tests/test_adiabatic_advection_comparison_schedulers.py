@@ -63,6 +63,22 @@ def test_event_scheduler_requires_explicit_non_overwriting_paths():
     assert 'test -s "${OUTPUT_PATH}"' in text
 
 
+def test_presentation_smoke_is_pinned_and_runs_export_regressions():
+    scheduler = REPO_ROOT / "schedulers" / "schedule_presentation_feature_smoke.sh"
+    test_scheduler_is_commit_pinned_warning_free_and_syntax_valid(scheduler)
+    text = scheduler.read_text()
+    assert "#PBS -l select=1:ncpus=1:mem=4gb" in text
+    assert "#PBS -l walltime=00:10:00" in text
+    assert "-m pytest -q -W error" in text
+    assert 'test ! -e "${LOGFILE}"' in text
+    for name in (
+        "test_plot_style.py",
+        "test_plot_adiabatic_advection_comparison.py",
+        "test_plot_adiabatic_advection_comparison_baseline.py",
+    ):
+        assert f"tests/{name}" in text
+
+
 @pytest.mark.parametrize("scheduler", PRESENTATION_SCHEDULERS)
 def test_four_panel_schedulers_forward_the_requested_layout(scheduler):
     text = scheduler.read_text()

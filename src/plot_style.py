@@ -10,9 +10,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from matplotlib.colors import Normalize
+from matplotlib.lines import Line2D
 from matplotlib.ticker import (
     AutoMinorLocator,
     Formatter,
+    MaxNLocator,
     MultipleLocator,
     NullFormatter,
     StrMethodFormatter,
@@ -42,6 +44,7 @@ SINGLE_PANEL_ASPECT = 0.6
 TWO_PANEL_STACK_ASPECT = 0.55
 TWO_PANEL_COLUMN_ASPECT = 1.5
 PRESENTATION_TWO_PANEL_WIDTH_SCALE = 1.25
+PRESENTATION_SCATTER_X_INTERVALS = 4
 THREE_PANEL_STACK_ASPECT = 0.62
 SQUARE_PANEL_ASPECT = 0.95
 
@@ -239,6 +242,33 @@ def format_integer_axis(axis, *, spacing: int = 1) -> None:
     axis.set_major_locator(MultipleLocator(spacing))
     axis.set_major_formatter(StrMethodFormatter("{x:.0f}"))
     use_default_numeric_formatter(axis)
+
+
+def limit_major_ticks(axis, *, max_intervals: int) -> None:
+    """Limit numeric tick density without changing shared decimal formatting."""
+    if (
+        isinstance(max_intervals, bool)
+        or not isinstance(max_intervals, int)
+        or max_intervals < 1
+    ):
+        raise ValueError("max_intervals must be a positive integer.")
+    axis.set_major_locator(MaxNLocator(nbins=max_intervals))
+
+
+def event_severity_legend_handle(*, point_size: float, alpha: float) -> Line2D:
+    """Return a visible population key independent of the first event's color."""
+    return Line2D(
+        [],
+        [],
+        linestyle="none",
+        marker="o",
+        markersize=np.sqrt(point_size),
+        markerfacecolor=plt.get_cmap(EVENT_SEVERITY_COLOR_MAP)(0.5),
+        markeredgecolor=COLORS["benchmark"],
+        markeredgewidth=0.45,
+        alpha=alpha,
+        label="Events",
+    )
 
 
 def style_axis(ax, *, grid: bool = True) -> None:

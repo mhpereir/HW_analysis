@@ -474,6 +474,10 @@ def plot_presentation_tendency_scatter(
 
     for ax in axes:
         set_shared_x_data_limits(np.array([ax]), panel_x_values(np.array([ax])))
+        plot_style.limit_major_ticks(
+            ax.xaxis,
+            max_intervals=plot_style.PRESENTATION_SCATTER_X_INTERVALS,
+        )
 
     colorbar = fig.colorbar(event_mappable, ax=axes, shrink=0.92)
     colorbar.set_label(variable_label(color_variable))
@@ -530,7 +534,13 @@ def plot_comparison_panel(
     add_zero_reference_lines(ax)
     if show_legend:
         ax.legend(
-            handles=[baseline_scatter, event_scatter],
+            handles=[
+                baseline_scatter,
+                plot_style.event_severity_legend_handle(
+                    point_size=event_point_size,
+                    alpha=event_alpha,
+                ),
+            ],
             loc="upper right",
             **plot_style.legend_kwargs(),
         )
