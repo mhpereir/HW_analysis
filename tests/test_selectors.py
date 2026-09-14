@@ -4,6 +4,20 @@ import xarray as xr
 from HW_analysis.src import selectors
 
 
+def test_common_finite_mask_preserves_sources_and_rejects_invalid_shapes():
+    left = np.array([1.0, np.nan, 3.0, 4.0])
+    right = np.array([2.0, 3.0, np.inf, 5.0])
+    before = left.copy(), right.copy()
+    mask = selectors.common_finite_mask(left, right)
+    np.testing.assert_array_equal(mask, [True, False, False, True])
+    np.testing.assert_equal(left, before[0])
+    np.testing.assert_equal(right, before[1])
+    assert selectors.common_finite_mask(np.array([])).size == 0
+    for arrays in ((), (left, right[:2]), (left.reshape(2, 2),)):
+        with pytest.raises(ValueError, match="one-dimensional arrays of equal shape"):
+            selectors.common_finite_mask(*arrays)
+
+
 def test_select_events_by_season_uses_peak_month_with_drop_true():
     event_table = _make_event_table()
 

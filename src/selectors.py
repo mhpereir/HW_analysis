@@ -18,7 +18,6 @@ Out of scope:
 - Plotting.
 """
 
-
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -35,6 +34,16 @@ SIGN_MATCH_METHOD = "maximum_cardinality_minimum_distance"
 SIGN_MATCH_STANDARDIZATION = "pooled_group_standard_deviation"
 SIGN_MATCH_DISTANCE = "root_mean_square_standardized_difference"
 SIGN_MATCH_CALIPER_RULE = "all_variables_within_threshold"
+
+
+def common_finite_mask(*values: np.ndarray) -> np.ndarray:
+    """Select rows finite in every supplied field without mutating inputs."""
+    arrays = [np.asarray(value) for value in values]
+    if not arrays or any(
+        array.ndim != 1 or array.shape != arrays[0].shape for array in arrays
+    ):
+        raise ValueError("Expected one-dimensional arrays of equal shape.")
+    return np.logical_and.reduce([np.isfinite(array) for array in arrays])
 
 
 @dataclass(frozen=True)
@@ -188,9 +197,9 @@ def pooled_standard_deviation(left: np.ndarray, right: np.ndarray) -> float:
     right = np.asarray(right, dtype=float)
     if left.size < 2 or right.size < 2:
         return float("nan")
-    numerator = (left.size - 1) * np.var(left, ddof=1) + (
-        right.size - 1
-    ) * np.var(right, ddof=1)
+    numerator = (left.size - 1) * np.var(left, ddof=1) + (right.size - 1) * np.var(
+        right, ddof=1
+    )
     return float(np.sqrt(numerator / (left.size + right.size - 2)))
 
 

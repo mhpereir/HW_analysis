@@ -15,8 +15,13 @@ OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"
 LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
 COLOR_VARIABLE="${COLOR_VARIABLE:-tas_anom_peak}"
 LAYOUT="${LAYOUT:-full}"
-POINT_SIZE="${POINT_SIZE:-24.0}"
-ALPHA="${ALPHA:-0.7}"
+if [[ "${LAYOUT}" == "presentation" ]]; then
+    POINT_SIZE="${POINT_SIZE:-40.0}"
+    ALPHA="${ALPHA:-0.9}"
+else
+    POINT_SIZE="${POINT_SIZE:-24.0}"
+    ALPHA="${ALPHA:-0.7}"
+fi
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
@@ -46,6 +51,7 @@ echo "[info] event_input_path=${EVENT_INPUT_PATH}"
 echo "[info] output_path=${OUTPUT_PATH}"
 echo "[info] color_variable=${COLOR_VARIABLE}"
 echo "[info] layout=${LAYOUT}"
+echo "[info] point_size=${POINT_SIZE}; alpha=${ALPHA}"
 echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"

@@ -26,6 +26,7 @@ from matplotlib.axes import Axes
 from matplotlib.colors import Normalize, TwoSlopeNorm
 
 from src import plot_style
+from src.selectors import common_finite_mask
 
 REGION = "pnw_hotz"
 THRESHOLD_VARIABLE = "tas"
@@ -114,23 +115,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--point-size",
         type=float,
-        default=24.0,
-        help="Scatter marker size.",
+        default=None,
+        help="Scatter marker size (default: 40 for presentation, 24 for full).",
     )
     parser.add_argument(
         "--alpha",
         type=float,
-        default=0.75,
-        help="Scatter marker opacity.",
+        default=None,
+        help="Scatter marker opacity (default: 0.9 for presentation, 0.75 for full).",
     )
     return parser.parse_args()
 
 
 def validate_args(args: argparse.Namespace) -> None:
     """Validate CLI arguments."""
-    if args.point_size <= 0:
+    if args.point_size is not None and args.point_size <= 0:
         raise ValueError("--point-size must be > 0.")
-    if not 0 < args.alpha <= 1:
+    if args.alpha is not None and not 0 < args.alpha <= 1:
         raise ValueError("--alpha must satisfy 0 < alpha <= 1.")
 
 
@@ -184,8 +185,8 @@ def write_tendency_scatter_plot(
     *,
     layout: str = FULL_LAYOUT,
     color_variable: str | None = COLOR_VARIABLE,
-    point_size: float = 24.0,
-    alpha: float = 0.75,
+    point_size: float | None = None,
+    alpha: float | None = None,
 ) -> Path:
     """Write the adiabatic/advection net dynamical comparison figure."""
     output_path = Path(output_path).expanduser().resolve()
@@ -207,12 +208,17 @@ def plot_tendency_scatter(
     *,
     layout: str = FULL_LAYOUT,
     color_variable: str | None = COLOR_VARIABLE,
-    point_size: float = 24.0,
-    alpha: float = 0.75,
+    point_size: float | None = None,
+    alpha: float | None = None,
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return the requested adiabatic/advection comparison layout."""
     validate_layout(layout)
     validate_feature_variables(features, color_variable=color_variable)
+    presentation = layout == PRESENTATION_LAYOUT
+    if point_size is None:
+        point_size = plot_style.PRESENTATION_EVENT_SIZE_PT2 if presentation else 24.0
+    if alpha is None:
+        alpha = plot_style.PRESENTATION_EVENT_ALPHA if presentation else 0.75
 
     x_values = feature_values(features, X_VARIABLE)
     advection_values = feature_values(features, ADVECTION_VARIABLE)
@@ -239,13 +245,25 @@ def plot_tendency_scatter(
     finite_diabatic = finite_adiabatic & np.isfinite(diabatic_values)
 
     if layout == PRESENTATION_LAYOUT:
+        finite = common_finite_mask(
+            x_values,
+            advection_values,
+            net_dynamical_values,
+            temperature_change_values,
+            diabatic_values,
+            *([color_values] if color_values is not None else []),
+        )
+        if not finite.any():
+            raise ValueError("Presentation layout requires common finite event rows.")
+        color_norm = color_norm_for_values(
+            color_values[finite] if color_values is not None else None
+        )
         return plot_presentation_tendency_scatter(
             x_values,
             advection_values,
             net_dynamical_values,
             diabatic_values,
-            finite_adiabatic,
-            finite_diabatic,
+            finite,
             color_variable=color_variable,
             color_values=color_values,
             color_norm=color_norm,
@@ -381,8 +399,7 @@ def plot_presentation_tendency_scatter(
     advection_values: np.ndarray,
     net_dynamical_values: np.ndarray,
     diabatic_values: np.ndarray,
-    finite_adiabatic: np.ndarray,
-    finite_diabatic: np.ndarray,
+    finite: np.ndarray,
     *,
     color_variable: str | None,
     color_values: np.ndarray | None,
@@ -403,16 +420,17 @@ def plot_presentation_tendency_scatter(
         axes[0],
         x_values,
         advection_values,
-        finite_adiabatic,
+        finite,
         color_values=color_values,
         color_norm=color_norm,
         point_size=point_size,
         alpha=alpha,
+        show_counts=False,
     )
     add_one_to_negative_one_line(
         axes[0],
-        x_values[finite_adiabatic],
-        advection_values[finite_adiabatic],
+        x_values[finite],
+        advection_values[finite],
     )
     axes[0].set_title("Advection vs Adiabatic Heating")
     axes[0].set_ylabel(variable_label(ADVECTION_VARIABLE))
@@ -422,20 +440,21 @@ def plot_presentation_tendency_scatter(
         axes[1],
         net_dynamical_values,
         diabatic_values,
-        finite_diabatic,
+        finite,
         color_values=color_values,
         color_norm=color_norm,
         point_size=point_size,
         alpha=alpha,
+        show_counts=False,
     )
-    axes[1].set_title(r"Diabatic Heating vs $I_{dyn,net}$")
+    axes[1].set_title(r"Diabatic Residual vs $I_{dyn,net}$")
     axes[1].set_ylabel(variable_label(DIABATIC_VARIABLE))
     axes[1].set_xlabel(NET_DYNAMICAL_LABEL)
 
-    set_shared_x_data_limits(np.array([axes[0]]), x_values[finite_adiabatic])
+    set_shared_x_data_limits(np.array([axes[0]]), x_values[finite])
     set_shared_x_data_limits(
         np.array([axes[1]]),
-        net_dynamical_values[finite_diabatic],
+        net_dynamical_values[finite],
     )
     for ax in axes:
         plot_style.limit_major_ticks(
@@ -447,7 +466,13 @@ def plot_presentation_tendency_scatter(
         cbar = fig.colorbar(mappable, ax=axes, shrink=0.92)
         cbar.set_label(variable_label(color_variable))
 
-    fig.suptitle("Advection and Net Dynamical Contribution")
+    plot_style.add_sum_reference_lines(axes[1])
+    fig.supxlabel(
+        plot_style.BUDGET_REFERENCE_CAPTION, fontsize=plot_style.LEGEND_FONT_SIZE_PT
+    )
+    fig.suptitle(
+        f"Advection and Net Dynamical Contribution\nEvents n = {int(finite.sum())}"
+    )
     return fig
 
 
@@ -461,6 +486,7 @@ def plot_scatter_panel(
     color_norm: Normalize | None,
     point_size: float,
     alpha: float,
+    show_counts: bool = True,
 ):
     """Plot one panel using a shared finite-event mask."""
     kwargs = {
@@ -482,16 +508,17 @@ def plot_scatter_panel(
         )
 
     add_zero_reference_lines(ax)
-    ax.text(
-        0.03,
-        0.97,
-        f"n = {int(finite.sum())}",
-        transform=ax.transAxes,
-        ha="left",
-        va="top",
-        fontsize=9,
-        bbox={"facecolor": "white", "edgecolor": "0.8", "alpha": 0.85},
-    )
+    if show_counts:
+        ax.text(
+            0.03,
+            0.97,
+            f"n = {int(finite.sum())}",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            bbox={"facecolor": "white", "edgecolor": "0.8", "alpha": 0.85},
+        )
     plot_style.style_axis(ax)
     return mappable
 

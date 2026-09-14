@@ -121,10 +121,10 @@ figure entrypoints.
   figure. `presentation` retains the first panel, advection versus adiabatic
   heating, and the fourth panel, diabatic heating versus `I_dyn,net`, in a
   2-row by 1-column figure. Both retained panels show their own x-axis label
-  because their x variables differ. Point populations, finite-value masks,
-  reference lines, titles, count annotations, event-severity colors, shared
-  colorbar, and baseline-versus-event layering retain their full-layout
-  meanings. When no output path is supplied, presentation figures use a
+  because their x variables differ. Stored values, event-severity colour
+  mapping, the shared colorbar, and baseline-versus-event layering retain
+  their full-layout meanings. The presentation-specific population and
+  annotations are defined below. When no output path is supplied, figures use a
   distinct `_presentation.png` filename so they cannot overwrite the default
   four-panel product. The presentation canvas is 7.5 inches wide by 9 inches
   high, widening the original single-column canvas by 25% without changing its
@@ -142,13 +142,43 @@ figure entrypoints.
   not an individual event or severity value; the unchanged colorbar remains
   the quantitative severity key. Do not derive the legend marker from the
   first event, whose color may be white. Keep the legend in the first panel.
-- These presentation repairs change only visual spacing and the legend key.
-  They must not change input products, plotted values, masks, counts, stored
-  `I_dyn_pre`, point colors/opacity, reference lines or layout routing. Test
-  extreme-marker clearance and non-overlapping ticks after the shared export
-  formatting at 300 DPI, including negative ranges and constant data, and
-  test legend visibility independently of input row order. Validate fresh,
-  non-overwriting Venus renders at original resolution before acceptance.
+- Both comparison presentation layouts selectively adopt the budget guides
+  from `agent/stage2-antecedent-temperature` (`955f12d`, refined in `cd10710`).
+  The lower panel is titled `Diabatic Residual vs I_dyn,net`: `I_diabatic_pre`
+  is a closure residual, not a separately measured direct heating term. Add
+  labelled dotted `x+y=c` guides at 5 K increments and a shared footer explaining
+  `I_dyn,net + I_diabatic = I_dT/dt`. These are constant integrated atmospheric
+  warming guides, not fitted relationships or surface-temperature anomalies.
+  The shared `plot_style` helper clips guides to existing linear-axis limits
+  without changing the plotted range. For unusually broad ranges, increase
+  spacing to an integer multiple of 5 K to cap the guide count at 17. Omit
+  corner-only segments shorter than 10% of the panel in both dimensions.
+- Each presentation uses one common finite population for all five budget
+  fields (`I_adiabatic_pre`, `I_advection_pre`, stored `I_dyn_pre`,
+  `I_dTdt_pre`, and `I_diabatic_pre`) and the requested event colour variable,
+  if any. This intentionally includes `I_dTdt_pre` even though it is represented
+  by reference guides rather than a scatter axis. Apply the shared finite-row
+  selector in `src/selectors.py`; baseline rows must also have
+  `event_adjacent == 0`. Use the retained events to normalize colours, and fail
+  clearly before allocating a figure if any required population is empty.
+  Replace per-panel count boxes with one figure-level count header. Full
+  layouts retain their existing per-panel filtering and count annotations.
+- Presentation event markers default to 40 points squared and opacity 0.9 in
+  both renderers and their PBS launchers. Explicit size/opacity overrides take
+  precedence. Baseline markers remain size 24 and opacity 0.2; full-layout
+  defaults remain unchanged. Keep the visible Events legend proxy, padded
+  limits, four-interval x ticks, two-decimal formatting, and 7.5-by-9-inch
+  canvas from the earlier presentation-legibility repair.
+- No Stage-2 rebuild, climatology input, new temperature variables, or budget
+  window change is required for these presentation additions. They do not
+  modify source datasets or the separate antecedent-temperature diagnostic.
+  Test common masks (including missing values in different fields), retained
+  colour normalization, empty populations, source immutability, guide values
+  and clipping, shared counts, size/opacity defaults and overrides, and full
+  layout compatibility. Check marker clearance, guide labels, footer and tick
+  legibility after shared 300 DPI export, including negative ranges and constant
+  data. Validate fresh, non-overwriting Venus renders at original resolution
+  before production acceptance.
 - Event-versus-clean-baseline figures pad each finite plotted data range by 5%
   on both sides while keeping zero reference lines inside the padded range.
   Shared x-axes use the combined plotted x-data, while each panel derives its

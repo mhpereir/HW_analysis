@@ -45,6 +45,8 @@ cd "${PROJECT_ROOT}"
 "${python_executable}" -c 'import matplotlib, numpy, xarray; print("matplotlib", matplotlib.__version__, "numpy", numpy.__version__, "xarray", xarray.__version__)'
 /usr/bin/time -v "${python_executable}" -m pytest -q -W error \
   tests/test_plot_style.py \
+  tests/test_presentation_budget_comparisons.py \
+  tests/test_selectors.py \
   tests/test_plot_adiabatic_advection_comparison.py \
   tests/test_plot_adiabatic_advection_comparison_baseline.py
 

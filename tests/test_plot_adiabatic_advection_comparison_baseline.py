@@ -24,7 +24,7 @@ def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
         plot_axes = fig.axes[:2]
         assert [ax.get_title() for ax in plot_axes] == [
             "Advection vs Adiabatic Heating",
-            r"Diabatic Heating vs $I_{dyn,net}$",
+            r"Diabatic Residual vs $I_{dyn,net}$",
         ]
         assert [ax.get_xlabel() for ax in plot_axes] == [
             plot_diag.variable_label(plot_diag.X_VARIABLE),

@@ -28,6 +28,7 @@ from matplotlib.collections import PathCollection
 from matplotlib.colors import Normalize
 
 from src import plot_style
+from src.selectors import common_finite_mask
 
 REGION = "pnw_hotz"
 THRESHOLD_VARIABLE = "tas"
@@ -155,13 +156,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--event-point-size",
         type=float,
-        default=40.0,
+        default=plot_style.PRESENTATION_EVENT_SIZE_PT2,
         help="Event scatter marker size.",
     )
     parser.add_argument(
         "--event-alpha",
         type=float,
-        default=0.9,
+        default=plot_style.PRESENTATION_EVENT_ALPHA,
         help="Event scatter marker opacity.",
     )
     return parser.parse_args()
@@ -245,8 +246,8 @@ def write_tendency_scatter_plot(
     color_variable: str = COLOR_VARIABLE,
     point_size: float = 24.0,
     alpha: float = 0.2,
-    event_point_size: float = 40.0,
-    event_alpha: float = 0.9,
+    event_point_size: float = plot_style.PRESENTATION_EVENT_SIZE_PT2,
+    event_alpha: float = plot_style.PRESENTATION_EVENT_ALPHA,
 ) -> Path:
     """Write the selected event-versus-clean-baseline comparison figure."""
     output_path = Path(output_path).expanduser().resolve()
@@ -274,8 +275,8 @@ def plot_tendency_scatter(
     color_variable: str = COLOR_VARIABLE,
     point_size: float = 24.0,
     alpha: float = 0.2,
-    event_point_size: float = 40.0,
-    event_alpha: float = 0.9,
+    event_point_size: float = plot_style.PRESENTATION_EVENT_SIZE_PT2,
+    event_alpha: float = plot_style.PRESENTATION_EVENT_ALPHA,
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return the selected event-versus-clean-baseline comparison figure."""
     validate_layout(layout)
@@ -301,7 +302,6 @@ def plot_tendency_scatter(
             events,
             clean,
             event_color_values,
-            event_color_norm,
             color_variable=color_variable,
             point_size=point_size,
             alpha=alpha,
@@ -416,7 +416,6 @@ def plot_presentation_tendency_scatter(
     events: dict[str, np.ndarray],
     clean: np.ndarray,
     event_color_values: np.ndarray,
-    event_color_norm: Normalize,
     *,
     color_variable: str,
     point_size: float,
@@ -425,6 +424,15 @@ def plot_presentation_tendency_scatter(
     event_alpha: float,
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return the presentation 2x1 event-versus-baseline comparison."""
+    clean = clean & common_finite_mask(*baseline.values())
+    event_keep = common_finite_mask(*events.values(), event_color_values)
+    if not clean.any() or not event_keep.any():
+        raise ValueError(
+            "Presentation layout requires common finite baseline and event rows."
+        )
+    events = {name: values[event_keep] for name, values in events.items()}
+    event_color_values = event_color_values[event_keep]
+    event_color_norm = plot_style.finite_range_color_norm(event_color_values)
     fig, axes = plt.subplots(
         nrows=2,
         ncols=1,
@@ -447,6 +455,7 @@ def plot_presentation_tendency_scatter(
         event_point_size=event_point_size,
         event_alpha=event_alpha,
         show_legend=True,
+        show_counts=False,
     )
     add_one_to_negative_one_line_from_panel(axes[0])
     axes[0].set_title("Advection vs Adiabatic Heating")
@@ -467,8 +476,9 @@ def plot_presentation_tendency_scatter(
         event_point_size=event_point_size,
         event_alpha=event_alpha,
         show_legend=False,
+        show_counts=False,
     )
-    axes[1].set_title(r"Diabatic Heating vs $I_{dyn,net}$")
+    axes[1].set_title(r"Diabatic Residual vs $I_{dyn,net}$")
     axes[1].set_ylabel(variable_label(DIABATIC_VARIABLE))
     axes[1].set_xlabel(NET_DYNAMICAL_LABEL)
 
@@ -481,7 +491,14 @@ def plot_presentation_tendency_scatter(
 
     colorbar = fig.colorbar(event_mappable, ax=axes, shrink=0.92)
     colorbar.set_label(variable_label(color_variable))
-    fig.suptitle("Events vs Clean Baseline-Day Tendencies")
+    plot_style.add_sum_reference_lines(axes[1])
+    fig.supxlabel(
+        plot_style.BUDGET_REFERENCE_CAPTION, fontsize=plot_style.LEGEND_FONT_SIZE_PT
+    )
+    fig.suptitle(
+        "Events vs Clean Baseline-Day Tendencies\n"
+        f"Clean baseline n = {int(clean.sum())}; events n = {int(event_keep.sum())}"
+    )
     return fig
 
 
@@ -500,6 +517,7 @@ def plot_comparison_panel(
     event_point_size: float,
     event_alpha: float,
     show_legend: bool,
+    show_counts: bool = True,
 ) -> PathCollection:
     """Plot clean baseline and selected event layers in one panel."""
     baseline_finite = clean & np.isfinite(baseline_x) & np.isfinite(baseline_y)
@@ -544,19 +562,20 @@ def plot_comparison_panel(
             loc="upper right",
             **plot_style.legend_kwargs(),
         )
-    ax.text(
-        0.03,
-        0.97,
-        (
-            f"baseline n = {int(baseline_finite.sum())}\n"
-            f"events n = {int(event_finite.sum())}"
-        ),
-        transform=ax.transAxes,
-        ha="left",
-        va="top",
-        fontsize=9,
-        bbox={"facecolor": "white", "edgecolor": "0.8", "alpha": 0.85},
-    )
+    if show_counts:
+        ax.text(
+            0.03,
+            0.97,
+            (
+                f"baseline n = {int(baseline_finite.sum())}\n"
+                f"events n = {int(event_finite.sum())}"
+            ),
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            bbox={"facecolor": "white", "edgecolor": "0.8", "alpha": 0.85},
+        )
     plot_style.style_axis(ax)
     set_y_data_limits(
         ax,

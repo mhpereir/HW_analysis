@@ -45,6 +45,11 @@ TWO_PANEL_STACK_ASPECT = 0.55
 TWO_PANEL_COLUMN_ASPECT = 1.5
 PRESENTATION_TWO_PANEL_WIDTH_SCALE = 1.25
 PRESENTATION_SCATTER_X_INTERVALS = 4
+PRESENTATION_EVENT_SIZE_PT2 = 40.0
+PRESENTATION_EVENT_ALPHA = 0.9
+BUDGET_REFERENCE_CAPTION = (
+    r"Lower-panel lines: $I_{dyn,net}+I_{diabatic}=I_{dT/dt}$ (K)"
+)
 THREE_PANEL_STACK_ASPECT = 0.62
 SQUARE_PANEL_ASPECT = 0.95
 
@@ -269,6 +274,58 @@ def event_severity_legend_handle(*, point_size: float, alpha: float) -> Line2D:
         alpha=alpha,
         label="Events",
     )
+
+
+def add_sum_reference_lines(ax, *, spacing: float = 5.0, max_lines: int = 17) -> None:
+    """Label visible x+y=c guides in K without changing limits or autoscaling.
+
+    Broad ranges use integer multiples of spacing to bound rendering cost and
+    avoid a dense background. This is a geometric guide, not a fitted model.
+    """
+    if not np.isfinite(spacing) or spacing <= 0:
+        raise ValueError("spacing must be finite and positive.")
+    if isinstance(max_lines, bool) or not isinstance(max_lines, int) or max_lines < 2:
+        raise ValueError("max_lines must be an integer of at least two.")
+    if ax.get_xscale() != "linear" or ax.get_yscale() != "linear":
+        raise ValueError("Sum reference guides require linear axes.")
+
+    xmin, xmax = sorted(ax.get_xlim())
+    ymin, ymax = sorted(ax.get_ylim())
+    lower, upper = xmin + ymin, xmax + ymax
+    step = spacing * max(1, int(np.ceil((upper - lower) / spacing / (max_lines - 1))))
+    first, last = int(np.ceil(lower / step)), int(np.floor(upper / step))
+    for index in range(first, last + 1):
+        level = index * step
+        lo, hi = max(xmin, level - ymax), min(xmax, level - ymin)
+        if max((hi - lo) / (xmax - xmin), (hi - lo) / (ymax - ymin)) < 0.1:
+            continue
+        xx = np.array([lo, hi])
+        ax.plot(
+            xx,
+            np.clip(level - xx, ymin, ymax),
+            scalex=False,
+            scaley=False,
+            color=COLORS["zero"],
+            linewidth=REFERENCE_LINE_WIDTH_PT,
+            linestyle=":",
+            alpha=0.55,
+            zorder=0,
+            label=f"reference {level:g} K",
+        )
+        xpos = lo + 0.82 * (hi - lo)
+        xleft, xright = ax.get_xlim()
+        fraction = (xpos - xleft) / (xright - xleft)
+        ax.text(
+            xpos,
+            level - xpos,
+            f"{level:g} K",
+            fontsize=LEGEND_FONT_SIZE_PT - 1,
+            color="0.35",
+            ha="right" if fraction > 0.9 else "left" if fraction < 0.1 else "center",
+            va="center",
+            clip_on=True,
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.75, "pad": 0.3},
+        )
 
 
 def style_axis(ax, *, grid: bool = True) -> None:

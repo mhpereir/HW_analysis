@@ -38,3 +38,74 @@ def test_event_legend_handle_preserves_marker_size_and_opacity():
     assert handle.get_markersize() == pytest.approx(np.sqrt(24.0))
     assert handle.get_alpha() == 0.7
     assert handle.get_label() == "Events"
+
+
+@pytest.mark.parametrize("invert", [False, True])
+@pytest.mark.parametrize("scale", [1.0, 1e5])
+def test_sum_reference_guides_are_bounded_clipped_and_preserve_axes(invert, scale):
+    fig, ax = plot_style.plt.subplots()
+    try:
+        xlim = np.array([-28.0, 10.0]) * scale
+        ylim = np.array([-5.0, 20.0]) * scale
+        ax.set_xlim(xlim[::-1] if invert else xlim)
+        ax.set_ylim(ylim[::-1] if invert else ylim)
+        before = (
+            ax.get_xlim(),
+            ax.get_ylim(),
+            ax.get_autoscalex_on(),
+            ax.get_autoscaley_on(),
+        )
+        plot_style.add_sum_reference_lines(ax)
+        assert (
+            ax.get_xlim(),
+            ax.get_ylim(),
+            ax.get_autoscalex_on(),
+            ax.get_autoscaley_on(),
+        ) == before
+        assert 1 <= len(ax.lines) <= 17
+        for line in ax.lines:
+            x, y = line.get_data()
+            level = (x + y)[0]
+            np.testing.assert_allclose(x + y, level)
+            assert level / 5 == pytest.approx(round(level / 5))
+            assert np.all((x >= xlim[0]) & (x <= xlim[1]))
+            assert np.all((y >= ylim[0]) & (y <= ylim[1]))
+            assert line.get_zorder() == 0
+            assert line.get_linestyle() == ":"
+            assert line.get_label() == f"reference {level:g} K"
+        assert {text.get_text() for text in ax.texts} == {
+            line.get_label().removeprefix("reference ") for line in ax.lines
+        }
+    finally:
+        plot_style.plt.close(fig)
+
+
+@pytest.mark.parametrize("spacing", [0, -5, np.nan, np.inf])
+def test_sum_reference_guides_reject_invalid_spacing(spacing):
+    fig, ax = plot_style.plt.subplots()
+    try:
+        with pytest.raises(ValueError, match="spacing"):
+            plot_style.add_sum_reference_lines(ax, spacing=spacing)
+        assert not ax.lines and not ax.texts
+    finally:
+        plot_style.plt.close(fig)
+
+
+@pytest.mark.parametrize("max_lines", [0, 1, True, 2.5])
+def test_sum_reference_guides_reject_invalid_line_limit(max_lines):
+    fig, ax = plot_style.plt.subplots()
+    try:
+        with pytest.raises(ValueError, match="max_lines"):
+            plot_style.add_sum_reference_lines(ax, max_lines=max_lines)
+    finally:
+        plot_style.plt.close(fig)
+
+
+def test_sum_reference_guides_require_linear_axes():
+    fig, ax = plot_style.plt.subplots()
+    try:
+        ax.set_xscale("log")
+        with pytest.raises(ValueError, match="linear"):
+            plot_style.add_sum_reference_lines(ax)
+    finally:
+        plot_style.plt.close(fig)
