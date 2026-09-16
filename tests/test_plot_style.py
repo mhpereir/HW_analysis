@@ -5,6 +5,24 @@ import pytest
 from HW_analysis.src import plot_style
 
 
+def test_day_lag_axis_keeps_fractional_ticks_for_short_windows():
+    fig, ax = plot_style.plt.subplots()
+    try:
+        ax.plot([-1 / 24, 0, 1 / 24], [1, 2, 1])
+        plot_style.format_day_lag_axis(ax.xaxis)
+        plot_style.format_numeric_axes(fig)
+        fig.canvas.draw()
+        ticks = ax.get_xticks()
+        visible = ticks[(ticks >= ax.get_xlim()[0]) & (ticks <= ax.get_xlim()[1])]
+        assert len(visible) >= 3
+        assert 0 in visible
+        assert np.any(visible != np.round(visible))
+        labels = [tick.get_text() for tick in ax.get_xticklabels()]
+        assert len(set(labels)) == len(labels)
+    finally:
+        plot_style.plt.close(fig)
+
+
 @pytest.mark.parametrize("max_intervals", [0, -1, 2.5, True])
 def test_major_tick_limit_rejects_invalid_counts(max_intervals):
     fig, ax = plot_style.plt.subplots()

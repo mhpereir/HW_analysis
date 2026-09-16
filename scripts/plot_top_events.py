@@ -2,7 +2,7 @@
 
 This script consumes the harmonized regional time-series product written by
 ``build_stage1_harmonized_timeseries.py``. It selects ranked events from the
-saved Stage-1 event table and renders their absolute-time traces.
+saved Stage-1 event table and renders their traces in days relative to peak.
 """
 
 from __future__ import annotations

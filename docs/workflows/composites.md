@@ -58,7 +58,7 @@ right column remains advection, adiabatic heating, then diabatic heating.
 
 The absolute and climatological-anomaly top-event entrypoints support the same
 `paper` and `presentation` layout choices. Their presentation views preserve
-top-event ranking, absolute-time event windows, event-boundary and peak
+top-event ranking, timestamp-based event windows, event-boundary and peak
 markers, the all-event mean and IQR reference, and raw plus 24-hour-smoothed
 output semantics. They change only the data representation, variables, and
 panel arrangement used for rendering. Climatological-anomaly top-event
@@ -66,6 +66,12 @@ figures retain ranking and event metadata from absolute Stage 1, while both
 the individual traces and all-event reference are calculated from anomalies.
 Every layout and representation uses a separate output namespace and filename
 token.
+
+All top-event layouts display elapsed days relative to the exact Stage-1 peak
+timestamp. The selected trace, all-event mean and IQR, and event markers share
+this axis, with the peak at zero. This display conversion preserves the
+timestamp coordinates and hourly calculations of the source products. See
+[the top-event time-axis contract](plotting.md#top-event-time-axis).
 
 The six temporal plotting Venus schedulers expose the same choice through
 `PLOT_LAYOUT`. Its default is `paper`, which retains the extended ten-panel

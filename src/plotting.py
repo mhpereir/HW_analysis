@@ -376,7 +376,7 @@ def plot_top_event_timeseries(
     plot_extended_variables: bool = False,
     layout: str = PAPER_COMPOSITE_LAYOUT,
 ) -> Figure:
-    """Return an absolute-time figure for one selected event."""
+    """Return a figure in elapsed days from one selected event's peak."""
     _validate_composite_layout(layout, plot_extended_variables)
     _validate_top_event_reference_representation(event_window, reference_composite)
     if layout == PRESENTATION_COMPOSITE_LAYOUT:
@@ -430,10 +430,9 @@ def plot_top_event_timeseries(
 
     _mark_top_event_times(axes, event)
     _set_top_event_title(fig, event_window, event)
-    ax3.set_xlabel("Time")
-
-    _format_datetime_xaxis(axes)
+    ax3.set_xlabel("Lag from event peak (days)")
     _style_axes(axes)
+    _format_day_lag_xaxis(fig)
 
     return fig
 
@@ -685,10 +684,10 @@ def _plot_extended_top_event_timeseries(
 
     _mark_top_event_times(axes.ravel(), event)
     _set_top_event_title(fig, event_window, event)
-    left[-1].set_xlabel("Time")
-    right[-1].set_xlabel("Time")
-    _format_datetime_xaxis(axes.ravel())
+    left[-1].set_xlabel("Lag from event peak (days)")
+    right[-1].set_xlabel("Lag from event peak (days)")
     _style_axes(axes.ravel())
+    _format_day_lag_xaxis(fig)
     return fig
 
 
@@ -767,35 +766,37 @@ def _plot_presentation_top_event_timeseries(
 
     _mark_top_event_times(axes.ravel(), event)
     _set_top_event_title(fig, event_window, event)
-    left[-1].set_xlabel("Time")
-    right[-1].set_xlabel("Time")
-    _format_datetime_xaxis(axes.ravel())
+    left[-1].set_xlabel("Lag from event peak (days)")
+    right[-1].set_xlabel("Lag from event peak (days)")
     _style_axes(axes.ravel())
+    _format_day_lag_xaxis(fig)
     return fig
 
 
 def _mark_top_event_times(axes: Sequence[Axes], event: xr.Dataset) -> None:
-    """Mark one event's start, end, and peak on every supplied axis."""
+    """Mark one event's start, end, and peak in days relative to its peak."""
     peak_time = _event_time_value(event, "peak_time")
-    start_time = _event_time_value(event, "start_time")
-    end_time = _event_time_value(event, "end_time")
+    start_day = (_event_time_value(event, "start_time") - peak_time) / np.timedelta64(
+        1, "D"
+    )
+    end_day = (_event_time_value(event, "end_time") - peak_time) / np.timedelta64(1, "D")
     for ax in axes:
         ax.axvline(
-            start_time,
+            start_day,
             color=plot_style.FACE_COLORS["top"],
             linewidth=plot_style.LINE_WIDTH_PT,
             linestyle=":",
             alpha=0.9,
         )
         ax.axvline(
-            end_time,
+            end_day,
             color=plot_style.FACE_COLORS["top"],
             linewidth=plot_style.LINE_WIDTH_PT,
             linestyle=":",
             alpha=0.9,
         )
         ax.axvline(
-            peak_time,
+            0.0,
             color=plot_style.COLORS["zero"],
             linewidth=plot_style.REFERENCE_LINE_WIDTH_PT,
             linestyle="--",
@@ -904,9 +905,10 @@ def smooth_composite_for_display(
     return out
 
 
-def _format_datetime_xaxis(axes: Sequence[Axes]) -> None:
-    for ax in axes:
-        plot_style.format_time_axis(ax)
+def _format_day_lag_xaxis(fig: Figure) -> None:
+    """Keep day-lag formatting on every shared x-axis, including twin axes."""
+    for ax in fig.axes:
+        plot_style.format_day_lag_axis(ax.xaxis)
 
 
 def _style_axes(axes: Sequence[Axes]) -> None:
@@ -1085,10 +1087,10 @@ def _plot_top_event_temperature_volume_panel(
     reference_composite: xr.Dataset | None,
 ) -> None:
     """Plot top-event T_mean and volume with optional all-event reference."""
-    time = event_window["time"].values
+    lag_days = _top_event_lag_days(event_window, event)
     _plot_line(
         ax,
-        time,
+        lag_days,
         event_window,
         "T_mean",
         color=VARIABLE_COLORS["T_mean"],
@@ -1098,7 +1100,6 @@ def _plot_top_event_temperature_volume_panel(
     if reference_composite is not None:
         _plot_top_event_reference(
             ax,
-            event,
             reference_composite,
             "T_mean",
             color=VARIABLE_COLORS["T_mean"],
@@ -1112,7 +1113,7 @@ def _plot_top_event_temperature_volume_panel(
     ax_volume = ax.twinx()
     _plot_line(
         ax_volume,
-        time,
+        lag_days,
         event_window,
         "volume",
         color=VARIABLE_COLORS["volume"],
@@ -1122,7 +1123,6 @@ def _plot_top_event_temperature_volume_panel(
     if reference_composite is not None:
         _plot_top_event_reference(
             ax_volume,
-            event,
             reference_composite,
             "volume",
             color=VARIABLE_COLORS["volume"],
@@ -1289,7 +1289,7 @@ def _plot_top_event_single_variable_panel(
     scale = _display_scale(name)
     _plot_line(
         ax,
-        event_window["time"].values,
+        _top_event_lag_days(event_window, event),
         event_window,
         name,
         color=color,
@@ -1299,7 +1299,6 @@ def _plot_top_event_single_variable_panel(
     if reference_composite is not None:
         _plot_top_event_reference(
             ax,
-            event,
             reference_composite,
             name,
             color=color,
@@ -1322,12 +1321,13 @@ def _plot_top_event_multi_variable_panel(
     reference_composite: xr.Dataset | None,
 ) -> None:
     """Plot top-event variables with optional all-event reference."""
+    lag_days = _top_event_lag_days(event_window, event)
     for name in names:
         color = VARIABLE_COLORS[name]
         scale = _display_scale(name)
         _plot_line(
             ax,
-            event_window["time"].values,
+            lag_days,
             event_window,
             name,
             color=color,
@@ -1337,7 +1337,6 @@ def _plot_top_event_multi_variable_panel(
         if reference_composite is not None:
             _plot_top_event_reference(
                 ax,
-                event,
                 reference_composite,
                 name,
                 color=color,
@@ -1432,11 +1431,12 @@ def _plot_top_event_tendency_panel(
     reference_composite: xr.Dataset | None,
 ) -> None:
     """Plot top-event heat-budget terms with optional all-event reference."""
+    lag_days = _top_event_lag_days(event_window, event)
     for name in ("advection", "adiabatic", "diabatic"):
         color = VARIABLE_COLORS[name]
         _plot_line(
             ax,
-            event_window["time"].values,
+            lag_days,
             event_window,
             name,
             color=color,
@@ -1445,7 +1445,6 @@ def _plot_top_event_tendency_panel(
         if reference_composite is not None:
             _plot_top_event_reference(
                 ax,
-                event,
                 reference_composite,
                 name,
                 color=color,
@@ -1509,11 +1508,12 @@ def _plot_top_event_lwa_panel(
     reference_composite: xr.Dataset | None,
 ) -> None:
     """Plot top-event LWA_a and LWA_c with optional all-event reference."""
+    lag_days = _top_event_lag_days(event_window, event)
     for name in ("lwa_a_region", "lwa_c_region"):
         color = VARIABLE_COLORS[name]
         _plot_line(
             ax,
-            event_window["time"].values,
+            lag_days,
             event_window,
             name,
             color=color,
@@ -1522,7 +1522,6 @@ def _plot_top_event_lwa_panel(
         if reference_composite is not None:
             _plot_top_event_reference(
                 ax,
-                event,
                 reference_composite,
                 name,
                 color=color,
@@ -1641,7 +1640,7 @@ def _plot_top_event_soil_moisture_cloud_panel(
     reference_composite: xr.Dataset | None,
 ) -> None:
     """Plot top-event soil moisture and cloud cover with independent y axes."""
-    time = event_window["time"].values
+    lag_days = _top_event_lag_days(event_window, event)
     soil_name = "soil_moisture"
     cloud_name = "cloud_cover"
     soil_color = VARIABLE_COLORS[soil_name]
@@ -1649,7 +1648,7 @@ def _plot_top_event_soil_moisture_cloud_panel(
 
     _plot_line(
         ax,
-        time,
+        lag_days,
         event_window,
         soil_name,
         color=soil_color,
@@ -1658,7 +1657,6 @@ def _plot_top_event_soil_moisture_cloud_panel(
     if reference_composite is not None:
         _plot_top_event_reference(
             ax,
-            event,
             reference_composite,
             soil_name,
             color=soil_color,
@@ -1672,7 +1670,7 @@ def _plot_top_event_soil_moisture_cloud_panel(
     ax_cloud = ax.twinx()
     _plot_line(
         ax_cloud,
-        time,
+        lag_days,
         event_window,
         cloud_name,
         color=cloud_color,
@@ -1681,7 +1679,6 @@ def _plot_top_event_soil_moisture_cloud_panel(
     if reference_composite is not None:
         _plot_top_event_reference(
             ax_cloud,
-            event,
             reference_composite,
             cloud_name,
             color=cloud_color,
@@ -1802,18 +1799,17 @@ def _expand_yaxis(ax: Axes, *, factor: float) -> None:
 
 def _plot_top_event_reference(
     ax: Axes,
-    event: xr.Dataset,
     reference_composite: xr.Dataset,
     name: str,
     *,
     color: str,
 ) -> None:
-    """Plot an all-event composite reference aligned to one event peak."""
-    time = _reference_composite_time(event, reference_composite)
+    """Plot an all-event composite reference in days relative to peak."""
+    lag_days = np.asarray(reference_composite["lag_hour"].values, dtype=float) / 24
     scale = _display_scale(name)
     _plot_line(
         ax,
-        time,
+        lag_days,
         reference_composite,
         name,
         color=color,
@@ -1823,7 +1819,7 @@ def _plot_top_event_reference(
     )
     _plot_event_percentile_band(
         ax,
-        time,
+        lag_days,
         reference_composite,
         name,
         color=color,
@@ -1905,19 +1901,19 @@ def _event_percentile_bounds(
     return lower, upper
 
 
-def _reference_composite_time(
+def _top_event_lag_days(
+    event_window: xr.Dataset,
     event: xr.Dataset,
-    reference_composite: xr.Dataset,
 ) -> np.ndarray:
-    """Return reference-composite lags as absolute datetimes for one event."""
+    """Return elapsed days from the exact peak without changing source times."""
+    time = np.asarray(event_window["time"].values, dtype="datetime64[ns]")
     peak_time = _event_time_value(event, "peak_time")
-    lag_hours = np.asarray(reference_composite["lag_hour"].values, dtype=np.int64)
-    return peak_time + lag_hours.astype("timedelta64[h]")
+    return (time - peak_time) / np.timedelta64(1, "D")
 
 
 def _event_time_value(event: xr.Dataset, name: str) -> np.datetime64:
     """Return an event timestamp scalar as datetime64[ns]."""
-    return np.datetime64(np.asarray(event[name].values).item(), "ns")
+    return np.asarray(event[name].values, dtype="datetime64[ns]")[()]
 
 
 def _select_quantile(

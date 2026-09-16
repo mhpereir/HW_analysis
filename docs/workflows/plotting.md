@@ -238,7 +238,7 @@ must not overwrite the paper-layout products. `--layout presentation` and
 
 The absolute and climatological-anomaly top-event entrypoints accept the same
 presentation layout and panel order. They preserve the selected event trace,
-the all-event mean and IQR reference, absolute-time x-axis, event start/end
+the all-event mean and IQR reference, peak-relative day x-axis, event start/end
 markers, event-peak marker, ranking, and raw plus 24-hour-smoothed output
 behavior. The temperature panel contains only `T_mean`, with the event trace
 and reference keys both retained. Climatological anomalies are constructed
@@ -246,6 +246,34 @@ before the event trace, all-event reference, IQR, or smoothing is calculated,
 while selection and ranking remain absolute. Presentation and anomaly outputs
 use distinct plot directories and filename tokens so they cannot overwrite
 the extended absolute paper figures.
+
+### Top-event time axis
+
+All top-event layouts, including the compact paper, extended 5x2 paper, and
+3x2 presentation views, label the x-axis `Lag from event peak (days)`. Plot
+each source timestamp at its elapsed time from the exact Stage-1 `peak_time`,
+divided by 24 hours. Negative values precede the peak, zero marks the peak,
+and positive values follow it. Preserve fractional days and sub-hour offsets;
+do not round timestamps to calendar dates or resample the hourly traces.
+
+Convert the all-event reference's `lag_hour` coordinate to days for both its
+mean and IQR. Place the event start and end markers on the same elapsed-day
+axis and the peak marker at zero. Use shared numeric tick formatting that
+prefers whole-day ticks when the range permits and retains fractional ticks
+for short windows. Preserve this formatting on export, including twin axes.
+
+This is a display-only change for both absolute and climatological-anomaly
+top-event figures, including raw and smoothed outputs. Stage-1 timestamps,
+event selection and ranking, window extraction, reference reductions,
+smoothing, y-values, and output naming remain unchanged. Composite plots
+continue to use their existing lag-hour axes. Existing figures remain
+historical artifacts; production validation uses a fresh output namespace.
+
+Synthetic regressions must check elapsed-day coordinates across every panel,
+reference means and IQRs, exact peak and boundary markers, non-midnight peaks,
+source immutability, and numeric ticks after export in each layout. Before
+production acceptance, render representative presentation and extended paper
+figures through Venus PBS and inspect the saved axes at original resolution.
 
 ### Composite labels and surface-flux signs
 
