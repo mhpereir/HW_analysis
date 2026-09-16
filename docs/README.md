@@ -30,6 +30,11 @@ Read in this order:
 `AGENTS.md` defines execution, validation, and contribution constraints. It
 routes to these documents rather than defining a separate pipeline contract.
 
+Before creating, resuming, integrating, pausing, or retiring a branch or
+checkout, follow the [Git branch lifecycle](workflows/git_lifecycle.md).
+Branch retirement, scientific acceptance, and task/run completion are separate
+decisions. The shared cleanup skill owns the deletion and archival procedure.
+
 ## Documentation-first change process
 
 Before implementing new development:
@@ -99,6 +104,7 @@ a figure.
 
 | Area | Canonical document |
 | --- | --- |
+| Git branches, integration, and retirement | [Git branch lifecycle](workflows/git_lifecycle.md) |
 | Active architecture and ownership | [Pipeline overview](pipeline_overview.md) |
 | Stage 1 regional dataset | [Stage 1 product contract](products/stage1_harmonized_timeseries.md) |
 | Stage 1 regional hourly climatology | [Regional hourly climatology contract](products/stage1_regional_hourly_climatology.md) |
