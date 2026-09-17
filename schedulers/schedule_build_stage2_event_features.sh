@@ -10,6 +10,7 @@ set -euo pipefail
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 REGION="${REGION:-pnw_bartusek}"
 THRESHOLD_VARIABLES=(tas lwa_a)
@@ -26,20 +27,23 @@ THRESHOLD_VARIABLE="${THRESHOLD_VARIABLES[ARRAY_INDEX]}"
 QUANTILE_THRESHOLD="${QUANTILE_THRESHOLD:-q90}"
 TIME_START="${TIME_START:-1940}"
 TIME_END="${TIME_END:-2024}"
-INPUT_PATH="${INPUT_PATH:-${PROJECT_ROOT}/results/stage1/harmonized_regional_timeseries_${REGION}_surface_700hPa_${THRESHOLD_VARIABLE}_${QUANTILE_THRESHOLD}_${TIME_START}_${TIME_END}.nc}"
-OUTPUT_PATH="${OUTPUT_PATH:-${PROJECT_ROOT}/results/stage2_event_features/hw_event_features_fixed_windows_${REGION}_${THRESHOLD_VARIABLE}_${QUANTILE_THRESHOLD}_${TIME_START}_${TIME_END}.nc}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+INPUT_PATH="${INPUT_PATH:-${HWA_ARTIFACT_ROOT}/stage1/harmonized_regional_timeseries_${REGION}_surface_700hPa_${THRESHOLD_VARIABLE}_${QUANTILE_THRESHOLD}_${TIME_START}_${TIME_END}.nc}"
+OUTPUT_PATH="${OUTPUT_PATH:-${HWA_ARTIFACT_ROOT}/stage2_event_features/hw_event_features_fixed_windows_${REGION}_${THRESHOLD_VARIABLE}_${QUANTILE_THRESHOLD}_${TIME_START}_${TIME_END}.nc}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 STAGED_OUTPUT_PATH="${OUTPUT_PATH}.tmp.${PBS_JOBID}"
+
+# Runtime validation and logging.
+hwa_start_log "stage2_event_features"
+hwa_validate_artifact_paths INPUT_PATH OUTPUT_PATH STAGED_OUTPUT_PATH
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
 test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
 test -s "${INPUT_PATH}"
+test ! -e "${OUTPUT_PATH}"
 test ! -e "${STAGED_OUTPUT_PATH}"
 
 mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_stage2_event_features.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
 trap 'rm -f -- "${STAGED_OUTPUT_PATH}"' EXIT
 
 export OMP_NUM_THREADS=1
@@ -68,6 +72,7 @@ cd "${PROJECT_ROOT}"
     --require-full-event
 
 test -s "${STAGED_OUTPUT_PATH}"
-mv -f -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"
+mv -n -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"
+test ! -e "${STAGED_OUTPUT_PATH}"
 test -s "${OUTPUT_PATH}"
 echo "[info] finished=$(date -Is)"

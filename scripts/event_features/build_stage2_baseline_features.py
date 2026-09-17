@@ -18,14 +18,14 @@ if str(REPO_ROOT) not in sys.path:
 from scripts.event_features import event_feature_config as config
 from scripts.event_features import fixed_window_features as fixed
 from src import analysis_io
+from src.artifact_paths import artifact_root
 
 BASELINE_DIM = "baseline_day"
 REFERENCE_TIME_NAME = "reference_time"
 PIPELINE_STAGE = "stage_2_baseline_features"
 FEATURE_METHOD = "fixed_windows_relative_to_reference_time"
 DEFAULT_OUTPUT_PATH = (
-    REPO_ROOT
-    / "results"
+    artifact_root()
     / "stage2_baseline_features"
     / "non_event_day_features_fixed_windows.nc"
 )

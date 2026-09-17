@@ -3,7 +3,11 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCHEDULER="${REPO_ROOT}/schedulers/schedule_build_era5_daily_spatial_data.sh"
+PROJECT_ROOT="${PROJECT_ROOT:-${REPO_ROOT}}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
+SCHEDULER="${PROJECT_ROOT}/schedulers/schedule_build_era5_daily_spatial_data.sh"
+OUTPUT_DIR="${OUTPUT_DIR:-${HWA_ARTIFACT_ROOT}/spatial_composites/daily}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 START_YEAR=1940
 END_YEAR=2024
 MAX_CONCURRENT=8
@@ -58,10 +62,26 @@ done
 [[ -f "$SCHEDULER" ]] || die "Missing PBS scheduler: $SCHEDULER"
 
 array_spec="${START_YEAR}-${END_YEAR}%${MAX_CONCURRENT}"
+actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
+EXPECTED_COMMIT="${EXPECTED_COMMIT:-${actual_commit}}"
+[[ "${actual_commit}" == "${EXPECTED_COMMIT}" ]] || die "EXPECTED_COMMIT does not match PROJECT_ROOT."
+hwa_validate_artifact_paths OUTPUT_DIR
+hwa_validate_log_dir
+export PROJECT_ROOT EXPECTED_COMMIT HWA_ARTIFACT_ROOT HWA_LOG_ROOT OUTPUT_DIR LOG_DIR
+export_names=PROJECT_ROOT,EXPECTED_COMMIT,HWA_ARTIFACT_ROOT,HWA_LOG_ROOT,OUTPUT_DIR,LOG_DIR
+qsub_args=(-J "$array_spec" -v "$export_names" "$SCHEDULER")
 if (( DRY_RUN )); then
-    printf '[dry-run] qsub -J %q %q\n' "$array_spec" "$SCHEDULER"
+    for name in PROJECT_ROOT EXPECTED_COMMIT HWA_ARTIFACT_ROOT HWA_LOG_ROOT OUTPUT_DIR LOG_DIR; do
+        printf '[dry-run] export %s=%q\n' "$name" "${!name}"
+    done
+    printf '[dry-run] qsub'
+    printf ' %q' "${qsub_args[@]}"
+    printf '\n'
 else
+    [[ -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)" ]] || \
+        die "Refusing submission from a dirty source checkout."
     command -v qsub >/dev/null 2>&1 || die "qsub was not found on PATH."
-    job_id="$(qsub -J "$array_spec" "$SCHEDULER")"
+    cd "${PROJECT_ROOT}"
+    job_id="$(qsub "${qsub_args[@]}")"
     echo "[info] Submitted ERA5 daily array ${array_spec}: ${job_id}"
 fi

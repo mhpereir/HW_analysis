@@ -51,13 +51,19 @@ the inputs are unavailable in a local checkout.
   diagnosing Venus work.
 - Develop and test code in the local Git checkout.
 - Never edit source directly on Venus.
-- Use Git commits and clean fast-forward deployment to move code to
-  `/home/mhpereir/HW_analysis` on Venus.
+- Use Git commits and clean, commit-pinned deployments under
+  `/home/mhpereir/HW-analysis/HW-analysis-production/` on Venus. Do not advance
+  a checkout needed by a queued or running job.
 - Use the Mamba-managed `dev_env` environment on Venus.
 - Run data-intensive scripts through the tracked OpenPBS schedulers, not on the
   Venus login node.
 - Treat raw data, assembled datasets, figures, logs, caches, and environments as
   external or generated artifacts. Do not commit them.
+- Follow [artifact locations](docs/workflows/artifacts.md): prepared inputs and
+  outputs default to `~/HW-analysis/artifacts/`, and scheduler logs to the
+  sibling `~/HW-analysis/logs/`. Never derive these paths from a source checkout.
+  Old pinned checkouts and unfinished branches need the updated path contract
+  before they can be used for new production submissions.
 - Do not transfer a mixed code-and-data repository root with `rsync`.
 - Require explicit authorization before pushing, deploying, transferring data,
   or submitting or modifying PBS jobs.

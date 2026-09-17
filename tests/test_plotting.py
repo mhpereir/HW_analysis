@@ -1,10 +1,10 @@
-import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 import xarray as xr
 from HW_analysis.src import plotting
 from matplotlib.legend import Legend
+from matplotlib.ticker import ScalarFormatter
 
 
 def test_smooth_composite_for_display_smooths_only_requested_variables():
@@ -696,26 +696,69 @@ def test_plot_top_event_timeseries_draws_reference_iqr():
         plt.close(fig)
 
 
-def test_plot_top_event_timeseries_aligns_reference_lag_zero_to_peak():
+@pytest.mark.parametrize(
+    ("layout", "extended", "panel_count"),
+    [("paper", False, 4), ("paper", True, 10), ("presentation", False, 6)],
+)
+@pytest.mark.parametrize("anomaly", [False, True])
+@pytest.mark.parametrize("smoothed", [False, True])
+def test_top_event_days_align_traces_references_iqr_and_markers(
+    layout, extended, panel_count, anomaly, smoothed
+):
     event = _make_top_event()
+    event["peak_time"] = np.datetime64("2000-05-02T00:30")
+    event_window = _make_top_event_window()
+    reference = _make_composite()
+    if anomaly:
+        for ds in (event_window, reference):
+            ds.attrs["data_representation"] = "climatological_anomaly"
+    if smoothed:
+        variables = tuple(event_window.data_vars)
+        event_window = plotting.smooth_composite_for_display(
+            event_window, variables=variables, smoothing_window=3, lag_dim="time"
+        )
+        reference = plotting.smooth_composite_for_display(
+            reference, variables=variables, smoothing_window=3
+        )
+    originals = [ds.copy(deep=True) for ds in (event_window, reference, event)]
+    expected_event_days = np.array([-2.5, -1.5, -0.5, 0.5, 1.5]) / 24
+    expected_reference_days = np.array([-2, -1, 0, 1, 2]) / 24
+    expected_iqr_days = (
+        expected_reference_days[1:-1] if smoothed else expected_reference_days
+    )
+    variable_labels = {_display_label(name) for name in event_window.data_vars}
     fig = plotting.plot_top_event_timeseries(
-        _make_top_event_window(),
+        event_window,
         event,
-        reference_composite=_make_composite(),
+        reference_composite=reference,
+        plot_extended_variables=extended,
+        layout=layout,
     )
     try:
-        reference_line = next(
-            line
-            for line in fig.axes[1].lines
-            if line.get_label() == "_all_event_average"
-        )
-        xdata = np.asarray(reference_line.get_xdata(), dtype="datetime64[ns]")
-        peak_time = np.asarray(event["peak_time"].values).astype("datetime64[ns]")[()]
-        zero_lag_index = int(
-            np.flatnonzero(_make_composite()["lag_hour"].values == 0)[0]
-        )
-
-        assert xdata[zero_lag_index] == peak_time
+        for ax in fig.axes:
+            event_lines = [
+                line for line in ax.lines if line.get_label() in variable_labels
+            ]
+            reference_lines = [
+                line for line in ax.lines if line.get_label() == "_all_event_average"
+            ]
+            assert event_lines and reference_lines and ax.collections
+            for line in event_lines:
+                np.testing.assert_allclose(line.get_xdata(), expected_event_days)
+            for line in reference_lines:
+                np.testing.assert_allclose(line.get_xdata(), expected_reference_days)
+            for band in ax.collections:
+                vertices = np.concatenate([path.vertices for path in band.get_paths()])
+                np.testing.assert_allclose(np.unique(vertices[:, 0]), expected_iqr_days)
+        for ax in fig.axes[:panel_count]:
+            for marker, expected_day in zip(
+                ax.lines[-3:], (-1.5 / 24, 0.5 / 24, 0.0), strict=True
+            ):
+                np.testing.assert_allclose(marker.get_xdata(), [expected_day] * 2)
+        for source, original in zip(
+            (event_window, reference, event), originals, strict=True
+        ):
+            xr.testing.assert_identical(source, original)
     finally:
         plt.close(fig)
 
@@ -754,14 +797,35 @@ def test_plot_top_event_timeseries_expands_tendency_axis_range():
         plt.close(expected_fig)
 
 
-def test_plot_top_event_timeseries_uses_concise_datetime_formatter():
+@pytest.mark.parametrize(
+    ("layout", "extended", "label_count"),
+    [("paper", False, 1), ("paper", True, 2), ("presentation", False, 2)],
+)
+def test_top_event_day_axis_survives_export(layout, extended, label_count, tmp_path):
+    event = _make_top_event()
+    peak = event["peak_time"].values
+    event["start_time"] = peak - np.timedelta64(3, "D")
+    event["end_time"] = peak + np.timedelta64(3, "D")
+    event_window = _make_top_event_window().assign_coords(
+        time=peak + np.array([-7, -3, 0, 3, 7], dtype="timedelta64[D]")
+    )
     fig = plotting.plot_top_event_timeseries(
-        _make_top_event_window(), _make_top_event()
+        event_window, event, plot_extended_variables=extended, layout=layout
     )
     try:
-        assert isinstance(
-            fig.axes[-1].xaxis.get_major_formatter(), mdates.ConciseDateFormatter
-        )
+        output = tmp_path / "top_event.png"
+        plotting.plot_style.save_figure(fig, output)
+        assert output.stat().st_size > 0
+        assert [ax.get_xlabel() for ax in fig.axes if ax.get_xlabel()] == [
+            "Lag from event peak (days)"
+        ] * label_count
+        for ax in fig.axes:
+            assert isinstance(ax.xaxis.get_major_formatter(), ScalarFormatter)
+            ticks = ax.get_xticks()
+            visible = ticks[(ticks >= ax.get_xlim()[0]) & (ticks <= ax.get_xlim()[1])]
+            assert 0 in visible
+            np.testing.assert_array_equal(visible, np.round(visible))
+            assert ax.xaxis.get_offset_text().get_text() == ""
     finally:
         plt.close(fig)
 
@@ -990,24 +1054,6 @@ def test_top_event_surface_fluxes_use_atmospheric_sign_for_event_and_reference(
             )
             np.testing.assert_allclose(event_window[name].values, event_sources[name])
             np.testing.assert_allclose(composite[name].values, reference_sources[name])
-    finally:
-        plt.close(fig)
-
-
-def test_plot_top_event_timeseries_extended_uses_concise_datetime_formatter():
-    fig = plotting.plot_top_event_timeseries(
-        _make_top_event_window(),
-        _make_top_event(),
-        reference_composite=_make_composite(),
-        plot_extended_variables=True,
-    )
-    try:
-        assert isinstance(
-            fig.axes[8].xaxis.get_major_formatter(), mdates.ConciseDateFormatter
-        )
-        assert isinstance(
-            fig.axes[9].xaxis.get_major_formatter(), mdates.ConciseDateFormatter
-        )
     finally:
         plt.close(fig)
 

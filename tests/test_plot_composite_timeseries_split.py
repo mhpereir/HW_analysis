@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import xarray as xr
 from HW_analysis.scripts import plot_composite_timeseries_split as plot_split
+from HW_analysis.src.artifact_paths import artifact_root
 
 RUN_ARGS = [
     "--region",
@@ -61,8 +62,7 @@ def test_parse_args_builds_separate_presentation_output_path(monkeypatch):
 
     assert args.layout == "presentation"
     assert args.output_path == (
-        plot_split.REPO_ROOT
-        / "results"
+        artifact_root()
         / "plots_composite_timeseries_split_presentation"
         / "region_pnw_hotz"
         / "boundary_surface_700hPa"

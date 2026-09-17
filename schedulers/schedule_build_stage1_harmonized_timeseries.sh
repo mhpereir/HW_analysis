@@ -8,6 +8,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT must be supplied by the submission workflow}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT must be supplied by the submission workflow}"
 REGION="${REGION:?REGION must be supplied by the submission workflow}"
 OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH must be supplied by the submission workflow}"
@@ -18,7 +19,7 @@ QUANTILE="${QUANTILE:-90}"
 THRESHOLD_VARIABLE="${THRESHOLD_VARIABLE:-tas}"
 HEAT_BUDGET_ROOT="${HEAT_BUDGET_ROOT:-}"
 CLOUD_COVER_ROOT="${CLOUD_COVER_ROOT:-/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/cloud_cover}"
-LOG_DIR="${LOG_DIR:-/home/mhpereir/HW_analysis/logs}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 VENUS_MAMBA_ENV="${VENUS_MAMBA_ENV:-dev_env}"
 
 case "${THRESHOLD_VARIABLE}" in
@@ -38,6 +39,10 @@ if [[ -n "${HEAT_BUDGET_ROOT}" ]]; then
     HEAT_BUDGET_ARGS=(--heat-budget-root "${HEAT_BUDGET_ROOT}")
 fi
 
+# Runtime validation and logging.
+hwa_start_log "stage1_${REGION}_global_cloud"
+hwa_validate_artifact_paths OUTPUT_PATH
+
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 if [[ "${actual_commit}" != "${EXPECTED_COMMIT}" ]]; then
     echo "[error] checkout commit ${actual_commit} does not match ${EXPECTED_COMMIT}" >&2
@@ -48,9 +53,8 @@ if [[ -n "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal
     exit 2
 fi
 
+test ! -e "${OUTPUT_PATH}"
 mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
-LOGFILE="${LOG_DIR}/${PBS_JOBID:-manual}_stage1_${REGION}_global_cloud.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1

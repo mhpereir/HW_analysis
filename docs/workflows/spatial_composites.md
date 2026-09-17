@@ -12,28 +12,31 @@ This is an active workflow with three durable dataset layers:
 2. a 366-day T2m/Z500 climatology; and
 3. lagged all-event or matched dynamical-sign spatial composite products.
 
+Storage paths follow the [artifact-location contract](artifacts.md); the root
+is shared across source checkouts and may be configured before submission.
+
 ## Data flow
 
 ```text
 hourly native-grid ERA5 T2m + Z500
   -> scripts/spatial_composites/build_era5_daily_spatial_data.sh
-  -> results/spatial_composites/daily/ERA5_daily_t2m_z500_<year>.nc
+  -> $HWA_ARTIFACT_ROOT/spatial_composites/daily/ERA5_daily_t2m_z500_<year>.nc
   -> scripts/spatial_composites/build_era5_daily_doy_climatology.sh
-  -> results/spatial_composites/climatology/
+  -> $HWA_ARTIFACT_ROOT/spatial_composites/climatology/
        era5_daily_doy_climatology_t2m_z500_global_1940_2024.nc
 
 Stage 2 event-feature table + annual daily files + climatology
   |-> scripts/spatial_composites/build_dyn_net_spatial_composites.py
-  |   -> results/spatial_composites/
+  |   -> $HWA_ARTIFACT_ROOT/spatial_composites/
   |        dyn_net_daily_spatial_composites_*.nc
   |   -> scripts/spatial_composites/plot_dyn_net_spatial_composites.py
-  |   -> results/spatial_composites/*.png
+  |   -> $HWA_ARTIFACT_ROOT/spatial_composites/*.png
   `-> tracked matching settings
       -> scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py
-      -> results/spatial_composites/
+      -> $HWA_ARTIFACT_ROOT/spatial_composites/
            matched_dyn_pre_daily_spatial_composites_*.nc
       -> scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py
-      -> results/spatial_composites/matched_dyn_pre_*.png
+      -> $HWA_ARTIFACT_ROOT/spatial_composites/matched_dyn_pre_*.png
 ```
 
 ## Step 1: Annual daily ERA5 fields

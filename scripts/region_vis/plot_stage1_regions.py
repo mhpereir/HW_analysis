@@ -26,12 +26,13 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src import analysis_io, config, plot_style
+from src.artifact_paths import artifact_root
 
 DEFAULT_RUN_ID = "bf232281_20260819"
-DEFAULT_RUN_DIR = REPO_ROOT / "results/stage1/runs" / DEFAULT_RUN_ID
+DEFAULT_RUN_DIR = artifact_root() / "stage1/runs" / DEFAULT_RUN_ID
 DEFAULT_OUTPUT_PATH = (
-    REPO_ROOT
-    / "results/region_vis"
+    artifact_root()
+    / "region_vis"
     / f"stage1_regional_domains_{DEFAULT_RUN_ID}.png"
 )
 DEFAULT_EXPECTED_REGION_COUNT = 7

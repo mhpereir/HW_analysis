@@ -21,6 +21,7 @@ from scripts.spatial_composites import (
     build_dyn_net_spatial_composites as spatial_builder,
 )
 from src import selectors
+from src.artifact_paths import artifact_root
 
 DEFAULT_EVENT_FEATURES_PATH = spatial_builder.DEFAULT_EVENT_FEATURES_PATH
 DEFAULT_DAILY_DIR = spatial_builder.DEFAULT_DAILY_DIR
@@ -28,8 +29,8 @@ DEFAULT_CLIMATOLOGY_PATH = spatial_builder.DEFAULT_CLIMATOLOGY_PATH
 DEFAULT_SETTINGS_PATH = matching_settings.DEFAULT_SETTINGS_PATH
 DEFAULT_MATCHING_SPECIFICATION = "peak_anomaly_0p20"
 DEFAULT_OUTPUT_PATH = (
-    REPO_ROOT
-    / "results/spatial_composites"
+    artifact_root()
+    / "spatial_composites"
     / (
         "matched_dyn_pre_daily_spatial_composites_pnw_bartusek_"
         "tas_q90_1940_2024_peak_anomaly_0p20.nc"

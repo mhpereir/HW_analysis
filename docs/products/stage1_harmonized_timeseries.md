@@ -14,8 +14,11 @@ consumers that require face tendencies or regional climatology must explicitly
 require contract version 2.
 
 ```text
-results/stage1/harmonized_regional_timeseries_*.nc
+$HWA_ARTIFACT_ROOT/stage1/harmonized_regional_timeseries_*.nc
 ```
+
+Storage paths follow the [artifact-location contract](../workflows/artifacts.md); the root
+is shared across source checkouts and may be configured before submission.
 
 ## Producer
 
@@ -198,6 +201,13 @@ not expanded with climatology or anomaly variables. See
 an immutable EHB campaign and an accepted contract-v2 Stage-1 reference for
 the same horizontal region, threshold variable, quantile, and analysis years.
 Run it through `schedulers/schedule_build_stage1_pressure_layer.sh`.
+
+The scheduler loads the shared artifact configuration and requires
+`REFERENCE_PATH` and the fresh `OUTPUT_DIR` beneath `HWA_ARTIFACT_ROOT`.
+`LOG_DIR` defaults to `HWA_LOG_ROOT`; application logs are created exclusively
+before preflight checks. The upstream `HEAT_BUDGET_MANIFEST` retains its EHB
+campaign location outside the prepared-artifact tree. Pass root overrides
+explicitly through PBS as described in the artifact-location contract.
 
 Only the vertical EHB control volume changes. TAS, all three LWA families,
 their thresholds, flags and event IDs, and regional surface diagnostics are

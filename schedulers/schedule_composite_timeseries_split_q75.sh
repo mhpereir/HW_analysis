@@ -10,20 +10,8 @@ set -euo pipefail
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
-
-actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
-test "${actual_commit}" = "${EXPECTED_COMMIT}"
-test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
-
-LOG_DIR="${PROJECT_ROOT}/logs"
-mkdir -p "${LOG_DIR}"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_plot_composite_timeseries_split_q75.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
-
-export MAMBA_ROOT_PREFIX=/home/mhpereir/miniconda3
-source /home/mhpereir/miniconda3/etc/profile.d/mamba.sh
-mamba activate "${VENUS_MAMBA_ENV:-dev_env}"
 
 REGION="pnw_bartusek"
 BOTTOM_BOUNDARY="surface"
@@ -33,7 +21,23 @@ QUANTILE=90
 TIME_START=1940
 TIME_END=2024
 SPLIT_QUANTILE=0.75
-OUTPUT_DIR="${PROJECT_ROOT}/results/plots_composite_timeseries_split/region_${REGION}/boundary_surface_700hPa/time_range_${TIME_START}_${TIME_END}/split_q75"
+OUTPUT_DIR="${OUTPUT_DIR:-${HWA_ARTIFACT_ROOT}/plots_composite_timeseries_split/region_${REGION}/boundary_surface_700hPa/time_range_${TIME_START}_${TIME_END}/split_q75}"
+INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
+
+# Runtime validation and logging.
+hwa_start_log "plot_composite_timeseries_split_q75"
+hwa_validate_artifact_paths INPUT_PATH OUTPUT_DIR
+
+actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
+test "${actual_commit}" = "${EXPECTED_COMMIT}"
+test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
+test -s "${INPUT_PATH}"
+test ! -e "${OUTPUT_DIR}"
+
+export MAMBA_ROOT_PREFIX=/home/mhpereir/miniconda3
+source /home/mhpereir/miniconda3/etc/profile.d/mamba.sh
+mamba activate "${VENUS_MAMBA_ENV:-dev_env}"
 
 echo "[info] job_id=${PBS_JOBID}"
 echo "[info] host=$(hostname)"
@@ -55,6 +59,7 @@ split_variable_list=(
 for split_variable in "${split_variable_list[@]}"; do
     echo "[info] $(date -Is) starting ${split_variable}"
     /usr/bin/time -v python plot_composite_timeseries_split.py \
+        --input-path "${INPUT_PATH}" \
         --region "${REGION}" \
         --bottom-boundary "${BOTTOM_BOUNDARY}" \
         --top-boundary "${TOP_BOUNDARY}" \

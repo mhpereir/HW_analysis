@@ -17,6 +17,7 @@ from matplotlib.ticker import (
     MaxNLocator,
     MultipleLocator,
     NullFormatter,
+    ScalarFormatter,
     StrMethodFormatter,
 )
 
@@ -238,6 +239,13 @@ def format_time_axis(ax) -> None:
     ax.xaxis.set_major_formatter(formatter)
     ax.xaxis.set_minor_locator(mdates.AutoDateLocator(minticks=8, maxticks=18))
     ax.xaxis.set_minor_formatter(NullFormatter())
+
+
+def format_day_lag_axis(axis) -> None:
+    """Prefer whole-day ticks, allowing fractional ticks for short windows."""
+    axis.set_major_locator(MaxNLocator(nbins="auto", integer=True))
+    axis.set_major_formatter(ScalarFormatter(useOffset=False))
+    use_default_numeric_formatter(axis)
 
 
 def format_integer_axis(axis, *, spacing: int = 1) -> None:

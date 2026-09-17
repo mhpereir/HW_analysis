@@ -18,11 +18,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-
 from src import analysis_io, plot_paths, plot_style, preprocess
+from src.artifact_paths import artifact_root
 
 PLOT_NAME = "threshold_timeseries"
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / f"plots_{PLOT_NAME}"
+DEFAULT_OUTPUT_DIR = artifact_root() / f"plots_{PLOT_NAME}"
 
 
 def parse_args() -> argparse.Namespace:

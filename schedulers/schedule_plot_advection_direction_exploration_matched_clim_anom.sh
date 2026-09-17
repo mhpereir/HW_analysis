@@ -9,6 +9,7 @@ set -euo pipefail
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"
 CLIMATOLOGY_PATH="${CLIMATOLOGY_PATH:?CLIMATOLOGY_PATH is required}"
@@ -16,7 +17,11 @@ EVENT_FEATURES_PATH="${EVENT_FEATURES_PATH:?EVENT_FEATURES_PATH is required}"
 MATCHING_SETTINGS_PATH="${MATCHING_SETTINGS_PATH:?MATCHING_SETTINGS_PATH is required}"
 OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"
 MATCHING_SPECIFICATION="${MATCHING_SPECIFICATION:-peak_anomaly_0p20}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
+
+# Runtime validation and logging.
+hwa_start_log "plot_advection_direction_matched_clim_anom"
+hwa_validate_artifact_paths INPUT_PATH CLIMATOLOGY_PATH EVENT_FEATURES_PATH OUTPUT_PATH
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
@@ -29,8 +34,6 @@ test "${OUTPUT_PATH##*.}" = "png"
 test ! -e "${OUTPUT_PATH}"
 
 mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_plot_advection_direction_matched_clim_anom.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
 
 STAGING_DIR="${OUTPUT_PATH}.staging.${PBS_JOBID}"
 test ! -e "${STAGING_DIR}"

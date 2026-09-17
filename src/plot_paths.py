@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from . import analysis_io, data_io
+from .artifact_paths import artifact_root
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -123,8 +124,7 @@ def default_plot_output_dir(
     bottom = data_io.normalize_heat_budget_bottom_boundary(bottom_boundary)
     top = data_io.normalize_heat_budget_top_boundary(top_boundary)
     return (
-        REPO_ROOT
-        / "results"
+        artifact_root()
         / f"plots_{filename_token(plot_name)}"
         / f"region_{filename_token(region)}"
         / f"boundary_{filename_token(bottom)}_{filename_token(top)}"

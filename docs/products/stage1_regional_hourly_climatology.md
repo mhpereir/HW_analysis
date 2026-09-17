@@ -7,8 +7,11 @@ Stage-1 harmonized regional time series. It supports timestamp-matched anomaly
 calculations without adding ad-hoc variables or dimensions to Stage 1.
 
 ```text
-results/stage1_climatology/regional_hourly_climatology_*.nc
+$HWA_ARTIFACT_ROOT/stage1_climatology/regional_hourly_climatology_*.nc
 ```
+
+Storage paths follow the [artifact-location contract](../workflows/artifacts.md); the root
+is shared across source checkouts and may be configured before submission.
 
 ## Producer
 

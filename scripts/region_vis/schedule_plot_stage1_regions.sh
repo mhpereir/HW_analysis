@@ -3,19 +3,25 @@
 #PBS -l select=1:ncpus=1:mem=4gb
 #PBS -l walltime=00:10:00
 #PBS -j oe
+#PBS -o /dev/null
 
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 PBS_O_WORKDIR="${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 RUN_ID="${RUN_ID:-bf232281_20260819}"
-RUN_DIR="${RUN_DIR:-${PROJECT_ROOT}/results/stage1/runs/${RUN_ID}}"
-OUTPUT_PATH="${OUTPUT_PATH:-${PROJECT_ROOT}/results/region_vis/stage1_regional_domains_${RUN_ID}.png}"
+RUN_DIR="${RUN_DIR:-${HWA_ARTIFACT_ROOT}/stage1/runs/${RUN_ID}}"
+OUTPUT_PATH="${OUTPUT_PATH:-${HWA_ARTIFACT_ROOT}/region_vis/stage1_regional_domains_${RUN_ID}.png}"
 EXPECTED_REGION_COUNT="${EXPECTED_REGION_COUNT:-7}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 VENUS_MAMBA_ENV="${VENUS_MAMBA_ENV:-dev_env}"
+
+# Runtime validation and logging.
+hwa_start_log "plot_stage1_regions"
+hwa_validate_artifact_paths RUN_DIR OUTPUT_PATH
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 if [[ "${actual_commit}" != "${EXPECTED_COMMIT}" ]]; then
@@ -39,9 +45,8 @@ if [[ ! "${EXPECTED_REGION_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
     exit 2
 fi
 
+test ! -e "${OUTPUT_PATH}"
 mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
-LOGFILE="${LOG_DIR}/${PBS_JOBID:-manual}_plot_stage1_regions.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1

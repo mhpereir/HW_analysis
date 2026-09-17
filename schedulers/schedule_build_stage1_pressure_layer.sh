@@ -8,12 +8,13 @@
 set -euo pipefail
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 REFERENCE_PATH="${REFERENCE_PATH:?REFERENCE_PATH is required}"
 REFERENCE_SHA256="${REFERENCE_SHA256:?REFERENCE_SHA256 is required}"
 HEAT_BUDGET_MANIFEST="${HEAT_BUDGET_MANIFEST:?HEAT_BUDGET_MANIFEST is required}"
 OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR is required}"
-LOG_DIR="${LOG_DIR:?LOG_DIR is required}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 REGION="${REGION:?REGION is required}"
 THRESHOLD_VARIABLE="${THRESHOLD_VARIABLE:?THRESHOLD_VARIABLE is required}"
 BOTTOM_HPA="${BOTTOM_HPA:?BOTTOM_HPA is required}"
@@ -23,11 +24,12 @@ END_YEAR="${END_YEAR:-2024}"
 QUANTILE="${QUANTILE:-90}"
 VALIDATE_ALL_SOURCE_YEARS="${VALIDATE_ALL_SOURCE_YEARS:-1}"
 
+hwa_start_log "stage1_pressure_layer"
+hwa_validate_artifact_paths REFERENCE_PATH OUTPUT_DIR
+
 test "$(git -C "${PROJECT_ROOT}" rev-parse HEAD)" = "${EXPECTED_COMMIT}"
 test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
 test ! -e "${OUTPUT_DIR}"
-mkdir -p "${LOG_DIR}"
-exec > >(tee "${LOG_DIR}/${PBS_JOBID}_stage1_pressure_layer.log") 2>&1
 
 export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1
 export PYTHONUNBUFFERED=1

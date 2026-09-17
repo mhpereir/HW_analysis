@@ -15,10 +15,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-
 import matplotlib
 import numpy as np
 import xarray as xr
+
+from src.artifact_paths import artifact_root
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -33,14 +34,12 @@ THRESHOLD_VARIABLE = "tas"
 QUANTILE_THRESHOLD = "q90"
 
 DEFAULT_INPUT_PATH = (
-    REPO_ROOT
-    / "results"
+    artifact_root()
     / "stage2_event_features"
     / f"hw_event_features_fixed_windows_{REGION}_{THRESHOLD_VARIABLE}_{QUANTILE_THRESHOLD}_1940_2024.nc"
 )
 DEFAULT_OUTPUT_PATH = (
-    REPO_ROOT
-    / "results"
+    artifact_root()
     / "stage2_event_features"
     / "diagnostics"
     / REGION

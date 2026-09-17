@@ -35,6 +35,11 @@ checkout, follow the [Git branch lifecycle](workflows/git_lifecycle.md).
 Branch retirement, scientific acceptance, and task/run completion are separate
 decisions. The shared cleanup skill owns the deletion and archival procedure.
 
+Before configuring or submitting production work, follow the
+[artifact and log location contract](workflows/artifacts.md). Prepared inputs
+and outputs live outside source checkouts, with scheduler logs in a separate
+stable sibling directory.
+
 ## Documentation-first change process
 
 Before implementing new development:
@@ -105,6 +110,7 @@ a figure.
 | Area | Canonical document |
 | --- | --- |
 | Git branches, integration, and retirement | [Git branch lifecycle](workflows/git_lifecycle.md) |
+| Prepared inputs, outputs, and scheduler logs | [Artifact locations](workflows/artifacts.md) |
 | Active architecture and ownership | [Pipeline overview](pipeline_overview.md) |
 | Stage 1 regional dataset | [Stage 1 product contract](products/stage1_harmonized_timeseries.md) |
 | Stage 1 regional hourly climatology | [Regional hourly climatology contract](products/stage1_regional_hourly_climatology.md) |

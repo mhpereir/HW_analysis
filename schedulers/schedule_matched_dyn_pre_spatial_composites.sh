@@ -9,15 +9,20 @@ set -euo pipefail
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
-EVENT_FEATURES_PATH="${EVENT_FEATURES_PATH:-${PROJECT_ROOT}/results/stage2_event_features/hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc}"
-DAILY_DIR="${DAILY_DIR:-${PROJECT_ROOT}/results/spatial_composites/daily}"
-CLIMATOLOGY_PATH="${CLIMATOLOGY_PATH:-${PROJECT_ROOT}/results/spatial_composites/climatology/era5_daily_doy_climatology_t2m_z500_global_1940_2024.nc}"
+EVENT_FEATURES_PATH="${EVENT_FEATURES_PATH:-${HWA_ARTIFACT_ROOT}/stage2_event_features/hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc}"
+DAILY_DIR="${DAILY_DIR:-${HWA_ARTIFACT_ROOT}/spatial_composites/daily}"
+CLIMATOLOGY_PATH="${CLIMATOLOGY_PATH:-${HWA_ARTIFACT_ROOT}/spatial_composites/climatology/era5_daily_doy_climatology_t2m_z500_global_1940_2024.nc}"
 MATCHING_SETTINGS_PATH="${MATCHING_SETTINGS_PATH:-${PROJECT_ROOT}/scripts/idyn_matching_exploration/matching_settings.json}"
 MATCHING_SPECIFICATION="${MATCHING_SPECIFICATION:-peak_anomaly_0p20}"
-COMPOSITE_OUTPUT_PATH="${COMPOSITE_OUTPUT_PATH:-${PROJECT_ROOT}/results/spatial_composites/matched_dyn_pre_daily_spatial_composites_pnw_bartusek_tas_q90_1940_2024_peak_anomaly_0p20.nc}"
-FIGURE_OUTPUT_PATH="${FIGURE_OUTPUT_PATH:-${PROJECT_ROOT}/results/spatial_composites/matched_dyn_pre_daily_t2m_z500_composites_pnw_bartusek_tas_q90_1940_2024_peak_anomaly_0p20.png}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+COMPOSITE_OUTPUT_PATH="${COMPOSITE_OUTPUT_PATH:-${HWA_ARTIFACT_ROOT}/spatial_composites/matched_dyn_pre_daily_spatial_composites_pnw_bartusek_tas_q90_1940_2024_peak_anomaly_0p20.nc}"
+FIGURE_OUTPUT_PATH="${FIGURE_OUTPUT_PATH:-${HWA_ARTIFACT_ROOT}/spatial_composites/matched_dyn_pre_daily_t2m_z500_composites_pnw_bartusek_tas_q90_1940_2024_peak_anomaly_0p20.png}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
+
+# Runtime validation and logging.
+hwa_start_log "matched_dyn_pre_spatial_composites"
+hwa_validate_artifact_paths EVENT_FEATURES_PATH DAILY_DIR CLIMATOLOGY_PATH COMPOSITE_OUTPUT_PATH FIGURE_OUTPUT_PATH
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
@@ -36,8 +41,6 @@ mkdir -p \
     "${LOG_DIR}" \
     "$(dirname "${COMPOSITE_OUTPUT_PATH}")" \
     "$(dirname "${FIGURE_OUTPUT_PATH}")"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_matched_dyn_pre_spatial_composites.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
 
 COMPOSITE_STAGING_DIR="${COMPOSITE_OUTPUT_PATH}.staging.${PBS_JOBID}"
 FIGURE_STAGING_DIR="${FIGURE_OUTPUT_PATH}.staging.${PBS_JOBID}"

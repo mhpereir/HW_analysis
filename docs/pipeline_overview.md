@@ -68,8 +68,8 @@ Product Stage 2: event-feature table + tracked matching settings
 
 | Product stage | Durable artifact | Producer | Main consumers |
 | --- | --- | --- | --- |
-| Stage 1 | `results/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_stage1_harmonized_timeseries.py` | event features, baseline features, composites, top-event plots |
-| Stage 1 companion | `results/stage1_climatology/regional_hourly_climatology_*.nc` | `scripts/build_stage1_hourly_climatology.py` | climatological-anomaly composites, top-event traces, and face-advection diagnostics |
+| Stage 1 | `$HWA_ARTIFACT_ROOT/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_stage1_harmonized_timeseries.py` | event features, baseline features, composites, top-event plots |
+| Stage 1 companion | `$HWA_ARTIFACT_ROOT/stage1_climatology/regional_hourly_climatology_*.nc` | `scripts/build_stage1_hourly_climatology.py` | climatological-anomaly composites, top-event traces, and face-advection diagnostics |
 | Stage 2 | event-feature table | `scripts/event_features/build_stage2_event_features.py` | feature plots, event comparisons, exploratory diagnostics |
 | Stage 2 | baseline-day feature table | `scripts/event_features/build_stage2_baseline_features.py` | event/baseline comparisons, exploratory diagnostics |
 
@@ -90,10 +90,10 @@ annual daily fields + climatology + Stage 2 event features with I_dyn_pre
 
 | Durable artifact | Producer | Main consumer |
 | --- | --- | --- |
-| `results/spatial_composites/daily/ERA5_daily_t2m_z500_<year>.nc` | `scripts/spatial_composites/build_era5_daily_spatial_data.sh` | climatology and composite builders |
-| `results/spatial_composites/climatology/era5_daily_doy_climatology_*.nc` | `scripts/spatial_composites/build_era5_daily_doy_climatology.sh` | spatial composite builder |
-| `results/spatial_composites/dyn_net_daily_spatial_composites_*.nc` | `scripts/spatial_composites/build_dyn_net_spatial_composites.py` | spatial composite plotter |
-| `results/spatial_composites/matched_dyn_pre_daily_spatial_composites_*.nc` | `scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py` | matched spatial composite plotter |
+| `$HWA_ARTIFACT_ROOT/spatial_composites/daily/ERA5_daily_t2m_z500_<year>.nc` | `scripts/spatial_composites/build_era5_daily_spatial_data.sh` | climatology and composite builders |
+| `$HWA_ARTIFACT_ROOT/spatial_composites/climatology/era5_daily_doy_climatology_*.nc` | `scripts/spatial_composites/build_era5_daily_doy_climatology.sh` | spatial composite builder |
+| `$HWA_ARTIFACT_ROOT/spatial_composites/dyn_net_daily_spatial_composites_*.nc` | `scripts/spatial_composites/build_dyn_net_spatial_composites.py` | spatial composite plotter |
+| `$HWA_ARTIFACT_ROOT/spatial_composites/matched_dyn_pre_daily_spatial_composites_*.nc` | `scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py` | matched spatial composite plotter |
 
 Stages 3 and 4 are inactive legacy workflows. Their PCA and clustering
 implementations are retained under `scripts/event_features/old/` for historical
@@ -117,11 +117,18 @@ products or plotting dependencies.
 | `src/diagnostics.py` | Domain-specific derived diagnostics such as residual checks and heating-rate approximations. |
 | `src/plotting.py` | Plot prepared products without raw loading or event generation. |
 | `src/plot_style.py` | Shared names, colors, dimensions, axis formatting, legends, and figure export. |
+| `src/artifact_paths.py`, `config/artifact_paths.sh` | Checkout-independent prepared-product and scheduler-log roots. |
 | `src/plot_paths.py` | Structured default output paths for Stage-1-based figures. |
 | `scripts/region_vis/` | Inventory a Stage-1 run and render its configured regional domains on a Northern Hemisphere map. |
 | `scripts/spatial_composites/` | Prepare daily ERA5 fields, build lagged spatial products, and render maps. |
 
 ## File And Directory Conventions
+
+Prepared inputs and outputs use `$HWA_ARTIFACT_ROOT`, defaulting to
+`~/HW-analysis/artifacts/`. Logs use the sibling `~/HW-analysis/logs/`.
+See [artifact locations](workflows/artifacts.md) for overrides, submission,
+no-overwrite rules, and migration of older checkouts. Raw upstream inputs are
+unchanged. The source checkout contains code and configuration only:
 
 ```text
 HW_analysis/
@@ -158,12 +165,21 @@ HW_analysis/
 |       `-- plot_matched_dyn_pre_spatial_composites.py
 |-- src/
 |-- tests/
-`-- results/
-    |-- stage1/
-    |-- stage1_climatology/
-    |-- stage2_event_features/
-    |-- stage2_baseline_features/
-    `-- spatial_composites/
+`-- config/
+```
+
+The independent Venus storage tree is:
+
+```text
+~/HW-analysis/
+|-- artifacts/
+|   |-- stage1/
+|   |-- stage1_climatology/
+|   |-- stage2_event_features/
+|   |-- stage2_baseline_features/
+|   |-- spatial_composites/
+|   `-- plots_*/
+`-- logs/
 ```
 
 Product filenames should encode enough run context to distinguish region,
@@ -184,6 +200,7 @@ specifications.
 
 ## Workflow Docs
 
+- [Artifact and scheduler-log locations](workflows/artifacts.md)
 - [Composites](workflows/composites.md)
 - [Spatial composites](workflows/spatial_composites.md)
 - [Plotting and shared style](workflows/plotting.md)

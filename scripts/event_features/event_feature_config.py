@@ -4,25 +4,24 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from src.artifact_paths import artifact_root
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 DEFAULT_INPUT_PATH = (
-    REPO_ROOT
-    / "results"
+    artifact_root()
     / "stage1"
     / "harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
 )
 
 DEFAULT_OUTPUT_PATH = (
-    REPO_ROOT
-    / "results"
+    artifact_root()
     / "stage2_event_features"
     / "hw_event_features_fixed_windows.nc"
 )
 
 DEFAULT_CSV_OUTPUT_PATH = (
-    REPO_ROOT
-    / "results"
+    artifact_root()
     / "stage2_event_features"
     / "hw_event_features_fixed_windows.csv"
 )
