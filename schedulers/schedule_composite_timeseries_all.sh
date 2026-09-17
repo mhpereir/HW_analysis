@@ -9,6 +9,7 @@ set -euo pipefail
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"
 OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"
@@ -22,7 +23,7 @@ TIME_END="${TIME_END:-2024}"
 WINDOW_DAYS="${WINDOW_DAYS:-7}"
 SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"
 PLOT_LAYOUT="${PLOT_LAYOUT:-paper}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 SMOOTHED_OUTPUT_PATH="${OUTPUT_PATH%.*}_smoothed.${OUTPUT_PATH##*.}"
 
 case "${PLOT_LAYOUT}" in
@@ -38,6 +39,10 @@ case "${PLOT_LAYOUT}" in
     ;;
 esac
 
+# Runtime validation and logging.
+hwa_start_log "plot_composite_timeseries_all"
+hwa_validate_artifact_paths INPUT_PATH OUTPUT_PATH SMOOTHED_OUTPUT_PATH
+
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
 test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
@@ -46,8 +51,6 @@ test ! -e "${OUTPUT_PATH}"
 test ! -e "${SMOOTHED_OUTPUT_PATH}"
 
 mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_plot_composite_timeseries_all.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1

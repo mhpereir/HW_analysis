@@ -29,10 +29,10 @@ top-event figures. Its callers therefore use the shared style indirectly even
 when they do not import `plot_style` themselves.
 
 `src/plot_paths.py` owns structured default output directories for Stage-1
-plots:
+plots beneath the [external artifact root](artifacts.md):
 
 ```text
-results/plots_<plot_name>/
+$HWA_ARTIFACT_ROOT/plots_<plot_name>/
   region_<region>/
   boundary_<bottom>_<top>/
   time_range_<start>_<end>/

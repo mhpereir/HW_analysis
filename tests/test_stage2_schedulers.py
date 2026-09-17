@@ -22,7 +22,9 @@ def test_stage2_scheduler_is_commit_pinned_and_publishes_atomically(kind):
     assert 'STAGED_OUTPUT_PATH="${OUTPUT_PATH}.tmp.${PBS_JOBID}"' in text
     assert 'trap \'rm -f -- "${STAGED_OUTPUT_PATH}"\' EXIT' in text
     assert '--output-path "${STAGED_OUTPUT_PATH}"' in text
-    assert 'mv -f -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"' in text
+    assert 'mv -n -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"' in text
+    assert 'test ! -e "${OUTPUT_PATH}"' in text
+    assert text.count('test ! -e "${STAGED_OUTPUT_PATH}"') == 2
     assert "--overwrite" not in text
 
 

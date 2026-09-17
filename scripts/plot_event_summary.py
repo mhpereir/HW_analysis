@@ -11,10 +11,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-
 import matplotlib
 import numpy as np
 import xarray as xr
+
+from src.artifact_paths import artifact_root
 
 matplotlib.use("Agg")
 import matplotlib.dates as mdates
@@ -25,7 +26,7 @@ from src import analysis_io, plot_paths, plot_style, selectors
 
 PLOT_NAME = "event_summary"
 DEFAULT_OUTPUT_FILENAME = "event_summary_histograms.png"
-DEFAULT_OUTPUT_PATH = REPO_ROOT / "results" / f"plots_{PLOT_NAME}" / DEFAULT_OUTPUT_FILENAME
+DEFAULT_OUTPUT_PATH = artifact_root() / f"plots_{PLOT_NAME}" / DEFAULT_OUTPUT_FILENAME
 DEFAULT_BINS = 30
 DEFAULT_EVENT_DIM = "event"
 DEFAULT_EXCLUDED_VARIABLES: frozenset[str] = frozenset(

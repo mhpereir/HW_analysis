@@ -41,8 +41,8 @@ def test_scheduler_uses_bounded_serial_resources_and_isolated_logs(scheduler):
 
     assert "#PBS -l select=1:ncpus=1:mem=4gb" in text
     assert "#PBS -l walltime=00:15:00" in text
-    assert 'LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"' in text
-    assert 'LOGFILE="${LOG_DIR}/${PBS_JOBID}_' in text
+    assert 'LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"' in text
+    assert 'hwa_start_log "plot_' in text
     assert "export OMP_NUM_THREADS=1" in text
     assert "export MKL_NUM_THREADS=1" in text
     assert "export OPENBLAS_NUM_THREADS=1" in text
@@ -70,8 +70,11 @@ def test_presentation_smoke_is_pinned_and_runs_export_regressions():
     assert "#PBS -l select=1:ncpus=1:mem=4gb" in text
     assert "#PBS -l walltime=00:10:00" in text
     assert "-m pytest -q -W error" in text
-    assert 'test ! -e "${LOGFILE}"' in text
+    assert 'hwa_start_log "presentation_feature_smoke"' in text
     for name in (
+        "test_artifact_paths.py",
+        "test_stage2_schedulers.py",
+        "test_spatial_composite_shell_scripts.py",
         "test_plot_style.py",
         "test_presentation_budget_comparisons.py",
         "test_selectors.py",
@@ -89,8 +92,9 @@ def test_scheduler_marker_defaults_and_overrides_match_layout(
 ):
     # Evaluate only local variable declarations, stopping before Git, files,
     # environments or job execution. No scheduler or production input is used.
-    declarations = scheduler.read_text().split("\nactual_commit=", 1)[0]
+    declarations = scheduler.read_text().split("\n# Runtime validation and logging.", 1)[0]
     env = {
+        "HOME": str(Path.home()),
         "PBS_O_WORKDIR": str(tmp_path),
         "PROJECT_ROOT": str(REPO_ROOT),
         "EXPECTED_COMMIT": "synthetic-not-a-deployment",

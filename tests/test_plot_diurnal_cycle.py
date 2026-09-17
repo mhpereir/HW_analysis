@@ -7,6 +7,7 @@ import pytest
 import xarray as xr
 from HW_analysis.scripts import plot_diurnal_cycle
 from HW_analysis.src import analysis_io
+from HW_analysis.src.artifact_paths import artifact_root
 
 RUN_ARGS = [
     "--region", "pnw_hotz",
@@ -38,8 +39,7 @@ def test_parse_args_builds_default_paths(monkeypatch):
         end_year=2024,
     )
     assert args.output_path == (
-        plot_diurnal_cycle.REPO_ROOT
-        / "results"
+        artifact_root()
         / "plots_diurnal_cycle"
         / "region_pnw_hotz"
         / "boundary_surface_700hPa"

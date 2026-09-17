@@ -9,17 +9,17 @@ set -euo pipefail
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
+
+# Runtime validation and logging.
+hwa_start_log "presentation_feature_smoke"
+hwa_validate_artifact_paths
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
 test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
-
-mkdir -p "${LOG_DIR}"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_presentation_feature_smoke.log"
-test ! -e "${LOGFILE}"
-exec > >(tee -a "${LOGFILE}") 2>&1
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
@@ -44,6 +44,9 @@ echo "[info] started=$(date -Is)"
 cd "${PROJECT_ROOT}"
 "${python_executable}" -c 'import matplotlib, numpy, xarray; print("matplotlib", matplotlib.__version__, "numpy", numpy.__version__, "xarray", xarray.__version__)'
 /usr/bin/time -v "${python_executable}" -m pytest -q -W error \
+  tests/test_artifact_paths.py \
+  tests/test_stage2_schedulers.py \
+  tests/test_spatial_composite_shell_scripts.py \
   tests/test_plot_style.py \
   tests/test_presentation_budget_comparisons.py \
   tests/test_selectors.py \

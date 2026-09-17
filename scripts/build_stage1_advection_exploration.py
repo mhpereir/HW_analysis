@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Enhanced Stage-1 output. Defaults to the "
-            f"results/stage1/{EXPLORATION_SUBDIR}/ subfolder."
+            f"stage1/{EXPLORATION_SUBDIR}/ subfolder of HWA_ARTIFACT_ROOT."
         ),
     )
     parser.add_argument(

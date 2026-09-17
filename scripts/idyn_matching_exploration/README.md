@@ -373,14 +373,17 @@ one third of the 117 negative events.
 ## Reproduce the exploration
 
 The script consumes only the compact Stage-2 table. Generated figures remain
-under the ignored `results/` tree.
+outside source checkouts under `HWA_ARTIFACT_ROOT`. Historical provenance and
+figure links above retain their original locations. New runs follow the
+[artifact-location contract](../../docs/workflows/artifacts.md).
 
 ```bash
 mamba activate dev_env
+export HWA_ARTIFACT_ROOT="${HWA_ARTIFACT_ROOT:-$HOME/HW-analysis/artifacts}"
 python scripts/idyn_matching_exploration/explore_idyn_matching.py \
-  --input-path /path/to/hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc \
+  --input-path "$HWA_ARTIFACT_ROOT/stage2_event_features/hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc" \
   --settings-path scripts/idyn_matching_exploration/matching_settings.json \
-  --output-dir results/Idyn_matching_exploration
+  --output-dir "$HWA_ARTIFACT_ROOT/Idyn_matching_exploration/FRESH_ATTEMPT"
 ```
 
 The tracked Venus production entrypoint is:
@@ -390,7 +393,9 @@ schedulers/schedule_explore_idyn_matching.sh
 ```
 
 It stages all five outputs, validates that they are nonempty, and only then
-replaces the four figures and `matching_summary.json` in the final directory.
+publishes the four figures and `matching_summary.json` in the final directory.
+The scheduler refuses to replace existing products. Run production through
+that PBS entrypoint, not directly on the login node or a local workstation.
 
 Edit a copied settings file and pass it with `--settings-path` when evaluating
 different matching variables or SD calipers. Use `--overwrite` only when

@@ -9,6 +9,7 @@ set -euo pipefail
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"
 OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"
@@ -24,7 +25,7 @@ SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"
 PLOT_LAYOUT="${PLOT_LAYOUT:-paper}"
 SPLIT_QUANTILE="${SPLIT_QUANTILE:-0.90}"
 SPLIT_YEAR="${SPLIT_YEAR:-1982}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 OUTPUT_DIRECTORY="$(dirname "${OUTPUT_PATH}")"
 OUTPUT_FILENAME="$(basename "${OUTPUT_PATH}")"
 OUTPUT_STEM="${OUTPUT_FILENAME%.*}"
@@ -60,6 +61,10 @@ split_output_path() {
     "${OUTPUT_SUFFIX}"
 }
 
+# Runtime validation and logging.
+hwa_start_log "plot_composite_timeseries_split"
+hwa_validate_artifact_paths INPUT_PATH OUTPUT_PATH OUTPUT_DIRECTORY
+
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
 test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
@@ -71,8 +76,6 @@ for split_variable in "${split_variable_list[@]}" peak_time; do
 done
 
 mkdir -p "${LOG_DIR}" "${OUTPUT_DIRECTORY}"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_plot_composite_timeseries_split.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1

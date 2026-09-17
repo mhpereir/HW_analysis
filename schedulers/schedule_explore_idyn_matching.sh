@@ -9,21 +9,16 @@ set -euo pipefail
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
-INPUT_PATH="${INPUT_PATH:-${PROJECT_ROOT}/results/stage2_event_features/hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc}"
+INPUT_PATH="${INPUT_PATH:-${HWA_ARTIFACT_ROOT}/stage2_event_features/hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc}"
 SETTINGS_PATH="${SETTINGS_PATH:-${PROJECT_ROOT}/scripts/idyn_matching_exploration/matching_settings.json}"
-OUTPUT_DIR="${OUTPUT_DIR:-${PROJECT_ROOT}/results/Idyn_matching_exploration}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+OUTPUT_DIR="${OUTPUT_DIR:-${HWA_ARTIFACT_ROOT}/Idyn_matching_exploration}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 
-RESULTS_ROOT=$(realpath -m -- "${PROJECT_ROOT}/results")
-OUTPUT_DIR=$(realpath -m -- "${OUTPUT_DIR}")
-case "${OUTPUT_DIR}" in
-    "${RESULTS_ROOT}"/*) ;;
-    *)
-        echo "[error] OUTPUT_DIR must be beneath ${RESULTS_ROOT}: ${OUTPUT_DIR}" >&2
-        exit 1
-        ;;
-esac
+# Runtime validation and logging.
+hwa_start_log "idyn_matching_exploration"
+hwa_validate_artifact_paths INPUT_PATH OUTPUT_DIR
 STAGED_OUTPUT_DIR="${OUTPUT_DIR}.tmp.${PBS_JOBID}"
 ARTIFACT_FILENAMES=(
     idyn_population_overview.png
@@ -33,16 +28,16 @@ ARTIFACT_FILENAMES=(
     matching_summary.json
 )
 
-mkdir -p "${LOG_DIR}"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_idyn_matching_exploration.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
-
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
 test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
 test -s "${INPUT_PATH}"
 test -s "${SETTINGS_PATH}"
+hwa_validate_artifact_paths STAGED_OUTPUT_DIR
 test ! -e "${STAGED_OUTPUT_DIR}"
+for filename in "${ARTIFACT_FILENAMES[@]}"; do
+    test ! -e "${OUTPUT_DIR}/${filename}"
+done
 
 cleanup() {
     if [[ -d "${STAGED_OUTPUT_DIR}" ]]; then
@@ -83,7 +78,8 @@ done
 
 mkdir -p "${OUTPUT_DIR}"
 for filename in "${ARTIFACT_FILENAMES[@]}"; do
-    mv -f -- "${STAGED_OUTPUT_DIR}/${filename}" "${OUTPUT_DIR}/${filename}"
+    mv -n -- "${STAGED_OUTPUT_DIR}/${filename}" "${OUTPUT_DIR}/${filename}"
+    test ! -e "${STAGED_OUTPUT_DIR}/${filename}"
 done
 test -z "$(find "${STAGED_OUTPUT_DIR}" -mindepth 1 -print -quit)"
 rmdir -- "${STAGED_OUTPUT_DIR}"

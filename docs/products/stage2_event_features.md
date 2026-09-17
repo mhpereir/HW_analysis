@@ -8,13 +8,16 @@ event-level row of fixed-window features centered on `peak_time`.
 Typical outputs:
 
 ```text
-results/stage2_event_features/hw_event_features_fixed_windows*.nc
-results/stage2_event_features/hw_event_features_fixed_windows*.csv
+$HWA_ARTIFACT_ROOT/stage2_event_features/hw_event_features_fixed_windows*.nc
+$HWA_ARTIFACT_ROOT/stage2_event_features/hw_event_features_fixed_windows*.csv
 ```
 
 The NetCDF product is canonical. CSV output is an optional convenience export.
 Older generated artifacts may still exist under `results/event_features/`, but
 new defaults use the stage-specific directory above.
+
+Storage paths follow the [artifact-location contract](../workflows/artifacts.md); the root
+is shared across source checkouts and may be configured before submission.
 
 ## Producer
 

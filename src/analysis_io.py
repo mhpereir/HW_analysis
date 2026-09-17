@@ -27,15 +27,16 @@ from uuid import uuid4
 import numpy as np
 import xarray as xr
 
+from .artifact_paths import artifact_root
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HARMONIZED_TIMESERIES_PATH = (
-    REPO_ROOT
-    / "results"
+    artifact_root()
     / "stage1"
     / "harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
 )
-DEFAULT_STAGE1_OUTPUT_DIR = REPO_ROOT / "results" / "stage1"
-DEFAULT_STAGE1_CLIMATOLOGY_OUTPUT_DIR = REPO_ROOT / "results" / "stage1_climatology"
+DEFAULT_STAGE1_OUTPUT_DIR = artifact_root() / "stage1"
+DEFAULT_STAGE1_CLIMATOLOGY_OUTPUT_DIR = artifact_root() / "stage1_climatology"
 EXPECTED_PIPELINE_STAGE = "stage_1_harmonized_regional_timeseries"
 EXPECTED_CLIMATOLOGY_PIPELINE_STAGE = "stage_1_regional_hourly_climatology"
 CURRENT_STAGE1_CONTRACT_VERSION = 2

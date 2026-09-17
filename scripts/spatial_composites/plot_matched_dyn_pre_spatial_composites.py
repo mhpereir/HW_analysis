@@ -22,11 +22,12 @@ from scripts.spatial_composites import (
 from scripts.spatial_composites import (
     plot_dyn_net_spatial_composites as spatial_plotter,
 )
+from src.artifact_paths import artifact_root
 
 DEFAULT_INPUT_PATH = matched_builder.DEFAULT_OUTPUT_PATH
 DEFAULT_OUTPUT_PATH = (
-    REPO_ROOT
-    / "results/spatial_composites"
+    artifact_root()
+    / "spatial_composites"
     / (
         "matched_dyn_pre_daily_t2m_z500_composites_pnw_bartusek_"
         "tas_q90_1940_2024_peak_anomaly_0p20.png"

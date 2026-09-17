@@ -14,8 +14,11 @@ consumers that require face tendencies or regional climatology must explicitly
 require contract version 2.
 
 ```text
-results/stage1/harmonized_regional_timeseries_*.nc
+$HWA_ARTIFACT_ROOT/stage1/harmonized_regional_timeseries_*.nc
 ```
+
+Storage paths follow the [artifact-location contract](../workflows/artifacts.md); the root
+is shared across source checkouts and may be configured before submission.
 
 ## Producer
 

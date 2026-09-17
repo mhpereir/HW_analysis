@@ -23,11 +23,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-
 from src import analysis_io, composites, plot_paths, plot_style, plotting, selectors
+from src.artifact_paths import artifact_root
 
 PLOT_NAME = "top_events"
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / f"plots_{PLOT_NAME}"
+DEFAULT_OUTPUT_DIR = artifact_root() / f"plots_{PLOT_NAME}"
 PRESENTATION_PLOT_NAME = f"{PLOT_NAME}_presentation"
 DEFAULT_TOP_N = 10
 DEFAULT_WINDOW_DAYS = 7

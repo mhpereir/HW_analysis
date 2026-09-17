@@ -29,13 +29,14 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.idyn_matching_exploration import matching_settings
 from src import plot_style, selectors
+from src.artifact_paths import artifact_root
 
 DEFAULT_INPUT_PATH = (
-    REPO_ROOT
-    / "results/stage2_event_features"
+    artifact_root()
+    / "stage2_event_features"
     / "hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc"
 )
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results/Idyn_matching_exploration"
+DEFAULT_OUTPUT_DIR = artifact_root() / "Idyn_matching_exploration"
 
 OVERVIEW_FILENAME = "idyn_population_overview.png"
 MATCHING_FILENAME = "tas_anom_matching_diagnostics.png"

@@ -23,15 +23,16 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src import plot_style
+from src.artifact_paths import artifact_root
 
 DEFAULT_INPUT_PATH = (
-    REPO_ROOT
-    / "results/spatial_composites"
+    artifact_root()
+    / "spatial_composites"
     / "dyn_net_daily_spatial_composites_pnw_bartusek_tas_q90_1940_2024.nc"
 )
 DEFAULT_OUTPUT_PATH = (
-    REPO_ROOT
-    / "results/spatial_composites"
+    artifact_root()
+    / "spatial_composites"
     / "dyn_net_daily_t2m_z500_composites_pnw_bartusek_tas_q90_1940_2024.png"
 )
 GROUPS = ("positive", "negative")

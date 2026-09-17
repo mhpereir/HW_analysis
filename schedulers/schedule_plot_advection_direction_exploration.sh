@@ -9,16 +9,20 @@ set -euo pipefail
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
+
+INPUT_PATH="${INPUT_PATH:-${HWA_ARTIFACT_ROOT}/stage1/advection_direction_exploration/harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc}"
+OUTPUT_PATH="${OUTPUT_PATH:-${HWA_ARTIFACT_ROOT}/plots_advection_direction_exploration/region_pnw_bartusek/boundary_surface_700hPa/time_range_1940_2024/advection_face_contributions_two_panel.png}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
+
+# Runtime validation and logging.
+hwa_start_log "plot_advection_direction_exploration"
+hwa_validate_artifact_paths INPUT_PATH OUTPUT_PATH
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
 test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
-
-LOG_DIR="${PROJECT_ROOT}/logs"
-mkdir -p "${LOG_DIR}"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_plot_advection_direction_exploration.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
@@ -27,9 +31,6 @@ export NUMEXPR_NUM_THREADS=1
 export MAMBA_ROOT_PREFIX=/home/mhpereir/miniconda3
 source /home/mhpereir/miniconda3/etc/profile.d/mamba.sh
 mamba activate "${VENUS_MAMBA_ENV:-dev_env}"
-
-INPUT_PATH="${PROJECT_ROOT}/results/stage1/advection_direction_exploration/harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
-OUTPUT_PATH="${PROJECT_ROOT}/results/plots_advection_direction_exploration/region_pnw_bartusek/boundary_surface_700hPa/time_range_1940_2024/advection_face_contributions_two_panel.png"
 
 test -s "${INPUT_PATH}"
 if [[ -e "${OUTPUT_PATH}" ]]; then

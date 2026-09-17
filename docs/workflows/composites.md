@@ -5,6 +5,9 @@
 Composite workflows consume prepared products to summarize event-centered
 trajectories. They are workflows and diagnostics, not product stages.
 
+Storage paths follow the [artifact-location contract](artifacts.md); the root
+is shared across source checkouts and may be configured before submission.
+
 ## Primary Inputs
 
 - Stage-1 harmonized regional time series
@@ -132,7 +135,7 @@ changing the tracked source between submissions.
 
 ## Outputs
 
-Outputs are figures and diagnostic tables under `results/plots_*`. They are not
+Outputs are figures and diagnostic tables under `$HWA_ARTIFACT_ROOT/plots_*`. They are not
 durable pipeline product stages unless a later implementation explicitly writes
 and documents a composite dataset contract.
 

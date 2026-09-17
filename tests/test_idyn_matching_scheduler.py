@@ -29,7 +29,9 @@ def test_matching_scheduler_stages_all_outputs_before_publication():
     ):
         assert filename in text
     assert 'test -s "${STAGED_OUTPUT_DIR}/${filename}"' in text
-    assert 'mv -f -- "${STAGED_OUTPUT_DIR}/${filename}"' in text
+    assert 'mv -n -- "${STAGED_OUTPUT_DIR}/${filename}"' in text
+    assert 'test ! -e "${STAGED_OUTPUT_DIR}/${filename}"' in text
+    assert 'test ! -e "${OUTPUT_DIR}/${filename}"' in text
 
 
 def test_matching_scheduler_uses_right_sized_resources_and_dev_env():

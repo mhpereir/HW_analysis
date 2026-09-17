@@ -10,13 +10,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-
 from src import analysis_io, composites, plot_paths, plotting, selectors
+from src.artifact_paths import artifact_root
 
 PLOT_NAME = "composite_timeseries_all"
 DEFAULT_OUTPUT_FILENAME = "hw_all_events_composite.png"
 DEFAULT_OUTPUT_PATH = (
-    REPO_ROOT / "results" / f"plots_{PLOT_NAME}" / DEFAULT_OUTPUT_FILENAME
+    artifact_root() / f"plots_{PLOT_NAME}" / DEFAULT_OUTPUT_FILENAME
 )
 PRESENTATION_PLOT_NAME = f"{PLOT_NAME}_presentation"
 PRESENTATION_DEFAULT_OUTPUT_FILENAME = "hw_all_events_composite_presentation.png"

@@ -10,9 +10,12 @@ non-event population; it is not an event-feature table.
 Typical outputs:
 
 ```text
-results/stage2_baseline_features/non_event_day_features_fixed_windows*.nc
-results/stage2_baseline_features/non_event_day_features_fixed_windows*.csv
+$HWA_ARTIFACT_ROOT/stage2_baseline_features/non_event_day_features_fixed_windows*.nc
+$HWA_ARTIFACT_ROOT/stage2_baseline_features/non_event_day_features_fixed_windows*.csv
 ```
+
+Storage paths follow the [artifact-location contract](../workflows/artifacts.md); the root
+is shared across source checkouts and may be configured before submission.
 
 ## Producer
 
