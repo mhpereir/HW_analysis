@@ -191,3 +191,44 @@ a partial file at the final product path.
 The regional climatology is a separate compact companion product. Stage 1 is
 not expanded with climatology or anomaly variables. See
 [Regional hourly climatology](stage1_regional_hourly_climatology.md).
+
+## Fixed pressure layers using an accepted regional reference
+
+`scripts/build_stage1_pressure_layer.py` assembles a new pressure layer from
+an immutable EHB campaign and an accepted contract-v2 Stage-1 reference for
+the same horizontal region, threshold variable, quantile, and analysis years.
+Run it through `schedulers/schedule_build_stage1_pressure_layer.sh`.
+
+Only the vertical EHB control volume changes. TAS, all three LWA families,
+their thresholds, flags and event IDs, and regional surface diagnostics are
+reused exactly from the reference. The hourly axes must match exactly after
+selecting complete analysis years; interpolation and partial-year selections
+are forbidden. The selected event table is retained for those years and must
+agree with an independently rebuilt event table. The reference file's SHA-256
+must match an explicitly supplied accepted hash.
+
+The builder replaces temperature, volume, all budget rates and every boundary
+face from the new annual EHB inputs using the standard harmonization code.
+Both pressure faces are required. Surface-energy approximations are recomputed
+from the preserved surface fluxes, recorded regional area and constants, and
+the new volume. For an elevated layer these are hypothetical uniform-energy
+equivalents, not measured heating or boundary fluxes into that layer; their
+metadata states this limitation. They must not be substituted for the EHB
+residual `diabatic`.
+
+Before publication, validate the EHB manifest's horizontal region and pressure
+bounds, every requested year's complete seasonal hourly axis, finite numeric
+fields, positive volume, six-face reconstruction and budget closure. Validate
+the complete upstream annual inventory, including years outside the analysis
+period, in the production run. Validate exact equality of reused fields and
+event summaries, direct normalized source values and closure in the reopened
+output. A one-year smoke precedes full production. Synthetic tests cover
+incompatible references, pressure metadata, missing hours, missing bottom
+faces, closure failure, and the changed volume normalization.
+
+Each attempt requires a new output directory and never overwrites an existing
+directory. NetCDF publication remains atomic. A JSON manifest records source
+and reference hashes, source and analysis years, EHB producer provenance,
+execution commit and PBS identity, validation metrics, and output hashes.
+Existing raw-source builds, surface products and downstream schemas remain
+unchanged. New filenames encode the fixed lower and upper pressure bounds.

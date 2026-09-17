@@ -55,6 +55,48 @@ FULL_DIAGNOSTIC_SOURCE_VARIABLES: dict[str, str] = {
 SURFACE_ENERGY_VARIABLES: tuple[str, ...] = ("nslr", "nssr", "slhf", "sshf")
 
 
+def replace_heat_budget(reference: xr.Dataset, heat_budget: xr.Dataset) -> xr.Dataset:
+    """Replace a validated reference's budget and volume-dependent diagnostics.
+
+    Callers validate region, coverage, pressure bounds and reference provenance.
+    Surface fields and event definitions are independent of the EHB layer.
+    """
+    if not reference.indexes["time"].equals(heat_budget.indexes["time"]):
+        raise ValueError("Reference and heat budget must have exactly matching times.")
+    replaced = set(HEAT_BUDGET_VARIABLE_MAP.values())
+    replaced.update(f"advection_{face}" for face in (*advection_direction.REQUIRED_FACES, "bottom"))
+    replaced.update(f"{name}_heating_rate_approx" for name in SURFACE_ENERGY_VARIABLES)
+    replaced.add("surface_energy_heating_rate_approx")
+    out = reference.drop_vars(sorted(replaced.intersection(reference.data_vars)))
+    out = out.assign(_prepare_heat_budget_variables(heat_budget, time_dim="time"))
+    out = advection_direction.add_face_advection_tendencies(out, heat_budget)
+    for name in SURFACE_ENERGY_VARIABLES:
+        rate_name = f"{name}_heating_rate_approx"
+        old_attrs = reference[rate_name].attrs
+        out[rate_name] = diagnostics.approximate_surface_energy_heating_rate(
+            out[name],
+            out["volume"],
+            region_area_m2=float(old_attrs["region_area_m2"]),
+            g_m_s2=float(old_attrs["g_m_s2"]),
+            cp_j_kg_k=float(old_attrs["cp_j_kg_k"]),
+            name=rate_name,
+        )
+        out[rate_name].attrs.update({
+            "native_time_resolution": "hourly",
+            "analysis_time_resolution": "hourly",
+            "source_dataset": name,
+            "physical_interpretation": (
+                "Hypothetical uniform surface-energy equivalent for this pressure "
+                "layer; not a measured heating or boundary flux into the layer."
+            ),
+        })
+    total_name = "surface_energy_heating_rate_approx"
+    out[total_name] = sum(out[f"{name}_heating_rate_approx"] for name in SURFACE_ENERGY_VARIABLES)
+    out[total_name].attrs = dict(reference[total_name].attrs)
+    out[total_name].attrs["physical_interpretation"] = out[rate_name].attrs["physical_interpretation"]
+    return out
+
+
 def build_regional_analysis_dataset(
     *,
     heat_budget: xr.Dataset,
