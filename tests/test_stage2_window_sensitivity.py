@@ -63,7 +63,7 @@ def test_independent_reductions_populations_and_roundtrip(source, hours, tmp_pat
     events, baseline = pair(source, hours)
     path = tmp_path / "events.nc"
     events.to_netcdf(path, engine="h5netcdf")
-    with xr.open_dataset(path, engine="h5netcdf") as saved:
+    with xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True) as saved:
         report = validate_core_pair(source, saved, baseline, hours)
     assert report["event"]["rows"] == 3
     assert report["expected_hourly_samples"] == hours + 1

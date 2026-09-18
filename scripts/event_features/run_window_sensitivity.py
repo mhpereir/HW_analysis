@@ -60,10 +60,14 @@ def main() -> int:
             )
         with (
             xr.open_dataset(
-                args.output_dir / "event_features.nc", engine="h5netcdf"
+                args.output_dir / "event_features.nc",
+                engine="h5netcdf",
+                decode_timedelta=True,
             ) as saved_events,
             xr.open_dataset(
-                args.output_dir / "baseline_features.nc", engine="h5netcdf"
+                args.output_dir / "baseline_features.nc",
+                engine="h5netcdf",
+                decode_timedelta=True,
             ) as saved_baseline,
         ):
             validation = validate_core_pair(
