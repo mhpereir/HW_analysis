@@ -77,6 +77,14 @@ explicitly through PBS. `REGIONS` defaults to both PNW regions; use
 requests one CPU, 4 GB and 15 minutes, with numerical threads limited to one.
 The builder and plotter record the supplied commit and PBS identity.
 
+For a plotting-only rerun, set `COMPARISON_DIR` to an accepted run directory
+containing each region's `heating_comparison.nc`. The same scheduler then
+reads those immutable tables and writes only the PNG, PDF and figure manifest
+to a fresh `OUTPUT_DIR`. `STAGE1_DIR`, `CLIMATOLOGY_DIR` and `REFERENCE_DIR`
+are not required in this mode. Both directories must be beneath the resolved
+artifact root. Use `RUN_TESTS=1` for the queued plotting smoke; verify the
+source-table hashes and inspect the regenerated figure before acceptance.
+
 Local validation uses synthetic data only:
 
 ```bash

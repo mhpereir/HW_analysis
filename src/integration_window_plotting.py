@@ -66,7 +66,7 @@ def plot_heating_ranks(tables: Sequence[xr.Dataset]):
                 linewidth=plot_style.LINE_WIDTH_PT,
             )
         plot_style.style_axis(ax)
-        plot_style.format_integer_axis(ax.xaxis, spacing=3)
+        plot_style.format_integer_axis(ax.xaxis, spacing=3, minor_spacing=1)
         ax.set_xticks(
             np.unique(
                 np.r_[
@@ -96,7 +96,10 @@ def plot_heating_ranks(tables: Sequence[xr.Dataset]):
         )
     spacing = max(1, int(np.ceil(maximum / 5 / 5) * 5)) if maximum > 5 else 1
     for ax in axes.flat:
-        plot_style.format_integer_axis(ax.yaxis, spacing=spacing)
+        # Rank 1 makes the first major interval shorter than the regular ones.
+        plot_style.format_integer_axis(
+            ax.yaxis, spacing=spacing, minor_spacing=max(1, spacing // 5)
+        )
         ax.set_yticks(
             np.unique(np.r_[1, np.arange(spacing, maximum + spacing, spacing)])
         )

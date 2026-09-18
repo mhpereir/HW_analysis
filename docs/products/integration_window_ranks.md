@@ -92,6 +92,14 @@ at the top, and a visible cohort size. Identify the atmospheric-temperature
 correction and reference period. Use the shared plotting style and export PNG
 and PDF into fresh external artifact paths. Keep all source data immutable.
 
+Minor ticks use fixed integer spacing: one day on the integration axis and
+one fifth of the regular major-rank spacing (at least one rank) on the rank
+axis. The extra major tick at rank 1 must not determine the minor spacing.
+For example, major ranks 1, 25, 50, ... use minor ranks 5, 10, 15, 20, 30,
+... . This is a display-only rule; saved ranks and major tick labels retain
+their existing meanings. Validate tick positions after drawing and export,
+including the irregular first major interval and the shared regional axes.
+
 ## Validation and execution
 
 - Synthetic tests cover known warming and cooling corrections, re-ranking all

@@ -263,12 +263,22 @@ def format_day_lag_axis(axis) -> None:
     use_default_numeric_formatter(axis)
 
 
-def format_integer_axis(axis, *, spacing: int = 1) -> None:
-    """Format a numeric axis with integer labels at a fixed integer spacing."""
+def format_integer_axis(
+    axis, *, spacing: int = 1, minor_spacing: int | None = None
+) -> None:
+    """Format integer labels, optionally fixing minor ticks independently."""
     if isinstance(spacing, bool) or not isinstance(spacing, int) or spacing < 1:
         raise ValueError("spacing must be a positive integer.")
+    if minor_spacing is not None and (
+        isinstance(minor_spacing, bool)
+        or not isinstance(minor_spacing, int)
+        or minor_spacing < 1
+    ):
+        raise ValueError("minor_spacing must be a positive integer.")
     axis.set_major_locator(MultipleLocator(spacing))
     axis.set_major_formatter(StrMethodFormatter("{x:.0f}"))
+    if minor_spacing is not None:
+        axis.set_minor_locator(MultipleLocator(minor_spacing))
     use_default_numeric_formatter(axis)
 
 
