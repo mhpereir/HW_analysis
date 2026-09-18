@@ -801,7 +801,10 @@ def test_plot_top_event_timeseries_expands_tendency_axis_range():
     ("layout", "extended", "label_count"),
     [("paper", False, 1), ("paper", True, 2), ("presentation", False, 2)],
 )
-def test_top_event_day_axis_survives_export(layout, extended, label_count, tmp_path):
+@pytest.mark.parametrize("anomaly", [False, True])
+def test_top_event_day_axis_survives_export(
+    layout, extended, label_count, anomaly, tmp_path
+):
     event = _make_top_event()
     peak = event["peak_time"].values
     event["start_time"] = peak - np.timedelta64(3, "D")
@@ -809,6 +812,8 @@ def test_top_event_day_axis_survives_export(layout, extended, label_count, tmp_p
     event_window = _make_top_event_window().assign_coords(
         time=peak + np.array([-7, -3, 0, 3, 7], dtype="timedelta64[D]")
     )
+    if anomaly:
+        event_window.attrs["data_representation"] = "climatological_anomaly"
     fig = plotting.plot_top_event_timeseries(
         event_window, event, plot_extended_variables=extended, layout=layout
     )
@@ -825,6 +830,16 @@ def test_top_event_day_axis_survives_export(layout, extended, label_count, tmp_p
             visible = ticks[(ticks >= ax.get_xlim()[0]) & (ticks <= ax.get_xlim()[1])]
             assert 0 in visible
             np.testing.assert_array_equal(visible, np.round(visible))
+            minor_ticks = ax.get_xticks(minor=True)
+            lower, upper = ax.get_xlim()
+            visible_minor = minor_ticks[
+                (minor_ticks >= lower) & (minor_ticks <= upper)
+            ]
+            np.testing.assert_array_equal(visible_minor, np.round(visible_minor))
+            np.testing.assert_array_equal(
+                np.union1d(visible, visible_minor),
+                np.arange(np.ceil(lower), np.floor(upper) + 1),
+            )
             assert ax.xaxis.get_offset_text().get_text() == ""
     finally:
         plt.close(fig)

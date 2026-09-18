@@ -242,9 +242,10 @@ def format_time_axis(ax) -> None:
 
 
 def format_day_lag_axis(axis) -> None:
-    """Prefer whole-day ticks, allowing fractional ticks for short windows."""
+    """Use daily minor ticks and prefer whole-day major ticks when possible."""
     axis.set_major_locator(MaxNLocator(nbins="auto", integer=True))
     axis.set_major_formatter(ScalarFormatter(useOffset=False))
+    axis.set_minor_locator(MultipleLocator(1))
     use_default_numeric_formatter(axis)
 
 

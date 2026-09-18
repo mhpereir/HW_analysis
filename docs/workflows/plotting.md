@@ -259,8 +259,11 @@ do not round timestamps to calendar dates or resample the hourly traces.
 Convert the all-event reference's `lag_hour` coordinate to days for both its
 mean and IQR. Place the event start and end markers on the same elapsed-day
 axis and the peak marker at zero. Use shared numeric tick formatting that
-prefers whole-day ticks when the range permits and retains fractional ticks
-for short windows. Preserve this formatting on export, including twin axes.
+prefers whole-day major ticks when the range permits and retains fractional
+major ticks for short windows. Minor ticks fall at integer days, spaced one
+day apart, with ticks coincident with major ticks omitted. Do not subdivide
+days into fractional minor ticks, even for short windows. Preserve this
+formatting on export, including twin axes.
 
 This is a display-only change for both absolute and climatological-anomaly
 top-event figures, including raw and smoothed outputs. Stage-1 timestamps,
@@ -271,9 +274,11 @@ historical artifacts; production validation uses a fresh output namespace.
 
 Synthetic regressions must check elapsed-day coordinates across every panel,
 reference means and IQRs, exact peak and boundary markers, non-midnight peaks,
-source immutability, and numeric ticks after export in each layout. Before
-production acceptance, render representative presentation and extended paper
-figures through Venus PBS and inspect the saved axes at original resolution.
+source immutability, and whole-day minor ticks after export in each layout.
+Check that major and minor ticks together mark every integer day in the
+standard event window, while short windows retain distinct major labels.
+Before production acceptance, render representative presentation and extended
+paper figures through Venus PBS and inspect the saved axes at original resolution.
 
 ### Composite labels and surface-flux signs
 
