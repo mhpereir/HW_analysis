@@ -28,6 +28,12 @@ def parse_args() -> argparse.Namespace:
         description="Build event-level fixed-window features from a Stage-1 dataset."
     )
     parser.add_argument(
+        "--integration-hours",
+        type=int,
+        default=None,
+        help="Positive pre-peak heat-budget/LWA span in hours (default: 96).",
+    )
+    parser.add_argument(
         "--input-path",
         type=Path,
         default=config.DEFAULT_INPUT_PATH,
@@ -104,6 +110,7 @@ def build_event_features(
     all_seasons: bool = False,
     require_full_event: bool = False,
     input_path: str | Path | None = None,
+    integration_hours: int | None = None,
 ) -> xr.Dataset:
     """Return one event-level fixed-window feature table."""
     if not all_seasons and season_months is None:
@@ -111,6 +118,7 @@ def build_event_features(
     if all_seasons and season_months is not None:
         raise ValueError("Pass season_months or all_seasons=True, not both.")
 
+    windows = config.integration_windows(integration_hours)
     ds = fixed.ensure_tas_anom(ds)
     event_table = event_summary_table(ds)
     if season_months is not None:
@@ -133,9 +141,10 @@ def build_event_features(
         event_table,
         ds,
         fixed.active_window_names(feature_spec),
+        windows=windows,
     )
     peak_times = event_peak_values(event_table)
-    reducer = fixed.WindowReducer(ds)
+    reducer = fixed.WindowReducer(ds, windows=windows)
 
     out = xr.Dataset(coords={config.EVENT_DIM: event_table[config.EVENT_DIM]})
     copy_event_summary_features(out, event_table)
@@ -151,7 +160,7 @@ def build_event_features(
             operation=operation,
         ),
     )
-    fixed.add_integrated_dynamical_feature(out, row_dim=config.EVENT_DIM)
+    fixed.add_integrated_dynamical_feature(out, row_dim=config.EVENT_DIM, windows=windows)
     fixed.add_days_from_solstice(
         out,
         peak_times,
@@ -168,6 +177,7 @@ def build_event_features(
         require_full_event=require_full_event,
         dropped_boundary_events=dropped_boundary_events,
         feature_spec=feature_spec,
+        windows=windows,
     )
     return out
 
@@ -240,6 +250,8 @@ def drop_boundary_events(
     event_table: xr.Dataset,
     ds: xr.Dataset,
     window_names: Sequence[str],
+    *,
+    windows: Mapping[str, tuple[int, int]] | None = None,
 ) -> tuple[xr.Dataset, int]:
     """Drop events whose active feature windows are outside the dataset time range."""
     time_values = np.asarray(ds[config.TIME_DIM].values, dtype="datetime64[ns]")
@@ -248,7 +260,9 @@ def drop_boundary_events(
         dtype="datetime64[ns]",
     )
 
-    keep = fixed.complete_anchor_mask(time_values, peak_times, window_names)
+    keep = fixed.complete_anchor_mask(
+        time_values, peak_times, window_names, windows=windows
+    )
 
     dropped = int((~keep).sum())
     out = event_table.isel({config.EVENT_DIM: np.flatnonzero(keep)})
@@ -446,6 +460,7 @@ def add_global_attrs(
     require_full_event: bool,
     dropped_boundary_events: int,
     feature_spec: Mapping[str, Mapping[str, str]],
+    windows: Mapping[str, tuple[int, int]] | None = None,
 ) -> None:
     """Attach feature-table provenance and method metadata."""
     attrs: dict[str, Any] = {
@@ -468,7 +483,8 @@ def add_global_attrs(
     }
     if season_months is not None:
         attrs["season_months"] = ",".join(str(month) for month in season_months)
-    for name, (start_lag, end_lag) in config.WINDOWS.items():
+    windows = config.WINDOWS if windows is None else windows
+    for name, (start_lag, end_lag) in windows.items():
         attrs[f"{name}_window_hours"] = f"{start_lag},{end_lag}"
     out.attrs.update(attrs)
 
@@ -551,6 +567,7 @@ def main() -> int:
             all_seasons=args.all_seasons,
             require_full_event=args.require_full_event,
             input_path=args.input_path,
+            integration_hours=args.integration_hours,
         )
         written = write_feature_outputs(
             features,

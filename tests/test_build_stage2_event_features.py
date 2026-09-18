@@ -245,6 +245,7 @@ def test_main_orchestrates_open_build_and_write(monkeypatch, tmp_path):
     assert captured["input_path"] == feature_config.DEFAULT_INPUT_PATH
     assert captured["build_ds"] is opened
     assert captured["build_kwargs"] == {
+        "integration_hours": None,
         "use_extended_variables": False,
         "allow_missing_extended": False,
         "season_months": None,

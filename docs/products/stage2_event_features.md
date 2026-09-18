@@ -60,6 +60,16 @@ Timestamp slices are inclusive. Current defaults are:
 
 See [decision 001](../decisions/001_event_feature_windows.md).
 
+An explicit positive integer `--integration-hours H` changes the heat-budget
+and LWA integration windows to `(-H, 0)` without changing defaults, other
+windows or Stage-1 selection. API callers use `integration_hours=H`. Every
+window-derived attribute and count must describe the resolved window. PBS
+entrypoints expose the same option as `INTEGRATION_HOURS` (default 96).
+Keep sensitivity products in distinct no-overwrite namespaces; do not combine
+them with a baseline table built using a different window. Complete 7/14/21-day
+windows have 169/337/505 hourly samples. Independent campaign validation must
+reject gaps or nonfinite required samples, even if a finite-sample sum exists.
+
 ## Default Variables
 
 Default mode uses only the core Stage-1 variables and writes:

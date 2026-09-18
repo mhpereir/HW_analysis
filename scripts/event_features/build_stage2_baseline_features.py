@@ -42,6 +42,12 @@ def parse_args() -> argparse.Namespace:
         description="Build baseline-day fixed-window features from a Stage-1 dataset."
     )
     parser.add_argument(
+        "--integration-hours",
+        type=int,
+        default=None,
+        help="Positive pre-reference heat-budget/LWA span in hours (default: 96).",
+    )
+    parser.add_argument(
         "--input-path",
         type=Path,
         default=config.DEFAULT_INPUT_PATH,
@@ -110,6 +116,7 @@ def build_baseline_features(
     season_months: Sequence[int] | None = None,
     all_seasons: bool = False,
     input_path: str | Path | None = None,
+    integration_hours: int | None = None,
 ) -> xr.Dataset:
     """Return one fixed-window feature row per selected-source non-event day."""
     if not all_seasons and season_months is None:
@@ -117,6 +124,7 @@ def build_baseline_features(
     if all_seasons and season_months is not None:
         raise ValueError("Pass season_months or all_seasons=True, not both.")
 
+    windows = config.integration_windows(integration_hours)
     ds = fixed.ensure_tas_anom(ds)
     feature_spec = fixed.active_feature_spec(
         ds,
@@ -125,7 +133,7 @@ def build_baseline_features(
     )
     fixed.validate_required_time_variables(ds, feature_spec)
     event_id_source = selected_event_id_source(ds)
-    reducer = fixed.WindowReducer(ds)
+    reducer = fixed.WindowReducer(ds, windows=windows)
 
     reference_times, reference_event_ids, n_calendar_days = daily_reference_rows(
         ds,
@@ -185,7 +193,7 @@ def build_baseline_features(
         feature_name_for_source=feature_name_for_source,
         sample_count_name_for_window=sample_count_name_for_window,
     )
-    fixed.add_integrated_dynamical_feature(out, row_dim=BASELINE_DIM)
+    fixed.add_integrated_dynamical_feature(out, row_dim=BASELINE_DIM, windows=windows)
     relabel_baseline_windows(out)
     fixed.add_days_from_solstice(
         out,
@@ -206,6 +214,7 @@ def build_baseline_features(
         n_selected_before_boundary=n_selected_before_boundary,
         dropped_boundary_days=dropped_boundary_days,
         feature_spec=feature_spec,
+        windows=windows,
     )
     return out
 
@@ -314,11 +323,13 @@ def add_global_attrs(
     n_selected_before_boundary: int,
     dropped_boundary_days: int,
     feature_spec: Mapping[str, Mapping[str, str]],
+    windows: Mapping[str, tuple[int, int]] | None = None,
 ) -> None:
     """Attach baseline-table provenance, population, and method metadata."""
     window_names = fixed.active_window_names(feature_spec)
-    adjacency_start = min(config.WINDOWS[name][0] for name in window_names)
-    adjacency_end = max(config.WINDOWS[name][1] for name in window_names)
+    windows = config.WINDOWS if windows is None else windows
+    adjacency_start = min(windows[name][0] for name in window_names)
+    adjacency_end = max(windows[name][1] for name in window_names)
     attrs: dict[str, Any] = {
         "pipeline_stage": PIPELINE_STAGE,
         "feature_method": FEATURE_METHOD,
@@ -352,7 +363,7 @@ def add_global_attrs(
     if season_months is not None:
         attrs["season_months"] = ",".join(str(month) for month in season_months)
     for name in window_names:
-        start_lag, end_lag = config.WINDOWS[name]
+        start_lag, end_lag = windows[name]
         attrs[f"{baseline_window_name(name)}_window_hours"] = f"{start_lag},{end_lag}"
     out.attrs.update(attrs)
 
@@ -411,6 +422,7 @@ def main() -> int:
             season_months=args.season_months,
             all_seasons=args.all_seasons,
             input_path=args.input_path,
+            integration_hours=args.integration_hours,
         )
         written = write_feature_outputs(
             features,

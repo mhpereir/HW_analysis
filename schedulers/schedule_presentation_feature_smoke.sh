@@ -46,6 +46,10 @@ cd "${PROJECT_ROOT}"
 /usr/bin/time -v "${python_executable}" -m pytest -q -W error \
   tests/test_artifact_paths.py \
   tests/test_stage2_schedulers.py \
+  tests/test_stage2_window_sensitivity.py \
+  tests/test_fixed_window_features.py \
+  tests/test_build_stage2_event_features.py \
+  tests/test_build_stage2_baseline_features.py \
   tests/test_spatial_composite_shell_scripts.py \
   tests/test_plot_style.py \
   tests/test_presentation_budget_comparisons.py \
