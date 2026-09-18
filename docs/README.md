@@ -116,6 +116,7 @@ a figure.
 | Stage 1 regional hourly climatology | [Regional hourly climatology contract](products/stage1_regional_hourly_climatology.md) |
 | Stage 2 event features | [Event-feature contract](products/stage2_event_features.md) |
 | Stage 2 baseline features | [Baseline-day contract](products/stage2_baseline_features.md) |
+| Integration-window exploration | [Heating-rank contract](products/integration_window_ranks.md), [workflow and further plans](../scripts/integration_window_analysis/README.md) |
 | Temporal composites | [Composite workflow](workflows/composites.md) |
 | Spatial ERA5 preparation and composites | [Spatial composite workflow](workflows/spatial_composites.md) |
 | Figure conventions and shared style | [Plotting workflow](workflows/plotting.md) |

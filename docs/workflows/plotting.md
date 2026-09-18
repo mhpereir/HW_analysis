@@ -54,6 +54,7 @@ $HWA_ARTIFACT_ROOT/plots_<plot_name>/
 | Stage 2 event features | adiabatic, advection, and diabatic event diagnostics | `plot_adiabatic_advection_comparison.py`, `plot_adiabatic_diabatic_advection.py` under `scripts/event_features/` |
 | Stage 2 event and baseline features | event-versus-baseline comparisons | `plot_adiabatic_advection_comparison_baseline.py`, `plot_adiabatic_diabatic_advection_baseline.py` under `scripts/event_features/` |
 | Stage 2 event features plus tracked settings | matched positive/negative `I_dyn` diagnostics | `scripts/idyn_matching_exploration/explore_idyn_matching.py` |
+| Saved integration-window heating-rank tables | target-event raw and climatology-corrected rank curves | `scripts/integration_window_analysis/plot_heating_comparison.py` |
 | Spatial composite product | sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |
 | Matched spatial composite product | matched positive/negative `I_dyn_pre` sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py` |
 
@@ -61,6 +62,14 @@ Scripts under `scripts/event_features/old/` are legacy and are not active
 figure entrypoints.
 
 ## Required behavior
+
+The integration-window rank figure follows the
+[heating-rank product contract](../products/integration_window_ranks.md).
+It reads saved comparisons, uses `HEATING_RANK_STYLES`, displays one regional
+panel per input, and puts rank 1 at the top of an integer axis. Both curves
+use the same fixed cohort across all integration windows. Identify the
+climatological atmospheric-temperature endpoint correction, reference years
+and population size. PNG and PDF outputs must not overwrite earlier figures.
 
 - Use the non-interactive Matplotlib `Agg` backend for batch rendering.
 - The regional-domain overview discovers unique regions from the Stage 1

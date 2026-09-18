@@ -110,10 +110,7 @@ def default_harmonized_timeseries_path(
         str(start_year),
         str(end_year),
     )
-    filename = (
-        "harmonized_regional_timeseries_"
-        f"{'_'.join(run_tokens)}.nc"
-    )
+    filename = f"harmonized_regional_timeseries_{'_'.join(run_tokens)}.nc"
     return DEFAULT_STAGE1_OUTPUT_DIR / filename
 
 
@@ -212,8 +209,7 @@ def _validate_harmonized_timeseries(ds: xr.Dataset) -> None:
     missing = sorted(REQUIRED_HARMONIZED_VARIABLES.difference(ds.data_vars))
     if missing:
         raise ValueError(
-            "Harmonized dataset is missing required variables: "
-            f"{', '.join(missing)}."
+            f"Harmonized dataset is missing required variables: {', '.join(missing)}."
         )
 
     contract_version = int(ds.attrs.get("stage1_contract_version", 1))
@@ -263,11 +259,35 @@ def _prepare_for_netcdf(ds: xr.Dataset) -> xr.Dataset:
     return out
 
 
+def save_integration_window_ranks(ds: xr.Dataset, output_path: str | Path) -> Path:
+    """Publish one validated rank comparison without replacing existing data."""
+    from src.integration_window_analysis import validate_heating_comparison
+
+    validate_heating_comparison(ds)
+    path = Path(output_path)
+    if path.exists():
+        raise FileExistsError(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_netcdf_atomically(_prepare_for_netcdf(ds), path)
+    return path
+
+
+def open_integration_window_ranks(path: str | Path) -> xr.Dataset:
+    """Open and validate a prepared heating-rank comparison."""
+    from src.integration_window_analysis import validate_heating_comparison
+
+    ds = xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True)
+    try:
+        validate_heating_comparison(ds)
+    except Exception:
+        ds.close()
+        raise
+    return ds
+
+
 def _write_netcdf_atomically(ds: xr.Dataset, output_path: Path) -> None:
     """Write beside the destination and publish only a complete NetCDF file."""
-    temporary_path = output_path.with_name(
-        f".{output_path.name}.{uuid4().hex}.partial"
-    )
+    temporary_path = output_path.with_name(f".{output_path.name}.{uuid4().hex}.partial")
     try:
         ds.to_netcdf(temporary_path, engine="h5netcdf")
         os.replace(temporary_path, output_path)

@@ -230,7 +230,7 @@ def _scheduler_env(scheduler, tmp_path):
     # Supply required prepared paths, but no data. The invalid commit must stop
     # the scheduler before any scientific environment or producer is invoked.
     for name in re.findall(
-        r'^([A-Z_]+)="\$\{\1:\?', scheduler.read_text(), re.MULTILINE
+        r'^([A-Z_][A-Z0-9_]*)="\$\{\1:\?', scheduler.read_text(), re.MULTILINE
     ):
         if name not in env:
             env[name] = str(tmp_path / "artifacts" / name.lower())
@@ -349,7 +349,9 @@ GUARDED_SCHEDULERS = [
     for path in ACTIVE_SCHEDULERS
     if (
         match := re.search(
-            r"^hwa_validate_artifact_paths ([A-Z_]+)", path.read_text(), re.MULTILINE
+            r"^hwa_validate_artifact_paths ([A-Z_][A-Z0-9_]*)",
+            path.read_text(),
+            re.MULTILINE,
         )
     )
 ]

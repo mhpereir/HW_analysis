@@ -115,6 +115,21 @@ FACE_COLORS = {
     "bottom": "#D55E00",
 }
 
+HEATING_RANK_STYLES = {
+    "raw": {
+        "color": COLORS["storage"],
+        "linestyle": "-",
+        "marker": "o",
+        "label": "Raw rank",
+    },
+    "corrected": {
+        "color": COLORS["temperature_tendency"],
+        "linestyle": "--",
+        "marker": "s",
+        "label": "Climatology-corrected rank",
+    },
+}
+
 REGION_NAME_MAPPING = {
     "alaska": "Alaska",
     "central_china": "Central China",

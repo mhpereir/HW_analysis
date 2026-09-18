@@ -72,6 +72,7 @@ Product Stage 2: event-feature table + tracked matching settings
 | Stage 1 companion | `$HWA_ARTIFACT_ROOT/stage1_climatology/regional_hourly_climatology_*.nc` | `scripts/build_stage1_hourly_climatology.py` | climatological-anomaly composites, top-event traces, and face-advection diagnostics |
 | Stage 2 | event-feature table | `scripts/event_features/build_stage2_event_features.py` | feature plots, event comparisons, exploratory diagnostics |
 | Stage 2 | baseline-day feature table | `scripts/event_features/build_stage2_baseline_features.py` | event/baseline comparisons, exploratory diagnostics |
+| Derived exploration | [integration-window heating ranks](products/integration_window_ranks.md) from Stage 1, hourly climatology and accepted Stage-2 events | `scripts/integration_window_analysis/build_heating_comparison.py` | raw and climatology-corrected event-rank curves |
 
 ### Spatial products
 
