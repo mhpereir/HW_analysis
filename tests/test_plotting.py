@@ -154,14 +154,14 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
         plot_extended_variables=True,
     )
     try:
-        assert len(fig.axes) == 12
+        assert len(fig.axes) == 10
 
         assert set(_line_colors_by_label(fig.axes[4])) == {_display_label("advection")}
         assert set(_line_colors_by_label(fig.axes[6])) == {_display_label("adiabatic")}
         assert set(_line_colors_by_label(fig.axes[8])) == {_display_label("diabatic")}
 
-        soil_axis = fig.axes[3]
-        cloud_axis = fig.axes[11]
+        soil_axis = fig.axes[5]
+        cloud_axis = fig.axes[3]
         assert soil_axis.get_ylabel() == "soil moisture [m3 m-3]"
         np.testing.assert_allclose(
             soil_axis.lines[0].get_ydata(),
@@ -174,16 +174,143 @@ def test_plot_composite_timeseries_extended_layout_uses_optional_panels():
         )
         np.testing.assert_allclose(cloud_axis.get_ylim(), (0.0, 1.0))
 
-        assert set(_line_colors_by_label(fig.axes[5])) == {
+        assert set(_line_colors_by_label(fig.axes[7])) == {
             _display_label("nslr_heating_rate_approx"),
             _display_label("nssr_heating_rate_approx"),
         }
-        assert set(_line_colors_by_label(fig.axes[7])) == {
+        assert set(_line_colors_by_label(fig.axes[9])) == {
             _display_label("sshf_heating_rate_approx")
         }
-        assert set(_line_colors_by_label(fig.axes[9])) == {
-            _display_label("slhf_heating_rate_approx")
-        }
+    finally:
+        plt.close(fig)
+
+
+@pytest.mark.parametrize("family", ["all", "split", "top"])
+@pytest.mark.parametrize("anomaly", [False, True])
+def test_extended_layout_preserves_separated_panels_without_removed_inputs(
+    family, anomaly
+):
+    composite = _make_split_composite() if family == "split" else _make_composite()
+    event_window = _make_top_event_window()
+    sources = [composite, event_window]
+    for index, source in enumerate(sources):
+        source = source.drop_vars(
+            [
+                "volume",
+                "slhf_heating_rate_approx",
+                "event_percentile_volume",
+                "event_percentile_slhf_heating_rate_approx",
+            ],
+            errors="ignore",
+        )
+        if anomaly:
+            source.attrs["data_representation"] = "climatological_anomaly"
+            for name, baseline in (
+                ("T_mean", 282.0),
+                ("cloud_cover", 0.5),
+                ("soil_moisture", 0.18),
+            ):
+                source[name] = source[name] - baseline
+                percentile = f"event_percentile_{name}"
+                if percentile in source:
+                    source[percentile] = source[percentile] - baseline
+        sources[index] = source
+    composite, event_window = sources
+    originals = [source.copy(deep=True) for source in sources]
+    if family == "top":
+        fig = plotting.plot_top_event_timeseries(
+            event_window,
+            _make_top_event(),
+            reference_composite=composite,
+            plot_extended_variables=True,
+        )
+    else:
+        renderer = (
+            plotting.plot_split_composite_timeseries
+            if family == "split"
+            else plotting.plot_composite_timeseries
+        )
+        fig = renderer(composite, plot_extended_variables=True)
+    try:
+        expected_panels = (
+            ("T_mean",),
+            ("lwa_a_region", "lwa_c_region"),
+            ("dTdt",),
+            ("cloud_cover",),
+            ("advection",),
+            ("soil_moisture",),
+            ("adiabatic",),
+            ("nslr_heating_rate_approx", "nssr_heating_rate_approx"),
+            ("diabatic",),
+            ("sshf_heating_rate_approx",),
+        )
+        assert len(fig.axes) == 10
+        for index, (ax, names) in enumerate(
+            zip(fig.axes, expected_panels, strict=True)
+        ):
+            spec = ax.get_subplotspec()
+            assert spec.rowspan.start == index // 2
+            assert spec.colspan.start == index % 2
+            legend_labels = [
+                text.get_text()
+                for legend in ax.findobj(Legend)
+                for text in legend.get_texts()
+            ]
+            for name in names:
+                assert legend_labels.count(_display_label(name)) == 1
+            assert _display_label("volume") not in legend_labels
+            assert _display_label("slhf_heating_rate_approx") not in legend_labels
+        first_labels = [
+            text.get_text()
+            for legend in fig.axes[0].findobj(Legend)
+            for text in legend.get_texts()
+        ]
+        if family == "split":
+            for label in (*composite.split_bin.values, "IQR bounds"):
+                assert first_labels.count(label) == 1
+        else:
+            assert first_labels.count("IQR") == 1
+            if family == "top":
+                assert first_labels.count("all-event average") == 1
+        for index, name in ((0, "T_mean"), (3, "cloud_cover"), (5, "soil_moisture")):
+            ax = fig.axes[index]
+            if family == "split":
+                for split_index in range(composite.sizes["split_bin"]):
+                    subset = composite.isel(split_bin=split_index)
+                    mean, lower, upper = ax.lines[split_index * 3 : split_index * 3 + 3]
+                    np.testing.assert_allclose(mean.get_ydata(), subset[name].values)
+                    for line, quantile in ((lower, 0.25), (upper, 0.75)):
+                        np.testing.assert_allclose(
+                            line.get_ydata(),
+                            subset[f"event_percentile_{name}"].sel(quantile=quantile),
+                        )
+            else:
+                expected = event_window if family == "top" else composite
+                np.testing.assert_allclose(ax.lines[0].get_ydata(), expected[name])
+                if family == "top":
+                    np.testing.assert_allclose(ax.lines[1].get_ydata(), composite[name])
+                bounds = ax.collections[0].get_datalim(ax.transData)
+                np.testing.assert_allclose(
+                    [bounds.ymin, bounds.ymax],
+                    [
+                        composite[f"event_percentile_{name}"].sel(quantile=0.25).min(),
+                        composite[f"event_percentile_{name}"].sel(quantile=0.75).max(),
+                    ],
+                )
+            if anomaly:
+                assert any(
+                    line.get_transform() == ax.get_yaxis_transform()
+                    and np.array_equal(line.get_ydata(), [0, 0])
+                    for line in ax.lines
+                )
+        if anomaly:
+            _assert_extended_anomaly_axis_labels(fig)
+            assert fig.axes[3].get_ylim()[0] < 0
+        else:
+            np.testing.assert_allclose(fig.axes[3].get_ylim(), (0, 1))
+            assert fig.axes[0].get_ylim()[0] > 200
+        for source, original in zip(sources, originals, strict=True):
+            xr.testing.assert_identical(source, original)
     finally:
         plt.close(fig)
 
@@ -300,7 +427,7 @@ def test_extended_anomaly_cloud_axis_is_not_bounded_to_fraction_range():
         plot_extended_variables=True,
     )
     try:
-        cloud_axis = fig.axes[11]
+        cloud_axis = fig.axes[3]
         assert cloud_axis.get_ylabel() == "Δcloud cover fraction"
         assert cloud_axis.get_ylim() != (0.0, 1.0)
     finally:
@@ -311,7 +438,6 @@ def test_extended_anomaly_composite_uses_delta_labels_and_atmospheric_flux_signs
     composite = _make_composite()
     composite.attrs["data_representation"] = "climatological_anomaly"
     source_sshf = composite["sshf_heating_rate_approx"].values.copy()
-    source_slhf = composite["slhf_heating_rate_approx"].values.copy()
 
     fig = plotting.plot_composite_timeseries(
         composite,
@@ -319,10 +445,7 @@ def test_extended_anomaly_composite_uses_delta_labels_and_atmospheric_flux_signs
     )
     try:
         _assert_extended_anomaly_axis_labels(fig)
-        for axis_index, name, source in (
-            (7, "sshf_heating_rate_approx", source_sshf),
-            (9, "slhf_heating_rate_approx", source_slhf),
-        ):
+        for axis_index, name, source in ((9, "sshf_heating_rate_approx", source_sshf),):
             surface_axis = fig.axes[axis_index]
             plotted = _line_ydata_by_label(surface_axis)
             np.testing.assert_allclose(plotted[_display_label(name)], -source)
@@ -340,10 +463,6 @@ def test_extended_anomaly_composite_uses_delta_labels_and_atmospheric_flux_signs
             composite["sshf_heating_rate_approx"].values,
             source_sshf,
         )
-        np.testing.assert_allclose(
-            composite["slhf_heating_rate_approx"].values,
-            source_slhf,
-        )
     finally:
         plt.close(fig)
 
@@ -351,17 +470,13 @@ def test_extended_anomaly_composite_uses_delta_labels_and_atmospheric_flux_signs
 def test_absolute_composite_uses_atmospheric_surface_flux_signs():
     composite = _make_composite()
     source_sshf = composite["sshf_heating_rate_approx"].values.copy()
-    source_slhf = composite["slhf_heating_rate_approx"].values.copy()
 
     fig = plotting.plot_composite_timeseries(
         composite,
         plot_extended_variables=True,
     )
     try:
-        for axis_index, name, source in (
-            (7, "sshf_heating_rate_approx", source_sshf),
-            (9, "slhf_heating_rate_approx", source_slhf),
-        ):
+        for axis_index, name, source in ((9, "sshf_heating_rate_approx", source_sshf),):
             plotted = _line_ydata_by_label(fig.axes[axis_index])
             np.testing.assert_allclose(plotted[_display_label(name)], -source)
             np.testing.assert_allclose(composite[name].values, source)
@@ -509,7 +624,7 @@ def test_plot_split_composite_timeseries_extended_layout_uses_optional_panels():
         plot_extended_variables=True,
     )
     try:
-        assert len(fig.axes) == 12
+        assert len(fig.axes) == 10
 
         assert plotting.VARIABLE_COLORS["advection"] in _non_marker_line_colors(
             fig.axes[4]
@@ -521,8 +636,8 @@ def test_plot_split_composite_timeseries_extended_layout_uses_optional_panels():
             fig.axes[8]
         )
 
-        soil_axis = fig.axes[3]
-        cloud_axis = fig.axes[11]
+        soil_axis = fig.axes[5]
+        cloud_axis = fig.axes[3]
         assert soil_axis.get_ylabel() == "soil moisture [m3 m-3]"
         np.testing.assert_allclose(
             soil_axis.lines[0].get_ydata(),
@@ -536,24 +651,17 @@ def test_plot_split_composite_timeseries_extended_layout_uses_optional_panels():
         np.testing.assert_allclose(cloud_axis.get_ylim(), (0.0, 1.0))
 
         assert plotting.VARIABLE_COLORS["nslr_heating_rate_approx"] in (
-            _non_marker_line_colors(fig.axes[5])
-        )
-        assert plotting.VARIABLE_COLORS["nssr_heating_rate_approx"] in (
-            _non_marker_line_colors(fig.axes[5])
-        )
-        assert plotting.VARIABLE_COLORS["sshf_heating_rate_approx"] in (
             _non_marker_line_colors(fig.axes[7])
         )
-        assert plotting.VARIABLE_COLORS["slhf_heating_rate_approx"] in (
+        assert plotting.VARIABLE_COLORS["nssr_heating_rate_approx"] in (
+            _non_marker_line_colors(fig.axes[7])
+        )
+        assert plotting.VARIABLE_COLORS["sshf_heating_rate_approx"] in (
             _non_marker_line_colors(fig.axes[9])
         )
         np.testing.assert_allclose(
-            fig.axes[7].lines[0].get_ydata(),
-            -composite.isel(split_bin=0)["sshf_heating_rate_approx"].values,
-        )
-        np.testing.assert_allclose(
             fig.axes[9].lines[0].get_ydata(),
-            -composite.isel(split_bin=0)["slhf_heating_rate_approx"].values,
+            -composite.isel(split_bin=0)["sshf_heating_rate_approx"].values,
         )
     finally:
         plt.close(fig)
@@ -619,10 +727,7 @@ def test_extended_split_anomaly_uses_delta_labels_and_atmospheric_flux_signs():
     )
     try:
         _assert_extended_anomaly_axis_labels(fig)
-        for surface_axis, name in (
-            (fig.axes[7], "sshf_heating_rate_approx"),
-            (fig.axes[9], "slhf_heating_rate_approx"),
-        ):
+        for surface_axis, name in ((fig.axes[9], "sshf_heating_rate_approx"),):
             for split_index in range(composite.sizes["split_bin"]):
                 subset = composite.isel(split_bin=split_index)
                 line_offset = split_index * 3
@@ -832,9 +937,7 @@ def test_top_event_day_axis_survives_export(
             np.testing.assert_array_equal(visible, np.round(visible))
             minor_ticks = ax.get_xticks(minor=True)
             lower, upper = ax.get_xlim()
-            visible_minor = minor_ticks[
-                (minor_ticks >= lower) & (minor_ticks <= upper)
-            ]
+            visible_minor = minor_ticks[(minor_ticks >= lower) & (minor_ticks <= upper)]
             np.testing.assert_array_equal(visible_minor, np.round(visible_minor))
             np.testing.assert_array_equal(
                 np.union1d(visible, visible_minor),
@@ -866,13 +969,13 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
         plot_extended_variables=True,
     )
     try:
-        assert len(fig.axes) == 12
+        assert len(fig.axes) == 10
         assert set(_line_colors_by_label(fig.axes[4])) == {_display_label("advection")}
         assert set(_line_colors_by_label(fig.axes[6])) == {_display_label("adiabatic")}
         assert set(_line_colors_by_label(fig.axes[8])) == {_display_label("diabatic")}
 
-        soil_axis = fig.axes[3]
-        cloud_axis = fig.axes[11]
+        soil_axis = fig.axes[5]
+        cloud_axis = fig.axes[3]
         assert soil_axis.get_ylabel() == "soil moisture [m3 m-3]"
         np.testing.assert_allclose(
             soil_axis.lines[0].get_ydata(),
@@ -884,15 +987,12 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
             event_window["cloud_cover"].values,
         )
         np.testing.assert_allclose(cloud_axis.get_ylim(), (0.0, 1.0))
-        assert set(_line_colors_by_label(fig.axes[5])) == {
+        assert set(_line_colors_by_label(fig.axes[7])) == {
             _display_label("nslr_heating_rate_approx"),
             _display_label("nssr_heating_rate_approx"),
         }
-        assert set(_line_colors_by_label(fig.axes[7])) == {
-            _display_label("sshf_heating_rate_approx")
-        }
         assert set(_line_colors_by_label(fig.axes[9])) == {
-            _display_label("slhf_heating_rate_approx")
+            _display_label("sshf_heating_rate_approx")
         }
     finally:
         plt.close(fig)
@@ -921,7 +1021,7 @@ def test_extended_top_event_anomaly_uses_delta_labels_and_baseline_title():
         assert "climatological-anomaly" in title
         assert "1940-2024 baseline" in title
         assert "absolute peak tas=305.00" in title
-        assert fig.axes[11].get_ylim() != (0.0, 1.0)
+        assert fig.axes[3].get_ylim() != (0.0, 1.0)
     finally:
         plt.close(fig)
 
@@ -1027,12 +1127,10 @@ def test_top_event_surface_fluxes_use_atmospheric_sign_for_event_and_reference(
         event_window.attrs["data_representation"] = "climatological_anomaly"
         composite.attrs["data_representation"] = "climatological_anomaly"
     event_sources = {
-        name: event_window[name].values.copy()
-        for name in ("sshf_heating_rate_approx", "slhf_heating_rate_approx")
+        name: event_window[name].values.copy() for name in ("sshf_heating_rate_approx",)
     }
     reference_sources = {
-        name: composite[name].values.copy()
-        for name in ("sshf_heating_rate_approx", "slhf_heating_rate_approx")
+        name: composite[name].values.copy() for name in ("sshf_heating_rate_approx",)
     }
 
     fig = plotting.plot_top_event_timeseries(
@@ -1042,10 +1140,7 @@ def test_top_event_surface_fluxes_use_atmospheric_sign_for_event_and_reference(
         plot_extended_variables=True,
     )
     try:
-        for axis_index, name in (
-            (7, "sshf_heating_rate_approx"),
-            (9, "slhf_heating_rate_approx"),
-        ):
+        for axis_index, name in ((9, "sshf_heating_rate_approx"),):
             axis = fig.axes[axis_index]
             plotted = _line_ydata_by_label(axis)
             np.testing.assert_allclose(
@@ -1201,15 +1296,13 @@ def _assert_extended_anomaly_axis_labels(fig) -> None:
         "ΔT_mean [K]",
         "ΔLWA [m hPa]",
         "Δ [K hr-1]",
+        "Δcloud cover fraction",
+        "Δ [K hr-1]",
         "Δsoil moisture [m3 m-3]",
         "Δ [K hr-1]",
         "Δ [K hr-1]",
         "Δ [K hr-1]",
         "Δ [K hr-1]",
-        "Δ [K hr-1]",
-        "Δ [K hr-1]",
-        "Δvolume [m2 Pa]",
-        "Δcloud cover fraction",
     ]
 
 

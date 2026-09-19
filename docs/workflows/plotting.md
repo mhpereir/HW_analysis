@@ -197,19 +197,43 @@ figure entrypoints.
 ### Extended temporal-composite layout
 
 Extended all-event, split-event, climatological-anomaly, and top-event figures
-use a 5x2 panel grid. The left column contains temperature and volume, `dTdt`,
-advection, adiabatic heating, and diabatic heating. The right column contains:
+use a 5x2 panel grid with exactly ten axes, one y-axis per panel:
 
-1. anticyclonic and cyclonic LWA;
-2. soil moisture and cloud cover on independent y-axes;
-3. longwave and shortwave radiative heating;
-4. sensible surface heating; and
-5. latent surface heating.
+| Row | Left column | Right column |
+| --- | --- | --- |
+| 1 | temperature (`T_mean`) | anticyclonic and cyclonic LWA |
+| 2 | `dTdt` | cloud cover |
+| 3 | advection | soil moisture |
+| 4 | adiabatic heating | longwave and shortwave radiative heating |
+| 5 | diabatic heating | sensible surface heating |
 
-Soil moisture uses the left y-axis and cloud cover uses the right y-axis in
-their shared panel. Absolute cloud cover is bounded to the physical fraction
-range from zero to one, while a climatological anomaly is not. PBL diagnostics
-and panels are inactive under
+The temperature panel contains no volume trace. Cloud cover and soil moisture
+have separate panels, and latent surface heating is omitted. Absolute cloud
+cover is bounded to the physical fraction range from zero to one, while a
+climatological anomaly is not. Anomalous temperature, cloud cover, and soil
+moisture include a zero reference. Keep the IQR, split-bin style, and top-event
+all-event-reference keys in the first panel as applicable, alongside the
+temperature key. Preserve the existing variable colors and sensible-heating
+sign convention.
+
+This changes the shared extended renderer and the variables selected and
+smoothed by its six absolute/anomaly entrypoints. Volume and latent heating
+are no longer required for extended rendering; existing Stage-1 and climatology
+products remain compatible and retain those stored variables. Compact paper
+and presentation layouts, event selection and ranking, peak alignment,
+percentile reductions, smoothing of retained variables, CLI flags, and output
+naming remain unchanged. Historical figures remain valid artifacts; new
+production validation and subsequent regeneration use fresh output namespaces.
+
+Synthetic tests must check the panel order, exactly ten axes, separated cloud
+and soil traces, absence of volume and latent heating, reference and percentile
+displays, legend keys, bounds, signs, and source immutability for all-event,
+split-event, and top-event figures in both representations. Extended entrypoints
+must select only the displayed variables and retain unsmoothed daily LWA.
+Before production acceptance, run the full local suite and representative
+Venus PBS renders, inspecting the saved figures at original resolution.
+
+PBL diagnostics and panels are inactive under
 [decision 008](../decisions/008_retire_pbl_diagnostics.md).
 
 ### Presentation temporal layout
@@ -292,11 +316,12 @@ climatological-anomaly representation explicitly.
 
 ERA5 sensible and latent surface heat fluxes use the source convention that
 positive values are directed toward the surface. In every extended temporal
-figure, render `sshf_heating_rate_approx` and `slhf_heating_rate_approx` with
-the opposite sign, so positive plotted values denote heat transfer into the
-atmosphere and can be compared directly with the atmospheric diabatic-heating
-sign. Apply the same sign reversal to composite means, event-percentile bounds,
-top-event traces, and their reference composites.
+figure, render sensible heating (`sshf_heating_rate_approx`) with the opposite
+sign, so positive plotted values denote heat transfer into the atmosphere and
+can be compared directly with the atmospheric diabatic-heating sign. Apply the
+same sign reversal to composite means, event-percentile bounds, top-event
+traces, and their reference composites. Latent heating retains its stored
+source convention but is no longer displayed in this layout.
 
 This is a display transform only. It must not mutate Stage 1, the climatology
 companion, or any assembled composite or top-event dataset. Synthetic plotting

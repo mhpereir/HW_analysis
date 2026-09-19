@@ -332,6 +332,16 @@ def test_write_top_event_plots_uses_extended_variables_when_requested(
     assert captured["smooth_kwargs"][0]["variables"] == (
         plot_top_events.EXTENDED_SMOOTHED_TOP_EVENT_VARIABLES
     )
+    selected = set(captured["composite_kwargs"]["variables"])
+    smoothed = set(captured["smooth_kwargs"][0]["variables"])
+    assert selected.isdisjoint({"volume", "slhf_heating_rate_approx"})
+    assert {
+        "T_mean",
+        "cloud_cover",
+        "soil_moisture",
+        "sshf_heating_rate_approx",
+    } <= smoothed
+    assert smoothed == selected - {"lwa_a_region", "lwa_c_region"}
     assert captured["plot_extended_variables"] == [True, True]
     assert captured["layouts"] == ["paper", "paper"]
 

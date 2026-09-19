@@ -19,9 +19,7 @@ from src.artifact_paths import artifact_root
 
 PLOT_NAME = "composite_timeseries_split"
 DEFAULT_OUTPUT_FILENAME = "hw_events_composite.png"
-DEFAULT_OUTPUT_PATH = (
-    artifact_root() / f"plots_{PLOT_NAME}" / DEFAULT_OUTPUT_FILENAME
-)
+DEFAULT_OUTPUT_PATH = artifact_root() / f"plots_{PLOT_NAME}" / DEFAULT_OUTPUT_FILENAME
 PRESENTATION_PLOT_NAME = f"{PLOT_NAME}_presentation"
 PRESENTATION_DEFAULT_OUTPUT_FILENAME = "hw_events_composite_presentation.png"
 DEFAULT_WINDOW_DAYS = 7
@@ -37,14 +35,7 @@ COMPOSITE_VARIABLES: tuple[str, ...] = (
     "lwa_a_region",
     "lwa_c_region",
 )
-EXTENDED_COMPOSITE_VARIABLES: tuple[str, ...] = COMPOSITE_VARIABLES + (
-    "nslr_heating_rate_approx",
-    "nssr_heating_rate_approx",
-    "sshf_heating_rate_approx",
-    "slhf_heating_rate_approx",
-    "soil_moisture",
-    "cloud_cover",
-)
+EXTENDED_COMPOSITE_VARIABLES = plotting.EXTENDED_PLOT_VARIABLES
 PRESENTATION_COMPOSITE_VARIABLES = plotting.PRESENTATION_PLOT_VARIABLES
 SMOOTHED_VARIABLES: tuple[str, ...] = (
     "T_mean",
@@ -54,14 +45,7 @@ SMOOTHED_VARIABLES: tuple[str, ...] = (
     "adiabatic",
     "diabatic",
 )
-EXTENDED_SMOOTHED_VARIABLES: tuple[str, ...] = SMOOTHED_VARIABLES + (
-    "nslr_heating_rate_approx",
-    "nssr_heating_rate_approx",
-    "sshf_heating_rate_approx",
-    "slhf_heating_rate_approx",
-    "soil_moisture",
-    "cloud_cover",
-)
+EXTENDED_SMOOTHED_VARIABLES = plotting.EXTENDED_SMOOTHED_VARIABLES
 PRESENTATION_SMOOTHED_VARIABLES: tuple[str, ...] = (
     "T_mean",
     "dTdt",
