@@ -211,7 +211,9 @@ def plot_split_violin_combined(
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return one violin-plot row per configured y variable."""
     splits = build_quantile_splits(features, split_specs=split_specs)
-    validate_feature_variables(features, split_specs=tuple(split.spec for split in splits))
+    validate_feature_variables(
+        features, split_specs=tuple(split.spec for split in splits)
+    )
 
     nrows = len(Y_VARIABLES)
     fig_width = plot_style.FULL_TWO_COLUMN_WIDTH_IN
@@ -314,7 +316,9 @@ def validate_feature_variables(
     split_specs: tuple[SplitSpec | tuple[str, float], ...] = SPLIT_SPECS,
 ) -> None:
     """Fail clearly when the feature table lacks required plot or split variables."""
-    missing_y = [name for name in Y_VARIABLES if not can_resolve_feature(features, name)]
+    missing_y = [
+        name for name in Y_VARIABLES if not can_resolve_feature(features, name)
+    ]
     if missing_y:
         raise ValueError(
             "Event-feature table is missing required plotted variables: "
@@ -515,7 +519,7 @@ def add_violin(
         showmedians=False,
         showextrema=False,
     )
-    body = parts["bodies"][0] #type: ignore
+    body = parts["bodies"][0]  # type: ignore
     body.set_facecolor(color)
     body.set_edgecolor(plot_style.COLORS["calculated"])
     body.set_alpha(VIOLIN_ALPHA)

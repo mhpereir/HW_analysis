@@ -54,8 +54,7 @@ def test_default_regional_hourly_climatology_path_includes_run_tokens():
 
     assert path.parent == analysis_io.DEFAULT_STAGE1_CLIMATOLOGY_OUTPUT_DIR
     assert path.name == (
-        "regional_hourly_climatology_"
-        "pnw_bartusek_surface_700hPa_1940_2024.nc"
+        "regional_hourly_climatology_pnw_bartusek_surface_700hPa_1940_2024.nc"
     )
 
 

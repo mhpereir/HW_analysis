@@ -330,8 +330,7 @@ def validate_feature_variables(
     missing = [name for name in required if name not in features]
     if missing:
         raise ValueError(
-            "Event-feature table is missing required variables: "
-            f"{', '.join(missing)}."
+            f"Event-feature table is missing required variables: {', '.join(missing)}."
         )
 
 
@@ -366,7 +365,9 @@ def heat_budget_fraction_values(features: xr.Dataset, variable: str) -> np.ndarr
     numerator = np.asarray(features[numerator_name].values, dtype=float)
     denominator = np.zeros_like(numerator, dtype=float)
     for source_name in INTEGRATED_HEAT_BUDGET_VARIABLES:
-        denominator = denominator + np.abs(np.asarray(features[source_name].values, dtype=float))
+        denominator = denominator + np.abs(
+            np.asarray(features[source_name].values, dtype=float)
+        )
     return np.where(denominator != 0.0, numerator / denominator, np.nan)
 
 

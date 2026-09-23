@@ -190,9 +190,7 @@ def prepare_matched_events(
             f"Matching specification {specification_id!r} retained no pairs."
         )
 
-    selected_indices = np.concatenate(
-        [match.positive_indices, match.negative_indices]
-    )
+    selected_indices = np.concatenate([match.positive_indices, match.negative_indices])
     pair_ids = np.tile(np.arange(match.pair_count, dtype=np.int64), 2)
     pair_distances = np.tile(match.distances, 2)
     events = spatial_builder.prepare_events(
@@ -361,9 +359,7 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
     event_path = args.event_features_path.expanduser().resolve()
-    settings = matching_settings.load_matching_settings(
-        args.matching_settings_path
-    )
+    settings = matching_settings.load_matching_settings(args.matching_settings_path)
     event_features_sha256 = sha256_file(event_path)
     features = open_event_features(event_path)
     try:

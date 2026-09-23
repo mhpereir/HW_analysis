@@ -71,7 +71,9 @@ def finalize_args(args: argparse.Namespace) -> argparse.Namespace:
     if args.start_year > args.end_year:
         raise ValueError("--start-year must be less than or equal to --end-year.")
     if args.start_year_ehb > args.end_year_ehb:
-        raise ValueError("--start-year-ehb must be less than or equal to --end-year-ehb.")
+        raise ValueError(
+            "--start-year-ehb must be less than or equal to --end-year-ehb."
+        )
     args.bottom_boundary = data_io.normalize_heat_budget_bottom_boundary(
         args.bottom_boundary
     )
@@ -89,7 +91,9 @@ def finalize_args(args: argparse.Namespace) -> argparse.Namespace:
     if args.input_path is None:
         args.input_path = default_stage1
     if args.output_path is None:
-        args.output_path = default_stage1.parent / EXPLORATION_SUBDIR / default_stage1.name
+        args.output_path = (
+            default_stage1.parent / EXPLORATION_SUBDIR / default_stage1.name
+        )
     if args.heat_budget_root is None:
         args.heat_budget_root = data_io.era5_heat_budget_annual_root(
             region=args.region,

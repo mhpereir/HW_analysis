@@ -45,8 +45,12 @@ def test_build_quantile_split_uses_threshold_and_puts_ties_in_low_group():
     )
 
     assert split.threshold == 3.0
-    np.testing.assert_array_equal(split.low_mask, [True, True, True, True, False, False])
-    np.testing.assert_array_equal(split.high_mask, [False, False, False, False, True, True])
+    np.testing.assert_array_equal(
+        split.low_mask, [True, True, True, True, False, False]
+    )
+    np.testing.assert_array_equal(
+        split.high_mask, [False, False, False, False, True, True]
+    )
 
 
 def test_build_quantile_split_supports_derived_selection_variables():
@@ -75,10 +79,14 @@ def test_selection_panel_draws_black_quantile_divider():
     try:
         duration_axis = fig.axes[list(plot_split.Y_VARIABLES).index("duration")]
         threshold_lines = [
-            line for line in duration_axis.lines if line.get_gid() == "selection_threshold"
+            line
+            for line in duration_axis.lines
+            if line.get_gid() == "selection_threshold"
         ]
         assert len(threshold_lines) == 1
-        assert threshold_lines[0].get_color() == plot_split.plot_style.COLORS["calculated"]
+        assert (
+            threshold_lines[0].get_color() == plot_split.plot_style.COLORS["calculated"]
+        )
         np.testing.assert_allclose(threshold_lines[0].get_ydata(), [3.0, 3.0])
     finally:
         plot_split.plt.close(fig)
@@ -95,9 +103,7 @@ def test_each_panel_draws_group_mean_lines_and_std_bands():
     try:
         for ax in fig.axes:
             mean_lines = [
-                line
-                for line in ax.lines
-                if line.get_gid() in {"low_mean", "high_mean"}
+                line for line in ax.lines if line.get_gid() in {"low_mean", "high_mean"}
             ]
             std_bands = [
                 patch

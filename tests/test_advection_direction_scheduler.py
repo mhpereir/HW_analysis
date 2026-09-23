@@ -23,15 +23,9 @@ def test_plot_only_scheduler_reuses_enhanced_stage1_without_overwriting():
 
 def test_combined_advection_direction_pipeline_entrypoints_are_absent():
     assert not (
-        REPO_ROOT
-        / "schedulers"
-        / "schedule_advection_direction_exploration.sh"
+        REPO_ROOT / "schedulers" / "schedule_advection_direction_exploration.sh"
     ).exists()
     assert not (
-        REPO_ROOT
-        / "schedulers"
-        / "schedule_advection_direction_exploration_smoke.sh"
+        REPO_ROOT / "schedulers" / "schedule_advection_direction_exploration_smoke.sh"
     ).exists()
-    assert not (
-        REPO_ROOT / "scripts" / "run_advection_direction_pipeline.sh"
-    ).exists()
+    assert not (REPO_ROOT / "scripts" / "run_advection_direction_pipeline.sh").exists()

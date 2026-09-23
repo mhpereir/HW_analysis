@@ -51,6 +51,7 @@ CLASS_LINESTYLES = {
     "Non-heatwave days": "--",
 }
 
+
 def parse_args() -> argparse.Namespace:
     """Parse command-line options for the diurnal-cycle diagnostic."""
     parser = argparse.ArgumentParser(
@@ -139,7 +140,9 @@ def build_diurnal_composite(
         selected = source.where(mask, drop=True)
         sample_count = int(selected.sizes.get(time_dim, 0))
         if sample_count == 0:
-            raise ValueError(f"No {label.lower()} samples remain after local-season filtering.")
+            raise ValueError(
+                f"No {label.lower()} samples remain after local-season filtering."
+            )
         class_composites.append(
             _build_one_class_diurnal_composite(
                 selected,
@@ -175,7 +178,13 @@ def build_diurnal_composite(
             "n_non_hw_samples": int(class_sample_counts[1]),
         }
     )
-    for attr_name in ("region", "threshold_variable", "quantile", "start_year", "end_year"):
+    for attr_name in (
+        "region",
+        "threshold_variable",
+        "quantile",
+        "start_year",
+        "end_year",
+    ):
         if attr_name in ds.attrs:
             composite.attrs[attr_name] = ds.attrs[attr_name]
     return composite
@@ -335,8 +344,7 @@ def _plot_lwa_panel(ax: Axes, composite: xr.Dataset) -> None:
     ax.set_ylabel("LWA [m hPa]")
     ax.legend(
         handles=[
-            _variable_legend_handle(name)
-            for name in ("lwa_a_region", "lwa_c_region")
+            _variable_legend_handle(name) for name in ("lwa_a_region", "lwa_c_region")
         ],
         loc="upper left",
     )
@@ -474,7 +482,7 @@ def _figure_title(composite: xr.Dataset) -> str:
     non_hw_count = int(composite.attrs.get("n_non_hw_samples", 0))
     return (
         f"Local diurnal cycle, {region}, months {season} ({offset}); "
-        f"HW n={hw_count//24}, non-HW n={non_hw_count//24}"
+        f"HW n={hw_count // 24}, non-HW n={non_hw_count // 24}"
     )
 
 
@@ -502,7 +510,9 @@ def _validate_diurnal_inputs(
         raise ValueError(f"Dataset is missing event-ID variable {hw_event_id_name!r}.")
     missing = sorted(name for name in variables if name not in ds)
     if missing:
-        raise ValueError(f"Dataset is missing requested variables: {', '.join(missing)}.")
+        raise ValueError(
+            f"Dataset is missing requested variables: {', '.join(missing)}."
+        )
     invalid = sorted(name for name in variables if time_dim not in ds[name].dims)
     if invalid:
         raise ValueError(
@@ -530,7 +540,9 @@ def _validate_season_months(season_months: Sequence[int]) -> tuple[int, ...]:
 
     months: list[int] = []
     for month in season_months:
-        if isinstance(month, (bool, np.bool_)) or not isinstance(month, (int, np.integer)):
+        if isinstance(month, (bool, np.bool_)) or not isinstance(
+            month, (int, np.integer)
+        ):
             raise TypeError("season_months must contain only integer month numbers.")
         month_int = int(month)
         if month_int < 1 or month_int > 12:

@@ -83,8 +83,7 @@ def finalize_args(args: argparse.Namespace) -> argparse.Namespace:
         if invalid:
             values = ", ".join(str(month) for month in invalid)
             raise ValueError(
-                "--season-months values must be between 1 and 12; "
-                f"got {values}."
+                f"--season-months values must be between 1 and 12; got {values}."
             )
 
     args.bottom_boundary = data_io.normalize_heat_budget_bottom_boundary(

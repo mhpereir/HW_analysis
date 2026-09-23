@@ -45,9 +45,7 @@ DEFAULT_PLOT_LAGS = (-2, 0, 2)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Plot event-relative daily T2m/Z500 composites by I_dyn_net sign."
-        )
+        description=("Plot event-relative daily T2m/Z500 composites by I_dyn_net sign.")
     )
     parser.add_argument("--input-path", type=Path, default=DEFAULT_INPUT_PATH)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH)
@@ -110,7 +108,9 @@ def validate_composite(ds: xr.Dataset) -> None:
     }
     missing = sorted(required.difference(ds.data_vars))
     if missing:
-        raise ValueError("Composite dataset is missing variables: " + ", ".join(missing))
+        raise ValueError(
+            "Composite dataset is missing variables: " + ", ".join(missing)
+        )
     for coord in (GROUP_DIM, LAG_DIM, "latitude", "longitude"):
         if coord not in ds.coords:
             raise ValueError(f"Composite dataset is missing coordinate {coord!r}.")
@@ -119,7 +119,9 @@ def validate_composite(ds: xr.Dataset) -> None:
         raise ValueError(f"Expected {GROUP_DIM} groups {GROUPS}; found {groups}.")
     lags = np.asarray(ds[LAG_DIM].values)
     if lags.ndim != 1 or lags.size == 0:
-        raise ValueError(f"Coordinate {LAG_DIM!r} must be one-dimensional and nonempty.")
+        raise ValueError(
+            f"Coordinate {LAG_DIM!r} must be one-dimensional and nonempty."
+        )
     if not np.issubdtype(lags.dtype, np.integer):
         raise ValueError(f"Coordinate {LAG_DIM!r} must contain integer days.")
     if np.any(np.diff(lags) <= 0):
@@ -190,8 +192,7 @@ def validate_matched_composite(
     missing_attrs = [name for name in required_attrs if name not in ds.attrs]
     if missing_attrs:
         raise ValueError(
-            "Matched composite is missing attributes: "
-            + ", ".join(missing_attrs)
+            "Matched composite is missing attributes: " + ", ".join(missing_attrs)
         )
     if ds.attrs["matching_group_variable"] != "I_dyn_pre":
         raise ValueError("Matched composite must use I_dyn_pre as its group variable.")

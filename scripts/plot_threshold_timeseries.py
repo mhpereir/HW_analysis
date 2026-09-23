@@ -61,7 +61,9 @@ def parse_args() -> argparse.Namespace:
         elif len(args.years) == 2:
             start_year, end_year = args.years
             if start_year > end_year:
-                parser.error("--years START END requires START to be less than or equal to END.")
+                parser.error(
+                    "--years START END requires START to be less than or equal to END."
+                )
             args.years = list(range(start_year, end_year + 1))
         else:
             parser.error("--years accepts either one year or two years: START END.")
@@ -95,7 +97,9 @@ def build_lwa_a_plot_products(ds: xr.Dataset) -> dict[str, xr.DataArray]:
     }
 
 
-def transform_lwa_a_for_plot(product: dict[str, xr.DataArray]) -> dict[str, xr.DataArray]:
+def transform_lwa_a_for_plot(
+    product: dict[str, xr.DataArray],
+) -> dict[str, xr.DataArray]:
     """Return LWA_a plot products with magnitude variables transformed to sqrt scale."""
     return {
         **product,
@@ -124,7 +128,7 @@ def _sqrt_nonnegative(
             f"{da.name or 'DataArray'} contains negative values; cannot plot sqrt scale."
         )
 
-    transformed = da ** 0.5 #square root of non-negative values
+    transformed = da**0.5  # square root of non-negative values
     transformed.name = name
     attrs = da.attrs.copy()
     if "units" in attrs:
@@ -208,7 +212,7 @@ def _years_in_time(da: xr.DataArray) -> list[int]:
 
 
 def _plot_event_panel(
-    ax: Axes, 
+    ax: Axes,
     *,
     year: int,
     title: str,
@@ -231,8 +235,8 @@ def _plot_event_panel(
     for idx, (start, stop) in enumerate(_true_runs(times, event_values)):
         label = "event_id != 0" if idx == 0 else None
         ax.axvspan(
-            start, #type: ignore
-            stop,  #type: ignore
+            start,  # type: ignore
+            stop,  # type: ignore
             color=plot_style.COLORS["volume"],
             alpha=0.12,
             linewidth=0,
@@ -283,7 +287,9 @@ def _plot_event_panel(
     ax.legend(loc="upper left", ncols=5, **plot_style.legend_kwargs())
 
 
-def _true_runs(times: np.ndarray, values: np.ndarray) -> list[tuple[np.datetime64, np.datetime64]]:
+def _true_runs(
+    times: np.ndarray, values: np.ndarray
+) -> list[tuple[np.datetime64, np.datetime64]]:
     """Return inclusive/exclusive plot spans for contiguous true runs."""
     runs: list[tuple[np.datetime64, np.datetime64]] = []
     idx = 0

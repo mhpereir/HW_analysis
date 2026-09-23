@@ -168,8 +168,7 @@ def validate_args(args: argparse.Namespace) -> None:
     if args.selection_variable not in Y_VARIABLES:
         allowed = ", ".join(Y_VARIABLES)
         raise ValueError(
-            "--selection-variable must be one of the plotted y-variables: "
-            f"{allowed}."
+            f"--selection-variable must be one of the plotted y-variables: {allowed}."
         )
 
 
@@ -385,8 +384,7 @@ def validate_feature_variables(
     missing = [name for name in dict.fromkeys(required) if name not in features]
     if missing:
         raise ValueError(
-            "Event-feature table is missing required variables: "
-            f"{', '.join(missing)}."
+            f"Event-feature table is missing required variables: {', '.join(missing)}."
         )
 
 
@@ -410,8 +408,7 @@ def build_quantile_split(
     if selection_variable not in Y_VARIABLES:
         allowed = ", ".join(Y_VARIABLES)
         raise ValueError(
-            "selection_variable must be one of the plotted y-variables: "
-            f"{allowed}."
+            f"selection_variable must be one of the plotted y-variables: {allowed}."
         )
     quantile = validate_selection_quantile(selection_quantile)
     values = feature_values(features, selection_variable)
@@ -448,7 +445,9 @@ def split_group_mask(split: QuantileSplit, group_name: str) -> np.ndarray:
     raise ValueError(f"Unknown split group: {group_name}")
 
 
-def split_group_statistics(values: np.ndarray, mask: np.ndarray) -> tuple[float, float, int]:
+def split_group_statistics(
+    values: np.ndarray, mask: np.ndarray
+) -> tuple[float, float, int]:
     """Return mean, standard deviation, and count for finite masked values."""
     group_values = np.asarray(values, dtype=float)[mask]
     finite_values = group_values[np.isfinite(group_values)]
@@ -618,7 +617,9 @@ def add_one_to_one_line(ax: Axes, x_values: np.ndarray, y_values: np.ndarray) ->
     )
 
 
-def set_data_driven_y_limits(ax: Axes, values: np.ndarray, *, pad_fraction: float = 0.08) -> None:
+def set_data_driven_y_limits(
+    ax: Axes, values: np.ndarray, *, pad_fraction: float = 0.08
+) -> None:
     """Set y-limits from finite data values, ignoring reference-line artists."""
     finite_values = np.asarray(values, dtype=float)
     finite_values = finite_values[np.isfinite(finite_values)]

@@ -53,12 +53,7 @@ def active_feature_spec(
         "change": dict(config.EXTENDED_CHANGE_FEATURES),
     }
     missing = sorted(
-        {
-            name
-            for group in extended.values()
-            for name in group
-            if name not in ds
-        }
+        {name for group in extended.values() for name in group if name not in ds}
     )
     if missing and not allow_missing_extended:
         raise ValueError(
@@ -148,9 +143,13 @@ class WindowReducer:
         if times.ndim != 1 or times.size == 0:
             raise ValueError("Input dataset time coordinate must be non-empty and 1D.")
         if np.isnat(times).any():
-            raise ValueError("Input dataset time coordinate contains missing timestamps.")
+            raise ValueError(
+                "Input dataset time coordinate contains missing timestamps."
+            )
         if np.any(times[1:] <= times[:-1]):
-            raise ValueError("Input dataset time coordinate must be strictly increasing.")
+            raise ValueError(
+                "Input dataset time coordinate must be strictly increasing."
+            )
 
         self.ds = ds
         self.time_dim = time_dim
@@ -381,9 +380,7 @@ def add_window_features(
             operation="change",
             windows=reducer.windows,
         )
-        out[feature_name].attrs["change_method"] = (
-            "final_24h_mean_minus_first_24h_mean"
-        )
+        out[feature_name].attrs["change_method"] = "final_24h_mean_minus_first_24h_mean"
 
 
 def add_integrated_dynamical_feature(

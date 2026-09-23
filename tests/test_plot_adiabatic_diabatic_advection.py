@@ -93,7 +93,10 @@ def test_advection_panel_draws_one_to_negative_one_line():
 
 def test_shared_x_axis_uses_finite_x_data_extent_only():
     features = _make_feature_table()
-    features["I_diabatic_pre"] = ("event", np.array([10.0, 12.0, 14.0, 16.0, 18.0, 20.0]))
+    features["I_diabatic_pre"] = (
+        "event",
+        np.array([10.0, 12.0, 14.0, 16.0, 18.0, 20.0]),
+    )
     features["I_advection_pre"] = (
         "event",
         np.array([-20.0, -18.0, -16.0, -14.0, -12.0, -10.0]),

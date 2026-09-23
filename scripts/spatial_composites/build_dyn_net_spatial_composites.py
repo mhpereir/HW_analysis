@@ -151,7 +151,9 @@ def prepare_events(features: xr.Dataset) -> xr.Dataset:
     finite = (~np.isnat(peak_values)) & np.isfinite(dyn_net)
     if not finite.all():
         bad = int((~finite).sum())
-        raise ValueError(f"Event-feature table contains {bad} non-finite required rows.")
+        raise ValueError(
+            f"Event-feature table contains {bad} non-finite required rows."
+        )
 
     nonzero = dyn_net != 0
     keep = np.flatnonzero(nonzero)
@@ -268,9 +270,7 @@ def build_spatial_composites(
         np.array(
             [
                 float(
-                    events["I_dyn_pre"]
-                    .where(events["event_dyn_sign"] == group)
-                    .mean()
+                    events["I_dyn_pre"].where(events["event_dyn_sign"] == group).mean()
                 )
                 for group in GROUPS
             ]
@@ -350,9 +350,9 @@ def timestamp_weights(
         group_index = GROUPS.index(str(sign))
         sample_weight = 1.0 / group_counts[group_index]
         for lag_index, value in enumerate(row):
-            weights[pd.Timestamp(value).normalize()][
-                group_index, lag_index
-            ] += sample_weight
+            weights[pd.Timestamp(value).normalize()][group_index, lag_index] += (
+                sample_weight
+            )
     assert_normalized_weights(weights)
     return dict(weights)
 
@@ -372,9 +372,9 @@ def calendar_key_weights(
         sample_weight = 1.0 / group_counts[group_index]
         for lag_index, value in enumerate(row):
             timestamp = pd.Timestamp(value)
-            weights[(timestamp.month, timestamp.day)][
-                group_index, lag_index
-            ] += sample_weight
+            weights[(timestamp.month, timestamp.day)][group_index, lag_index] += (
+                sample_weight
+            )
     assert_normalized_weights(weights)
     return dict(weights)
 
@@ -496,12 +496,16 @@ def standardize_spatial_dataset(
         pressure_dim = pressure_dims[0]
         levels = np.asarray(out[pressure_dim].values, dtype=float)
         if levels.size != 1 or not np.isclose(levels[0], 500.0):
-            raise ValueError(f"Expected only Z500; found pressure levels {levels.tolist()}.")
+            raise ValueError(
+                f"Expected only Z500; found pressure levels {levels.tolist()}."
+            )
         out = out.isel({pressure_dim: 0}, drop=True)
     elif "pressure_level" in out.coords:
         levels = np.asarray(out["pressure_level"].values, dtype=float)
         if levels.size != 1 or not np.isclose(levels[0], 500.0):
-            raise ValueError(f"Expected only Z500; found pressure levels {levels.tolist()}.")
+            raise ValueError(
+                f"Expected only Z500; found pressure levels {levels.tolist()}."
+            )
 
     latitude = np.asarray(out["latitude"].values, dtype=float)
     longitude = np.asarray(out["longitude"].values, dtype=float)
@@ -542,7 +546,9 @@ def load_weighted_fields(
     t2m = np.asarray(ds["t2m"].isel(time=indices).load().values, dtype=np.float64)
     z = np.asarray(ds["z"].isel(time=indices).load().values, dtype=np.float64)
     if t2m.ndim != 3 or z.ndim != 3:
-        raise ValueError(f"{context} fields must have time/latitude/longitude dimensions.")
+        raise ValueError(
+            f"{context} fields must have time/latitude/longitude dimensions."
+        )
     if not np.isfinite(t2m).all() or not np.isfinite(z).all():
         raise ValueError(f"{context} contains non-finite selected spatial fields.")
     return {

@@ -39,7 +39,9 @@ DEFAULT_INPUT_PATH = (
     / "stage3_event_feature_pca"
     / f"hw_event_feature_pca_{REGION}_tas_q90_1940_2024.nc"
 )
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "stage3_event_feature_pca" / "diagnostics" / REGION
+DEFAULT_OUTPUT_DIR = (
+    REPO_ROOT / "results" / "stage3_event_feature_pca" / "diagnostics" / REGION
+)
 DEFAULT_COLOR_VARIABLES = (
     "tas_anom_peak",
     "log10_tas_excess_integral",
@@ -53,7 +55,7 @@ DEFAULT_CORRELATION_DIAGNOSTICS = (
     "I_dTdt_pre",
     "I_advection_pre",
     "I_diabatic_pre",
-    "I_adiabatic_pre"
+    "I_adiabatic_pre",
 )
 DEFAULT_CORRELATION_PCS = ("PC1", "PC2", "PC3", "PC4")
 DEFAULT_PC_X = "PC1"
@@ -226,14 +228,18 @@ def validate_pca_dataset(
     }
     missing = sorted(name for name in required if name not in pca)
     if missing:
-        raise ValueError(f"PCA dataset is missing required variables: {', '.join(missing)}.")
+        raise ValueError(
+            f"PCA dataset is missing required variables: {', '.join(missing)}."
+        )
 
     pcs = {str(value) for value in pca["pc"].values}
     for pc_name in (pc_x, pc_y):
         if pc_name not in pcs:
             raise ValueError(f"Requested PC {pc_name!r} is not present in the dataset.")
 
-    missing_colors = [name for name in color_variables if not has_event_variable(pca, name)]
+    missing_colors = [
+        name for name in color_variables if not has_event_variable(pca, name)
+    ]
     if missing_colors:
         raise ValueError(
             "PCA dataset is missing requested color variables: "
@@ -287,7 +293,9 @@ def plot_loading_heatmap(
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return a heatmap of PC loadings by input feature."""
     n_pcs = min(max_pcs, pca.sizes["pc"])
-    loadings = np.asarray(pca["pc_loading"].isel(pc=slice(0, n_pcs)).values, dtype=float)
+    loadings = np.asarray(
+        pca["pc_loading"].isel(pc=slice(0, n_pcs)).values, dtype=float
+    )
     pc_labels = [str(value) for value in pca["pc"].isel(pc=slice(0, n_pcs)).values]
     feature_labels = [str(value) for value in pca["feature"].values]
     vmax = max(0.1, float(np.nanmax(np.abs(loadings))))
@@ -344,7 +352,9 @@ def plot_pc_score_diagnostics(
         nrows=nrows,
         ncols=ncols,
         figsize=(
-            plot_style.FULL_TWO_COLUMN_WIDTH_IN if ncols > 1 else plot_style.SINGLE_COLUMN_WIDTH_IN,
+            plot_style.FULL_TWO_COLUMN_WIDTH_IN
+            if ncols > 1
+            else plot_style.SINGLE_COLUMN_WIDTH_IN,
             4.8 * nrows,
         ),
         squeeze=False,
@@ -447,7 +457,9 @@ def event_variable_values(pca: xr.Dataset, variable: str) -> np.ndarray:
     if "feature" in pca.coords and variable in {
         str(value) for value in pca["feature"].values
     }:
-        return np.asarray(pca["feature_matrix"].sel(feature=variable).values, dtype=float)
+        return np.asarray(
+            pca["feature_matrix"].sel(feature=variable).values, dtype=float
+        )
 
     raise ValueError(f"PCA dataset does not contain diagnostic variable {variable!r}.")
 

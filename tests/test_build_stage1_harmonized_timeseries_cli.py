@@ -223,15 +223,26 @@ def test_load_era5_inputs_loads_full_diagnostics_only_when_requested(monkeypatch
     calls = []
     heat_budget_calls = []
 
-    monkeypatch.setattr(stage1_builder.data_io, "open_era5_tas", lambda **kwargs: xr.Dataset())
-    monkeypatch.setattr(stage1_builder.data_io, "open_era5_lwa", lambda **kwargs: xr.Dataset())
-    monkeypatch.setattr(stage1_builder.data_io, "open_era5_lwa_threshold", lambda **kwargs: xr.Dataset())
-    monkeypatch.setattr(stage1_builder.data_io, "open_era5_hw_threshold", lambda **kwargs: xr.Dataset())
+    monkeypatch.setattr(
+        stage1_builder.data_io, "open_era5_tas", lambda **kwargs: xr.Dataset()
+    )
+    monkeypatch.setattr(
+        stage1_builder.data_io, "open_era5_lwa", lambda **kwargs: xr.Dataset()
+    )
+    monkeypatch.setattr(
+        stage1_builder.data_io, "open_era5_lwa_threshold", lambda **kwargs: xr.Dataset()
+    )
+    monkeypatch.setattr(
+        stage1_builder.data_io, "open_era5_hw_threshold", lambda **kwargs: xr.Dataset()
+    )
+
     def fake_open_heat_budget(**kwargs):
         heat_budget_calls.append(kwargs)
         return xr.Dataset()
 
-    monkeypatch.setattr(stage1_builder.data_io, "open_era5_heat_budget", fake_open_heat_budget)
+    monkeypatch.setattr(
+        stage1_builder.data_io, "open_era5_heat_budget", fake_open_heat_budget
+    )
 
     def fake_load_full(args):
         calls.append(args)
@@ -314,7 +325,9 @@ def test_append_event_summary_table_defaults_to_tas_events():
 
     assert out.sizes["time"] == 4
     assert out.sizes["event"] == 2
-    assert {"event_id", "start_time", "end_time", "duration", "tas_anom_peak"} <= set(out)
+    assert {"event_id", "start_time", "end_time", "duration", "tas_anom_peak"} <= set(
+        out
+    )
     np.testing.assert_array_equal(out["event_id"].values, [1, 2])
     np.testing.assert_array_equal(out["duration"].values, [1, 1])
     np.testing.assert_allclose(out["tas_anom_peak"].values, [5.0, 5.0])

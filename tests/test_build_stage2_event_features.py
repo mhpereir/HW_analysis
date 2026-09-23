@@ -166,7 +166,10 @@ def test_build_extended_features_adds_optional_diagnostics():
     assert out["soil_moisture_mean_ant"].item() == pytest.approx(154.0 / 145.0)
     assert out["cloud_cover_mean_ant"].item() == 0.5
     assert out["soil_moisture_change"].item() == 9.0
-    assert out["I_sshf_pre"].attrs["sign_convention"] == "native Stage-1/source signs retained"
+    assert (
+        out["I_sshf_pre"].attrs["sign_convention"]
+        == "native Stage-1/source signs retained"
+    )
 
 
 def test_build_extended_features_raises_for_missing_extended_variables():
@@ -197,7 +200,10 @@ def test_build_extended_features_can_skip_missing_extended_variables():
 
 def test_write_feature_outputs_writes_netcdf_and_optional_csv(tmp_path):
     features = xr.Dataset(
-        data_vars={"event_id": ("event", np.array([1])), "I_dTdt_pre": ("event", np.array([1.0]))},
+        data_vars={
+            "event_id": ("event", np.array([1])),
+            "I_dTdt_pre": ("event", np.array([1.0])),
+        },
         coords={"event": np.array([0])},
     )
     output_path = tmp_path / "features.nc"
@@ -235,7 +241,9 @@ def test_main_orchestrates_open_build_and_write(monkeypatch, tmp_path):
         return [Path(output_path)]
 
     monkeypatch.setattr("sys.argv", ["build_stage2_event_features.py", "--all-seasons"])
-    monkeypatch.setattr(build_event_features.analysis_io, "open_harmonized_timeseries", fake_open)
+    monkeypatch.setattr(
+        build_event_features.analysis_io, "open_harmonized_timeseries", fake_open
+    )
     monkeypatch.setattr(build_event_features, "build_event_features", fake_build)
     monkeypatch.setattr(build_event_features, "write_feature_outputs", fake_write)
 

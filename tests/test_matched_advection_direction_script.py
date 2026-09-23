@@ -45,9 +45,7 @@ def test_build_matched_composites_uses_selector_and_stage1_event_alignment(
     assert prepared.positive.attrs["matched_sign"] == "positive"
     assert prepared.negative.attrs["n_events"] == 4
     assert prepared.positive.attrs["n_events"] == 4
-    assert prepared.negative.attrs["matching_specification"] == (
-        "peak_anomaly_0p20"
-    )
+    assert prepared.negative.attrs["matching_specification"] == ("peak_anomaly_0p20")
     assert prepared.negative.attrs["matching_label"] == "Peak anomaly"
 
 
@@ -89,8 +87,7 @@ def _make_inputs() -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
     feature_ids = np.array([14, 12, 11, 13, 25, 23, 21, 24, 22])
     stage1_ids = np.array([25, 11, 22, 14, 21, 13, 24, 12, 23])
     peak_lookup = {
-        event_id: np.datetime64("2000-06-03T00:00", "ns")
-        + np.timedelta64(index, "D")
+        event_id: np.datetime64("2000-06-03T00:00", "ns") + np.timedelta64(index, "D")
         for index, event_id in enumerate(sorted(feature_ids))
     }
     negative_anomaly = {11: 2.5, 12: 3.0, 13: 3.5, 14: 4.0}
@@ -140,10 +137,7 @@ def _make_inputs() -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
                 np.array([peak_lookup[event_id] for event_id in stage1_ids]),
             ),
             "advection": ("time", total),
-            **{
-                name: ("time", values)
-                for name, values in face_values.items()
-            },
+            **{name: ("time", values) for name, values in face_values.items()},
         },
         coords={
             "event": np.arange(stage1_ids.size),

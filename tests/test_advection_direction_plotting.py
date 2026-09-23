@@ -14,12 +14,14 @@ def test_plot_advection_direction_exploration_has_selected_two_panels():
         assert "Grouped advective contributions" == fig.axes[1].get_title()
         assert all("Component ratios" not in ax.get_title() for ax in fig.axes)
         assert all("glyph" not in ax.get_title().lower() for ax in fig.axes)
-        assert {
-            text.get_text() for text in fig.axes[0].get_legend().get_texts()
-        } == {"West", "East", "South", "North", "Top"}
-        assert {
-            text.get_text() for text in fig.axes[1].get_legend().get_texts()
-        } == {
+        assert {text.get_text() for text in fig.axes[0].get_legend().get_texts()} == {
+            "West",
+            "East",
+            "South",
+            "North",
+            "Top",
+        }
+        assert {text.get_text() for text in fig.axes[1].get_legend().get_texts()} == {
             "Zonal (west + east)",
             "Meridional (south + north)",
             "Horizontal",
@@ -62,8 +64,7 @@ def test_add_upper_axis_headroom_expands_only_upper_limit():
         assert new_lower == lower
         assert np.isclose(
             new_upper,
-            upper
-            + advection_direction_plotting.LEGEND_HEADROOM_FRACTION * span,
+            upper + advection_direction_plotting.LEGEND_HEADROOM_FRACTION * span,
         )
     finally:
         plt.close(fig)
@@ -83,11 +84,9 @@ def test_climatological_anomaly_title_is_explicit():
 def test_write_advection_direction_exploration_plot_writes_nonempty_png(tmp_path):
     output = tmp_path / "advection_face_contributions.png"
 
-    written = (
-        advection_direction_plotting.write_advection_direction_exploration_plot(
-            _make_composite(),
-            output,
-        )
+    written = advection_direction_plotting.write_advection_direction_exploration_plot(
+        _make_composite(),
+        output,
     )
 
     assert written == output.resolve()

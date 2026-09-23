@@ -1,9 +1,7 @@
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCHEDULER = (
-    REPO_ROOT / "schedulers/schedule_matched_dyn_pre_spatial_composites.sh"
-)
+SCHEDULER = REPO_ROOT / "schedulers/schedule_matched_dyn_pre_spatial_composites.sh"
 
 
 def test_matched_spatial_scheduler_is_commit_pinned_and_atomic():
@@ -13,7 +11,7 @@ def test_matched_spatial_scheduler_is_commit_pinned_and_atomic():
     assert "#PBS -l walltime=02:00:00" in text
     assert 'PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"' in text
     assert 'EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"' in text
-    assert 'PBS_O_WORKDIR:?PBS_O_WORKDIR is required' in text
+    assert "PBS_O_WORKDIR:?PBS_O_WORKDIR is required" in text
     assert "PYTHONWARNINGS=error" in text
     assert "peak_anomaly_0p20" in text
     assert "build_matched_dyn_pre_spatial_composites.py" in text

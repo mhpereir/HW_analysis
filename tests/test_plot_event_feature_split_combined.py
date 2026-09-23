@@ -48,8 +48,12 @@ def test_build_quantile_split_uses_threshold_and_puts_ties_in_low_group():
     )
 
     assert split.threshold == 3.0
-    np.testing.assert_array_equal(split.low_mask, [True, True, True, True, False, False])
-    np.testing.assert_array_equal(split.high_mask, [False, False, False, False, True, True])
+    np.testing.assert_array_equal(
+        split.low_mask, [True, True, True, True, False, False]
+    )
+    np.testing.assert_array_equal(
+        split.high_mask, [False, False, False, False, True, True]
+    )
 
 
 def test_split_specs_support_direct_and_derived_variables():

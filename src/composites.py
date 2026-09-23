@@ -108,7 +108,7 @@ def stack_events_centered_on_peak(
     lag_offsets = pd.to_timedelta(lag_hours, unit="h")
 
     windows: list[xr.Dataset] = []
-    event_ids  = np.asarray(event_table[event_id_name].values, dtype=np.int64)
+    event_ids = np.asarray(event_table[event_id_name].values, dtype=np.int64)
     peak_times = np.asarray(event_table[peak_time_name].values, dtype="datetime64[ns]")
 
     source = ds[list(variable_names)]
@@ -323,7 +323,9 @@ def _validate_stack_inputs(
     if event_dim not in event_table.dims:
         raise ValueError(f"event_table is missing event dimension {event_dim!r}.")
     if peak_time_name not in event_table:
-        raise ValueError(f"event_table is missing peak-time variable {peak_time_name!r}.")
+        raise ValueError(
+            f"event_table is missing peak-time variable {peak_time_name!r}."
+        )
     if event_id_name not in event_table:
         raise ValueError(f"event_table is missing event-ID variable {event_id_name!r}.")
     if pre_days < 0 or post_days < 0:
@@ -340,11 +342,13 @@ def _resolve_time_variables(
 ) -> list[str]:
     """Return valid time-indexed variables to include in event windows."""
     if variables is None:
-        return [name for name, da in ds.data_vars.items() if da.dims == (time_dim,)] # type: ignore
+        return [name for name, da in ds.data_vars.items() if da.dims == (time_dim,)]  # type: ignore
 
     missing = sorted(name for name in variables if name not in ds)
     if missing:
-        raise ValueError(f"Dataset is missing requested variables: {', '.join(missing)}.")
+        raise ValueError(
+            f"Dataset is missing requested variables: {', '.join(missing)}."
+        )
 
     invalid = sorted(name for name in variables if time_dim not in ds[name].dims)
     if invalid:

@@ -258,12 +258,7 @@ def test_resolve_tracked_variable_reads_pcs_direct_variables_and_derived_variabl
     )
     np.testing.assert_allclose(
         build_stage4_clusters.resolve_tracked_variable(pca, "cos_days_from_solstice"),
-        np.cos(
-            np.array([0.0, 30.0, 60.0, 90.0, 120.0, 150.0])
-            * 2.0
-            * np.pi
-            / 365.0
-        ),
+        np.cos(np.array([0.0, 30.0, 60.0, 90.0, 120.0, 150.0]) * 2.0 * np.pi / 365.0),
     )
 
     denominator = np.array([6.0, 7.0, 10.0, 15.0, 16.0, 20.0])
@@ -304,14 +299,22 @@ def test_summarize_clusters_uses_finite_values_and_handles_empty_clusters():
     )
 
     np.testing.assert_array_equal(out["cluster_count"].values, [2, 1, 0])
-    np.testing.assert_allclose(out["cluster_variable_mean"].sel(cluster=0).values, [2.0, 10.0])
-    np.testing.assert_array_equal(out["cluster_variable_n_finite"].sel(cluster=0).values, [2, 1])
-    assert np.isnan(out["cluster_variable_mean"].sel(cluster=2, tracked_variable="a").item())
+    np.testing.assert_allclose(
+        out["cluster_variable_mean"].sel(cluster=0).values, [2.0, 10.0]
+    )
+    np.testing.assert_array_equal(
+        out["cluster_variable_n_finite"].sel(cluster=0).values, [2, 1]
+    )
+    assert np.isnan(
+        out["cluster_variable_mean"].sel(cluster=2, tracked_variable="a").item()
+    )
 
 
 def test_missing_tracked_variable_raises_clear_error():
     with pytest.raises(ValueError, match="tracked variable"):
-        build_stage4_clusters.resolve_tracked_variable(_make_pca_dataset(), "not_a_variable")
+        build_stage4_clusters.resolve_tracked_variable(
+            _make_pca_dataset(), "not_a_variable"
+        )
 
 
 def test_missing_pc_raises_clear_error():
@@ -353,7 +356,9 @@ def test_write_cluster_output_respects_overwrite_flag(tmp_path):
     with pytest.raises(FileExistsError, match="--overwrite"):
         build_stage4_clusters.write_cluster_output(out, output_path)
 
-    written = build_stage4_clusters.write_cluster_output(out, output_path, overwrite=True)
+    written = build_stage4_clusters.write_cluster_output(
+        out, output_path, overwrite=True
+    )
 
     assert written == output_path.resolve()
     assert output_path.exists()
@@ -489,7 +494,10 @@ def _make_pca_dataset() -> xr.Dataset:
             "I_dTdt_pre": ("event", np.array([10.0, 11.0, 12.0, 30.0, 31.0, 32.0])),
             "I_adiabatic_pre": ("event", np.array([1.0, 2.0, 4.0, 5.0, 6.0, 8.0])),
             "I_diabatic_pre": ("event", np.array([3.0, 1.0, 2.0, 4.0, 7.0, 9.0])),
-            "I_advection_pre": ("event", np.array([-2.0, -4.0, -4.0, -6.0, -3.0, -3.0])),
+            "I_advection_pre": (
+                "event",
+                np.array([-2.0, -4.0, -4.0, -6.0, -3.0, -3.0]),
+            ),
             "I_lwa_a_pre_peak": ("event", np.array([4.0, 9.0, 16.0, 25.0, -1.0, 36.0])),
             "T_anom_mean_ant": ("event", np.array([1.0, 1.2, 1.4, 3.0, 3.2, 3.4])),
             "days_from_solstice": (

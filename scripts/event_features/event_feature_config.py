@@ -16,15 +16,11 @@ DEFAULT_INPUT_PATH = (
 )
 
 DEFAULT_OUTPUT_PATH = (
-    artifact_root()
-    / "stage2_event_features"
-    / "hw_event_features_fixed_windows.nc"
+    artifact_root() / "stage2_event_features" / "hw_event_features_fixed_windows.nc"
 )
 
 DEFAULT_CSV_OUTPUT_PATH = (
-    artifact_root()
-    / "stage2_event_features"
-    / "hw_event_features_fixed_windows.csv"
+    artifact_root() / "stage2_event_features" / "hw_event_features_fixed_windows.csv"
 )
 
 TIME_DIM = "time"
@@ -43,7 +39,9 @@ WINDOWS = {
 }
 
 
-def integration_windows(integration_hours: int | None = None) -> dict[str, tuple[int, int]]:
+def integration_windows(
+    integration_hours: int | None = None,
+) -> dict[str, tuple[int, int]]:
     """Resolve one run's windows without mutating the scientific defaults."""
     windows = dict(WINDOWS)
     if integration_hours is not None:
@@ -56,6 +54,7 @@ def integration_windows(integration_hours: int | None = None) -> dict[str, tuple
         for name in ("heat_budget_pre", "lwa_pre_peak"):
             windows[name] = (-int(integration_hours), 0)
     return windows
+
 
 DEFAULT_INTEGRAL_FEATURES = {
     "dTdt": "heat_budget_pre",

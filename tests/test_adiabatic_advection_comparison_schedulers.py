@@ -92,7 +92,9 @@ def test_scheduler_marker_defaults_and_overrides_match_layout(
 ):
     # Evaluate only local variable declarations, stopping before Git, files,
     # environments or job execution. No scheduler or production input is used.
-    declarations = scheduler.read_text().split("\n# Runtime validation and logging.", 1)[0]
+    declarations = scheduler.read_text().split(
+        "\n# Runtime validation and logging.", 1
+    )[0]
     env = {
         "HOME": str(Path.home()),
         "PBS_O_WORKDIR": str(tmp_path),

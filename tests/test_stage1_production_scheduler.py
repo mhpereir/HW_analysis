@@ -4,9 +4,7 @@ import pytest
 from HW_analysis.src import config
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCHEDULER = (
-    REPO_ROOT / "schedulers" / "schedule_build_stage1_harmonized_timeseries.sh"
-)
+SCHEDULER = REPO_ROOT / "schedulers" / "schedule_build_stage1_harmonized_timeseries.sh"
 
 
 def test_eastern_canada_region_matches_ehb_domain():
@@ -48,7 +46,7 @@ def test_stage1_scheduler_requires_commit_region_and_output_path():
 def test_stage1_scheduler_requires_global_cloud_cover_and_full_diagnostics():
     text = SCHEDULER.read_text()
 
-    assert '--add-full-diagnostics \\\n' in text
+    assert "--add-full-diagnostics \\\n" in text
     assert '--cloud-cover-source-layout "global-hourly-grid"' in text
     assert "--cloud-cover-root" in text
     assert "stage1_contract_version=2" in text
@@ -62,8 +60,8 @@ def test_stage1_scheduler_supports_explicit_threshold_variable_selection():
     text = SCHEDULER.read_text()
 
     assert 'THRESHOLD_VARIABLE="${THRESHOLD_VARIABLE:-tas}"' in text
-    assert 'tas|lwa|lwa_a|lwa_c)' in text
-    assert 'threshold_variable=${THRESHOLD_VARIABLE}' in text
+    assert "tas|lwa|lwa_a|lwa_c)" in text
+    assert "threshold_variable=${THRESHOLD_VARIABLE}" in text
     assert '--threshold-variable "${THRESHOLD_VARIABLE}"' in text
 
 
@@ -72,7 +70,9 @@ def test_stage1_scheduler_supports_explicit_heat_budget_root():
 
     assert 'HEAT_BUDGET_ROOT="${HEAT_BUDGET_ROOT:-}"' in text
     assert 'HEAT_BUDGET_ARGS=(--heat-budget-root "${HEAT_BUDGET_ROOT}")' in text
-    assert 'heat_budget_root=${HEAT_BUDGET_ROOT:-configured-saved-results-default}' in text
+    assert (
+        "heat_budget_root=${HEAT_BUDGET_ROOT:-configured-saved-results-default}" in text
+    )
     assert '"${HEAT_BUDGET_ARGS[@]}"' in text
 
 

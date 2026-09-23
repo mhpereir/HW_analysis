@@ -366,11 +366,7 @@ def plot_one_tendency_panel(
     if standardized:
         x_values = standardized_values(x_values)
         y_values = standardized_values(y_values)
-    finite = (
-        np.isfinite(x_values)
-        & np.isfinite(y_values)
-        & np.isfinite(cluster_values)
-    )
+    finite = np.isfinite(x_values) & np.isfinite(y_values) & np.isfinite(cluster_values)
 
     mappable = ax.scatter(
         x_values[finite],

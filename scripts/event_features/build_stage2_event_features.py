@@ -160,7 +160,9 @@ def build_event_features(
             operation=operation,
         ),
     )
-    fixed.add_integrated_dynamical_feature(out, row_dim=config.EVENT_DIM, windows=windows)
+    fixed.add_integrated_dynamical_feature(
+        out, row_dim=config.EVENT_DIM, windows=windows
+    )
     fixed.add_days_from_solstice(
         out,
         peak_times,
@@ -182,7 +184,9 @@ def build_event_features(
     return out
 
 
-def event_summary_table(ds: xr.Dataset, event_dim: str = config.EVENT_DIM) -> xr.Dataset:
+def event_summary_table(
+    ds: xr.Dataset, event_dim: str = config.EVENT_DIM
+) -> xr.Dataset:
     """Return variables that belong only to the event dimension."""
     names = [
         name
@@ -234,7 +238,9 @@ def validate_required_variables(
     if missing_event:
         missing.append("event-summary variables: " + ", ".join(missing_event))
     if missing:
-        raise ValueError("Input dataset is missing required " + "; ".join(missing) + ".")
+        raise ValueError(
+            "Input dataset is missing required " + "; ".join(missing) + "."
+        )
 
 
 def require_finite_peak_times(event_table: xr.Dataset) -> xr.Dataset:
@@ -334,7 +340,9 @@ def add_integral_features(
         if source_name in {"lwa_a_region", "lwa_c_region"}:
             out[feature_name].attrs["description"] = "LWA exposure over fixed window."
         if feature_name in SURFACE_FLUX_FEATURES:
-            out[feature_name].attrs["sign_convention"] = "native Stage-1/source signs retained"
+            out[feature_name].attrs["sign_convention"] = (
+                "native Stage-1/source signs retained"
+            )
 
 
 def add_mean_features(
@@ -398,7 +406,9 @@ def add_days_from_solstice(out: xr.Dataset, event_table: xr.Dataset) -> None:
     )
 
 
-def window_for_peak(ds: xr.Dataset, peak_time: np.datetime64, window_name: str) -> xr.Dataset:
+def window_for_peak(
+    ds: xr.Dataset, peak_time: np.datetime64, window_name: str
+) -> xr.Dataset:
     """Return an inclusive timestamp window for one event peak."""
     start_lag, end_lag = config.WINDOWS[window_name]
     start = peak_time + np.timedelta64(start_lag, "h")
@@ -426,7 +436,9 @@ def event_peak_values(event_table: xr.Dataset) -> np.ndarray:
     )
 
 
-def active_window_names(feature_spec: Mapping[str, Mapping[str, str]]) -> tuple[str, ...]:
+def active_window_names(
+    feature_spec: Mapping[str, Mapping[str, str]],
+) -> tuple[str, ...]:
     """Return active window names in config order."""
     return fixed.active_window_names(feature_spec)
 
@@ -542,7 +554,9 @@ def _validate_season_months(months: Sequence[int]) -> None:
     invalid = [month for month in months if month < 1 or month > 12]
     if invalid:
         values = ", ".join(str(month) for month in invalid)
-        raise ValueError(f"--season-months values must be between 1 and 12; got {values}.")
+        raise ValueError(
+            f"--season-months values must be between 1 and 12; got {values}."
+        )
 
 
 def _display_path(path: Path) -> str:

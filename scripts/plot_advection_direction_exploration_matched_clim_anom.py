@@ -106,7 +106,9 @@ def validate_args(args: argparse.Namespace) -> None:
     if args.output_path.suffix.lower() != ".png":
         raise ValueError("--output-path must use the .png suffix.")
     if args.output_path.exists():
-        raise FileExistsError(f"Matched anomaly plot already exists: {args.output_path}.")
+        raise FileExistsError(
+            f"Matched anomaly plot already exists: {args.output_path}."
+        )
 
 
 def open_event_features(path: str | Path) -> xr.Dataset:
@@ -291,12 +293,10 @@ def main() -> int:
             composite.attrs["climatology_path"] = str(args.climatology_path)
             composite.attrs["event_features_path"] = str(args.event_features_path)
             composite.attrs["event_features_sha256"] = event_features_sha256
-        path = (
-            advection_direction_plotting.write_matched_advection_direction_exploration_plot(
-                prepared.negative,
-                prepared.positive,
-                args.output_path,
-            )
+        path = advection_direction_plotting.write_matched_advection_direction_exploration_plot(
+            prepared.negative,
+            prepared.positive,
+            args.output_path,
         )
     finally:
         event_features.close()

@@ -146,7 +146,9 @@ def build_baseline_features(
         reference_times = reference_times[month_mask(reference_times, season_months)]
     n_selected_before_boundary = int(reference_times.size)
     if n_selected_before_boundary == 0:
-        raise ValueError("No selected-source non-event days remain after season selection.")
+        raise ValueError(
+            "No selected-source non-event days remain after season selection."
+        )
 
     window_names = fixed.active_window_names(feature_spec)
     keep = reducer.complete_anchor_mask(reference_times, window_names)
@@ -223,7 +225,9 @@ def selected_event_id_source(ds: xr.Dataset) -> str:
     """Return and validate the Stage-1 event-ID source defining baseline days."""
     source = ds.attrs.get("event_id_source")
     if not isinstance(source, str) or not source:
-        raise ValueError("Stage-1 dataset is missing required event_id_source metadata.")
+        raise ValueError(
+            "Stage-1 dataset is missing required event_id_source metadata."
+        )
     if source not in ds:
         raise ValueError(
             f"Stage-1 event_id_source {source!r} is not present in the dataset."
@@ -398,7 +402,9 @@ def _validate_season_months(months: Sequence[int]) -> None:
     invalid = [month for month in months if month < 1 or month > 12]
     if invalid:
         values = ", ".join(str(month) for month in invalid)
-        raise ValueError(f"--season-months values must be between 1 and 12; got {values}.")
+        raise ValueError(
+            f"--season-months values must be between 1 and 12; got {values}."
+        )
 
 
 def _display_path(path: Path) -> str:

@@ -290,8 +290,7 @@ def validate_feature_variables(
     missing = [name for name in required if name not in features]
     if missing:
         raise ValueError(
-            "Event-feature table is missing required variables: "
-            f"{', '.join(missing)}."
+            f"Event-feature table is missing required variables: {', '.join(missing)}."
         )
 
 

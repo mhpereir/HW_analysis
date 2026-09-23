@@ -10,13 +10,20 @@ from HW_analysis.src import analysis_io
 from HW_analysis.src.artifact_paths import artifact_root
 
 RUN_ARGS = [
-    "--region", "pnw_hotz",
-    "--bottom-boundary", "surface",
-    "--top-boundary", "700",
-    "--threshold-variable", "tas",
-    "--quantile", "90",
-    "--start-year", "1940",
-    "--end-year", "2024",
+    "--region",
+    "pnw_hotz",
+    "--bottom-boundary",
+    "surface",
+    "--top-boundary",
+    "700",
+    "--threshold-variable",
+    "tas",
+    "--quantile",
+    "90",
+    "--start-year",
+    "1940",
+    "--end-year",
+    "2024",
 ]
 
 
@@ -57,15 +64,15 @@ def test_parse_args_accepts_custom_options(monkeypatch, tmp_path):
         "sys.argv",
         [
             *_argv(
-            "--input-path",
-            str(input_path),
-            "--output-path",
-            str(output_path),
-            "--season-months",
-            "7",
-            "8",
-            "--local-utc-offset-hours",
-            "-8",
+                "--input-path",
+                str(input_path),
+                "--output-path",
+                str(output_path),
+                "--season-months",
+                "7",
+                "8",
+                "--local-utc-offset-hours",
+                "-8",
             ),
         ],
     )
@@ -170,22 +177,22 @@ def test_write_diurnal_cycle_plot_writes_png_and_plot_draws_iqr_lines(tmp_path):
         local_utc_offset_hours=-7,
     )
 
-    path = plot_diurnal_cycle.write_diurnal_cycle_plot(composite, tmp_path / "diurnal.png")
+    path = plot_diurnal_cycle.write_diurnal_cycle_plot(
+        composite, tmp_path / "diurnal.png"
+    )
     fig = plot_diurnal_cycle.plot_diurnal_cycle(composite)
     try:
         assert path.exists()
         assert path.name == "diurnal.png"
-        assert any(
-            line.get_alpha() == 0.28
-            for ax in fig.axes
-            for line in ax.lines
-        )
+        assert any(line.get_alpha() == 0.28 for ax in fig.axes for line in ax.lines)
         assert fig.axes[4].get_legend().get_texts()[-1].get_text() == "IQR bounds"
     finally:
         plt.close(fig)
 
 
-def test_main_orchestrates_open_composite_write_and_close(monkeypatch, tmp_path, capsys):
+def test_main_orchestrates_open_composite_write_and_close(
+    monkeypatch, tmp_path, capsys
+):
     input_path = tmp_path / "stage1.nc"
     output_path = tmp_path / "diurnal.png"
     opened = _ClosableDataset()
@@ -210,14 +217,14 @@ def test_main_orchestrates_open_composite_write_and_close(monkeypatch, tmp_path,
         "sys.argv",
         [
             *_argv(
-            "--input-path",
-            str(input_path),
-            "--output-path",
-            str(output_path),
-            "--season-months",
-            "6",
-            "--local-utc-offset-hours",
-            "-7",
+                "--input-path",
+                str(input_path),
+                "--output-path",
+                str(output_path),
+                "--season-months",
+                "6",
+                "--local-utc-offset-hours",
+                "-7",
             ),
         ],
     )
@@ -267,8 +274,7 @@ def _make_diurnal_dataset() -> xr.Dataset:
     )
     values = np.array([999.0, 10.0, 14.0, 30.0, 34.0, 20.0, 40.0])
     data_vars = {
-        name: ("time", values.copy())
-        for name in plot_diurnal_cycle.DIURNAL_VARIABLES
+        name: ("time", values.copy()) for name in plot_diurnal_cycle.DIURNAL_VARIABLES
     }
     data_vars["hw_event_id"] = (
         "time",
