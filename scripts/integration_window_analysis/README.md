@@ -14,9 +14,9 @@ Stage-2 products. The June 2021 event remains part of the regional heatwave
 population used for ranking.
 
 The initial question is how the heating totals and rankings change after
-subtracting the heating expected from the regional seasonal cycle. Anomalies
-of individual budget components and event-specific heating-onset definitions
-are possible later extensions, with their own documented scientific choices.
+subtracting the heating expected from the regional seasonal cycle. Anomalies of individual budget components now have a separate derived Stage-2
+contract and entrypoint described below. Event-specific heating-onset
+definitions remain a possible later extension.
 
 ## Entrypoints and ownership
 
@@ -93,8 +93,9 @@ python -m pytest -q -W error tests/test_integration_window_analysis.py
 
 ## Later tendency-anomaly comparison
 
-The following broader comparison remains planned. Its matched tendency
-integral differs discretely from the current temperature endpoint correction.
+The following broader total-heating comparison remains planned separately
+from the anomaly-only component product. Its matched tendency integral
+differs discretely from the current temperature endpoint correction.
 
 Use the existing [event-feature](../../docs/products/stage2_event_features.md)
 and [baseline-day](../../docs/products/stage2_baseline_features.md) products
@@ -173,3 +174,26 @@ a different question.
 
 The [pipeline overview](../../docs/pipeline_overview.md), product contracts and
 [documentation-first process](../../docs/README.md) remain authoritative.
+
+## Component-anomaly budget comparison
+
+The separate `feat/stage2-component-anomalies` feature implements the
+[component-anomaly contract](../../docs/products/stage2_component_anomalies.md).
+Use `build_component_anomalies.py` with explicit `--input-path`,
+`--climatology-path`, `--reference-dir`, `--integration-hours` and a fresh
+`--output-dir`. The reference directory is one accepted region/window directory
+with its event table, baseline table and original manifest. Only the five
+heat-budget features are replaced with explicitly named anomaly integrals.
+Raw totals are not recalculated.
+
+The existing event-versus-clean-baseline plotter reads either the original
+absolute pair or the new anomaly pair, checks their representations and labels
+the resulting figure. The builder writes both layouts as PNG and PDF after
+saving and independently validating the new tables.
+
+Production uses `schedulers/schedule_stage2_component_anomalies.sh`, one region
+and window per job. Supply `PROJECT_ROOT`, `EXPECTED_COMMIT`, `INPUT_PATH`,
+`CLIMATOLOGY_PATH`, `REFERENCE_DIR`, `INTEGRATION_HOURS`, `OUTPUT_DIR`, and
+`LOG_DIR`, forwarding any artifact/log root overrides explicitly. `RUN_TESTS=1`
+adds the synthetic anomaly and baseline plotting checks to the first queued
+smoke. Each serial job requests one CPU, 4 GB RAM and 15 minutes.

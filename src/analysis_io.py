@@ -353,3 +353,29 @@ def _filename_token(value: object) -> str:
     for old, new in (("/", "-"), ("\\", "-"), (" ", "-")):
         token = token.replace(old, new)
     return token
+
+
+def save_component_anomalies(ds: xr.Dataset, output_path: str | Path) -> Path:
+    """Atomically save a new validated component-anomaly feature table."""
+    from src.stage2_component_anomalies import validate_component_anomalies
+
+    validate_component_anomalies(ds)
+    path = Path(output_path).expanduser().resolve()
+    if path.exists():
+        raise FileExistsError(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_netcdf_atomically(_prepare_for_netcdf(ds), path)
+    return path
+
+
+def open_component_anomalies(path: str | Path) -> xr.Dataset:
+    """Open and validate one component-anomaly table."""
+    from src.stage2_component_anomalies import validate_component_anomalies
+
+    ds = xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True)
+    try:
+        validate_component_anomalies(ds)
+    except Exception:
+        ds.close()
+        raise
+    return ds

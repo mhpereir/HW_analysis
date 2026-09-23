@@ -51,6 +51,16 @@ PRESENTATION_EVENT_ALPHA = 0.9
 BUDGET_REFERENCE_CAPTION = (
     r"Lower-panel lines: $I_{dyn,net}+I_{diabatic}=I_{dT/dt}$ (K)"
 )
+ANOMALY_BUDGET_REFERENCE_CAPTION = (
+    r"Lower-panel lines: $I'_{dyn,net}+I'_{diabatic}=I'_{dT/dt}$ (K)"
+)
+HEAT_BUDGET_ANOMALY_LABELS = {
+    "I_advection_pre": r"$I'_{advective}$ (K)",
+    "I_adiabatic_pre": r"$I'_{adiabatic}$ (K)",
+    "I_dyn_pre": r"$I'_{dyn,net}$ (K)",
+    "I_dTdt_pre": r"$I'_{dT/dt}$ (K)",
+    "I_diabatic_pre": r"$I'_{diabatic}$ (K)",
+}
 THREE_PANEL_STACK_ASPECT = 0.62
 SQUARE_PANEL_ASPECT = 0.95
 

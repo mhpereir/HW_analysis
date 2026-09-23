@@ -63,6 +63,14 @@ figure entrypoints.
 
 ## Required behavior
 
+The event-versus-clean-baseline comparison also consumes the saved
+[component-anomaly products](../products/stage2_component_anomalies.md).
+Both inputs must use the same representation, region, pressure layer, window
+and climatological reference. Anomaly figures label all heating integrals with
+primes and identify the reference period; lower-panel diagonals represent the
+anomalous total. Peak-TAS coloring and accepted population membership are
+unchanged. Absolute inputs retain their existing rendering.
+
 The integration-window rank figure follows the
 [heating-rank product contract](../products/integration_window_ranks.md).
 It reads saved comparisons, uses `HEATING_RANK_STYLES`, displays one regional

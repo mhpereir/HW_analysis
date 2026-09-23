@@ -7,7 +7,8 @@ heating rank at every integer integration length from 4 through 31 days. It
 consumes accepted Stage-1, regional hourly climatology and 4-day Stage-2 event
 products. It does not redefine heatwaves, change Stage-2 features, or require
 new baseline-day tables. The previously accepted 4/7/14/21-day products remain
-unchanged. Component-wise anomaly integrals are a separate future analysis.
+unchanged. Component-wise anomaly integrals are a [separate derived Stage-2
+analysis](stage2_component_anomalies.md).
 
 The first production comparison uses `pnw_bartusek` and `pnw_hotz`, TAS q90,
 surface to 700 hPa, full JJA events, and the fixed 1940-2024 climatology. The
