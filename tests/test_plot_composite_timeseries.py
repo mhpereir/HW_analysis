@@ -266,6 +266,16 @@ def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
     assert captured["plot_kwargs"]["smoothed_variables"] == (
         plot_composite_timeseries.EXTENDED_SMOOTHED_VARIABLES
     )
+    selected = set(captured["composite_kwargs"]["variables"])
+    smoothed = set(captured["plot_kwargs"]["smoothed_variables"])
+    assert selected.isdisjoint({"volume", "slhf_heating_rate_approx"})
+    assert {
+        "T_mean",
+        "cloud_cover",
+        "soil_moisture",
+        "sshf_heating_rate_approx",
+    } <= smoothed
+    assert smoothed == selected - {"lwa_a_region", "lwa_c_region"}
     assert captured["plot_kwargs"]["plot_extended_variables"]
 
 

@@ -43,14 +43,7 @@ TOP_EVENT_VARIABLES: tuple[str, ...] = (
     "lwa_a_region",
     "lwa_c_region",
 )
-EXTENDED_TOP_EVENT_VARIABLES: tuple[str, ...] = TOP_EVENT_VARIABLES + (
-    "nslr_heating_rate_approx",
-    "nssr_heating_rate_approx",
-    "sshf_heating_rate_approx",
-    "slhf_heating_rate_approx",
-    "soil_moisture",
-    "cloud_cover",
-)
+EXTENDED_TOP_EVENT_VARIABLES = plotting.EXTENDED_PLOT_VARIABLES
 PRESENTATION_TOP_EVENT_VARIABLES = plotting.PRESENTATION_PLOT_VARIABLES
 SMOOTHED_TOP_EVENT_VARIABLES: tuple[str, ...] = (
     "T_mean",
@@ -60,17 +53,7 @@ SMOOTHED_TOP_EVENT_VARIABLES: tuple[str, ...] = (
     "adiabatic",
     "diabatic",
 )
-EXTENDED_SMOOTHED_TOP_EVENT_VARIABLES: tuple[str, ...] = (
-    SMOOTHED_TOP_EVENT_VARIABLES
-    + (
-        "nslr_heating_rate_approx",
-        "nssr_heating_rate_approx",
-        "sshf_heating_rate_approx",
-        "slhf_heating_rate_approx",
-        "soil_moisture",
-        "cloud_cover",
-    )
-)
+EXTENDED_SMOOTHED_TOP_EVENT_VARIABLES = plotting.EXTENDED_SMOOTHED_VARIABLES
 PRESENTATION_SMOOTHED_TOP_EVENT_VARIABLES: tuple[str, ...] = (
     "T_mean",
     "dTdt",

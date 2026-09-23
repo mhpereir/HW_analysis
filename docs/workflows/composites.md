@@ -81,6 +81,12 @@ The six temporal plotting Venus schedulers expose the same choice through
 production figures. Set `PLOT_LAYOUT=presentation` to pass the six-panel
 layout without the mutually exclusive extended-panel flag.
 
+The shared [extended layout](plotting.md#extended-temporal-composite-layout)
+has ten panels with one y-axis each. It shows temperature without volume,
+separates cloud cover and soil moisture, and omits latent heating. Extended
+variable selection and smoothing follow these displayed quantities; existing
+Stage-1 and climatology products need no migration.
+
 The matched face-advection variant obtains matched membership from the
 canonical Stage-2 event-feature table and tracked matching settings. It then
 selects those event IDs from the absolute Stage-1 event table and verifies that
