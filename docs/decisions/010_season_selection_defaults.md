@@ -135,3 +135,8 @@ real-data Stage-2 endpoint membership, explicit full-event compatibility and
 inclusive 21-day May history for early-June anchors. Audit outputs are separate
 from production figures. Regeneration uses the existing top-event schedulers,
 unchanged inputs and layout, default season options and new output paths.
+The shared Venus environment's complete `pip check` output is retained as a
+diagnostic; project imports and the full regression suite are mandatory gates.
+An unrelated shared-environment dependency must not trigger an unreviewed
+environment change. The first attempt exposed the existing `wrf-python`
+Basemap dependency, neither of which is imported by this repository.
