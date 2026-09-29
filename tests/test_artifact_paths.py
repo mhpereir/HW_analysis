@@ -26,9 +26,13 @@ ACTIVE_SCHEDULERS = sorted(
 
 
 def _env(tmp_path, **overrides):
-    env = os.environ.copy()
-    for name in ("PROJECT_ROOT", "REPO_ROOT", "LOG_DIR", "EXPECTED_COMMIT"):
-        env.pop(name, None)
+    # PBS exports production routing variables. Synthetic subprocesses must
+    # receive only their explicit fixture configuration, even inside a job.
+    env = {
+        name: os.environ[name]
+        for name in ("PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "LD_LIBRARY_PATH")
+        if name in os.environ
+    }
     env.update(
         HWA_ARTIFACT_ROOT=str(tmp_path / "artifacts"),
         HWA_LOG_ROOT=str(tmp_path / "logs"),
@@ -301,7 +305,9 @@ def test_active_python_entrypoints_have_no_checkout_results_defaults():
                 ), path
 
 
-def test_array_dry_run_forwards_paths_and_commit_without_writes(tmp_path):
+def test_array_dry_run_forwards_paths_and_commit_without_writes(monkeypatch, tmp_path):
+    monkeypatch.setenv("OUTPUT_DIR", "/inherited/campaign/output")
+    monkeypatch.setenv("LOG_DIR", "/inherited/campaign/logs")
     script = REPO_ROOT / "schedulers/submit_era5_daily_spatial_array.sh"
     result = subprocess.run(
         [

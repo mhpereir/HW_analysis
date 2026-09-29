@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 
@@ -153,7 +154,7 @@ def test_daily_script_can_skip_existing_output(tmp_path):
     assert "daymean" not in result.stdout
 
 
-def test_array_submitter_builds_throttled_year_range():
+def test_array_submitter_builds_throttled_year_range(tmp_path):
     result = subprocess.run(
         [
             str(ARRAY_SUBMIT_SCRIPT),
@@ -168,6 +169,7 @@ def test_array_submitter_builds_throttled_year_range():
         check=True,
         capture_output=True,
         text=True,
+        env={"PATH": os.environ["PATH"], "HOME": str(tmp_path)},
     )
 
     assert "qsub -J 2000-2004%3" in result.stdout
