@@ -6,6 +6,8 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
@@ -82,6 +84,7 @@ echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v python scripts/plot_top_events_clim_anom.py \
+  "${season_args[@]}" \
   --region "${REGION}" \
   --bottom-boundary "${BOTTOM_BOUNDARY}" \
   --top-boundary "${TOP_BOUNDARY}" \

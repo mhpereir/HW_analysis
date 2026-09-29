@@ -148,6 +148,7 @@ def test_write_top_event_plots_writes_raw_and_smoothed_figures_per_event(tmp_pat
         ds,
         selected,
         output_dir=tmp_path,
+        event_table=ds,
         window_days=0,
         smoothing_window=1,
     )
@@ -163,7 +164,7 @@ def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp
     ds = _make_plot_dataset()
     ds.attrs["data_representation"] = "climatological_anomaly"
     selected = plot_top_events.select_top_tas_events(ds, n=2)
-    event_table = xr.Dataset()
+    event_table = ds[["event_id", "peak_time"]]
     reference_composite = xr.Dataset()
     smoothed_reference_composite = xr.Dataset()
     captured = {
@@ -321,6 +322,7 @@ def test_write_top_event_plots_uses_extended_variables_when_requested(
         ds,
         selected,
         output_dir=tmp_path,
+        event_table=ds,
         window_days=1,
         plot_extended_variables=True,
     )
@@ -396,6 +398,7 @@ def test_write_top_event_plots_uses_presentation_variables_and_filenames(
         ds,
         selected,
         output_dir=tmp_path,
+        event_table=ds,
         window_days=1,
         smoothing_window=6,
         layout="presentation",

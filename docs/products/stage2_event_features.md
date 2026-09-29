@@ -47,6 +47,13 @@ series, and must not modify the Stage-1 product.
 
 ## Fixed Windows
 
+The default population uses JJA `peak_time` endpoints, with
+`require_full_event=0`. Detected events and integration windows may begin in
+May. `--all-seasons` preserves full-population analysis, and
+`--require-full-event` requests the historical stricter subset. Consumers must
+validate season metadata and dates; see
+[decision 010](../decisions/010_season_selection_defaults.md).
+
 Timestamp slices are inclusive. Current defaults are:
 
 | Window | Lags relative to `peak_time` |
@@ -145,6 +152,8 @@ adaptive_windows_used = 0
 all_seasons = 0 or 1
 season_months = comma-separated months or empty
 require_full_event = 0 or 1
+season_selection_rule = anchor_month or full_event or all_seasons
+season_anchor = peak_time
 dropped_boundary_events = integer count
 ```
 

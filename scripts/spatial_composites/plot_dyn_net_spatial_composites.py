@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src import plot_style
+from src import plot_style, season_selection
 from src.artifact_paths import artifact_root
 
 DEFAULT_INPUT_PATH = (
@@ -49,6 +49,7 @@ def parse_args() -> argparse.Namespace:
             "Plot event-relative daily T2m/Z500 composites by I_dyn_net sign."
         )
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument("--input-path", type=Path, default=DEFAULT_INPUT_PATH)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument(
@@ -70,7 +71,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional Z500 anomaly contour interval in metres.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -89,6 +90,9 @@ def main() -> int:
     validate_args(args)
     input_path = args.input_path.expanduser().resolve()
     with xr.open_dataset(input_path, engine="h5netcdf", decode_timedelta=True) as ds:
+        season_selection.validate_inherited_event_season(
+            ds, **season_selection.season_kwargs(args)
+        )
         fig = plot_spatial_composites(
             ds.load(),
             plot_lags=args.plot_lags,

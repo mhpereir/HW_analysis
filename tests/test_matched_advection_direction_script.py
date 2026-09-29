@@ -85,6 +85,82 @@ def test_matched_script_reads_canonical_idyn_without_reconstructing_components()
     assert "I_advection_pre" not in source
 
 
+def test_main_selects_complete_events_before_matching(monkeypatch, tmp_path):
+    stage1, anomaly_source, features = _make_inputs()
+    for ds in (stage1, features):
+        ds["start_time"] = ds.peak_time - np.timedelta64(1, "D")
+        ds["end_time"] = ds.peak_time + np.timedelta64(1, "D")
+        ds["start_time"] = xr.where(
+            ds.event_id == 11, np.datetime64("2000-05-30", "ns"), ds.start_time
+        )
+    features.attrs.update(all_seasons=0, season_months="6,7,8", require_full_event=0)
+    event_path = tmp_path / "features.nc"
+    features.to_netcdf(event_path, engine="h5netcdf")
+    stage1_path, climate_path = tmp_path / "stage1.nc", tmp_path / "climate.nc"
+    stage1_path.touch()
+    climate_path.touch()
+    monkeypatch.setattr(
+        matched_script.analysis_io, "open_harmonized_timeseries", lambda _: stage1
+    )
+    monkeypatch.setattr(
+        matched_script.analysis_io,
+        "open_regional_hourly_climatology",
+        lambda _: xr.Dataset(),
+    )
+    monkeypatch.setattr(
+        matched_script.climatology,
+        "apply_regional_hourly_climatology",
+        lambda *a, **kw: anomaly_source,
+    )
+    selected = []
+    original = matched_script.selectors.match_events_by_metric_sign
+
+    def capture(table, *args, **kwargs):
+        selected.extend(table.event_id.values.tolist())
+        return original(table, *args, **kwargs)
+
+    monkeypatch.setattr(
+        matched_script.selectors, "match_events_by_metric_sign", capture
+    )
+    monkeypatch.setattr(
+        matched_script.advection_direction_plotting,
+        "write_matched_advection_direction_exploration_plot",
+        lambda neg, pos, path: path,
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "matched",
+            "--region",
+            "pnw_bartusek",
+            "--bottom-boundary",
+            "surface",
+            "--top-boundary",
+            "700",
+            "--threshold-variable",
+            "tas",
+            "--quantile",
+            "90",
+            "--start-year",
+            "2000",
+            "--end-year",
+            "2000",
+            "--input-path",
+            str(stage1_path),
+            "--climatology-path",
+            str(climate_path),
+            "--event-features-path",
+            str(event_path),
+            "--output-path",
+            str(tmp_path / "matched.png"),
+            "--window-days",
+            "1",
+        ],
+    )
+    assert matched_script.main() == 0
+    assert set(selected) == set(features.event_id.values) - {11}
+
+
 def _make_inputs() -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
     feature_ids = np.array([14, 12, 11, 13, 25, 23, 21, 24, 22])
     stage1_ids = np.array([25, 11, 22, 14, 21, 13, 24, 12, 23])

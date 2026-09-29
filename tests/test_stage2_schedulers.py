@@ -54,12 +54,14 @@ def test_event_scheduler_preserves_canonical_pnw_selection():
     text = SCHEDULERS["event"].read_text()
 
     assert "hw_event_features_fixed_windows_${REGION}" in text
-    assert "--season-months 6 7 8" in text
-    assert "--require-full-event" in text
+    assert 'read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"' in text
+    assert '"${season_args[@]}"' in text
+    assert "--require-full-event" not in text
 
 
 def test_baseline_scheduler_preserves_canonical_pnw_selection():
     text = SCHEDULERS["baseline"].read_text()
 
     assert "non_event_day_features_fixed_windows_${REGION}" in text
-    assert "--season-months 6 7 8" in text
+    assert 'read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"' in text
+    assert '"${season_args[@]}"' in text

@@ -23,7 +23,15 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src import analysis_io, composites, plot_paths, plot_style, plotting, selectors
+from src import (
+    analysis_io,
+    composites,
+    plot_paths,
+    plot_style,
+    plotting,
+    season_selection,
+    selectors,
+)
 from src.artifact_paths import artifact_root
 
 PLOT_NAME = "top_events"
@@ -71,7 +79,7 @@ def parse_args() -> argparse.Namespace:
     )
     plot_paths.add_stage1_path_arguments(parser)
     add_top_event_plot_arguments(parser)
-    args = parser.parse_args()
+    args = season_selection.parse_args(parser)
     plot_name = _default_plot_name(args.layout)
     return plot_paths.finalize_stage1_plot_paths(
         args,
@@ -82,6 +90,7 @@ def parse_args() -> argparse.Namespace:
 
 def add_top_event_plot_arguments(parser: argparse.ArgumentParser) -> None:
     """Add output, ranking, window, smoothing, and layout arguments."""
+    season_selection.add_season_arguments(parser)
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -161,7 +170,7 @@ def describe_harmonized_dataset(ds: xr.Dataset) -> None:
 
 
 def select_top_tas_events(ds: xr.Dataset, *, n: int = DEFAULT_TOP_N) -> xr.Dataset:
-    """Select top heatwave events by peak regional tas."""
+    """Rank an already selected population by absolute peak regional TAS."""
     return selectors.select_top_n_events(
         ds,
         DEFAULT_RANK_METRIC,
@@ -176,18 +185,20 @@ def write_top_event_plots(
     selected_events: xr.Dataset,
     *,
     output_dir: Path,
-    event_table: xr.Dataset | None = None,
+    event_table: xr.Dataset,
     window_days: int = DEFAULT_WINDOW_DAYS,
     smoothing_window: int = DEFAULT_SMOOTHING_WINDOW,
     plot_extended_variables: bool = False,
     layout: str = plotting.PAPER_COMPOSITE_LAYOUT,
     filename_tag: str | None = None,
 ) -> list[Path]:
-    """Write raw and display-smoothed time-series figures per selected event."""
+    """Write event figures using an explicitly supplied reference population."""
     if window_days < 0:
         raise ValueError("window_days must be >= 0.")
     if smoothing_window < 1:
         raise ValueError("smoothing_window must be >= 1.")
+    if not np.isin(selected_events["event_id"], event_table["event_id"]).all():
+        raise ValueError("Selected top events must belong to the reference population.")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
@@ -205,8 +216,7 @@ def write_top_event_plots(
         "post_days": window_days,
         "event_percentiles": REFERENCE_EVENT_PERCENTILES,
     }
-    if event_table is not None:
-        reference_kwargs["event_table"] = event_table
+    reference_kwargs["event_table"] = event_table
     reference_composite = composites.all_event_peak_aligned_composite(
         ds,
         **reference_kwargs,
@@ -345,11 +355,15 @@ def main() -> int:
     ds = load_plot_inputs(args)
     try:
         describe_harmonized_dataset(ds)
-        selected_events = select_top_tas_events(ds, n=args.top_n)
+        event_table = season_selection.select_event_population(
+            ds, **season_selection.season_kwargs(args)
+        )
+        selected_events = select_top_tas_events(event_table, n=args.top_n)
         written = write_top_event_plots(
             ds,
             selected_events,
             output_dir=args.output_dir,
+            event_table=event_table,
             window_days=args.window_days,
             smoothing_window=args.smoothing_window,
             plot_extended_variables=args.plot_extended_variables,

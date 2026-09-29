@@ -7,6 +7,8 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
@@ -66,10 +68,9 @@ echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v python scripts/event_features/build_stage2_event_features.py \
+  "${season_args[@]}" \
     --input-path "${INPUT_PATH}" \
-    --output-path "${STAGED_OUTPUT_PATH}" \
-    --season-months 6 7 8 \
-    --require-full-event
+    --output-path "${STAGED_OUTPUT_PATH}"
 
 test -s "${STAGED_OUTPUT_PATH}"
 mv -n -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"

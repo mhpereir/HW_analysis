@@ -28,6 +28,7 @@ import numpy as np
 import xarray as xr
 
 from .artifact_paths import artifact_root
+from . import season_selection
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HARMONIZED_TIMESERIES_PATH = (
@@ -77,6 +78,26 @@ REQUIRED_STAGE1_V2_VARIABLES: frozenset[str] = frozenset(
         "advection_top",
     }
 )
+
+
+def open_stage2_features(
+    path: str | Path, *, expected_stage: str | None = None, **season_options: Any
+) -> xr.Dataset:
+    """Open a Stage-2 table and guard its seasonal population before use."""
+    ds = xr.open_dataset(
+        Path(path).expanduser().resolve(), engine="h5netcdf", decode_timedelta=True
+    )
+    try:
+        if (
+            expected_stage is not None
+            and ds.attrs.get("pipeline_stage") != expected_stage
+        ):
+            raise ValueError(f"Expected pipeline_stage={expected_stage!r}.")
+        season_selection.validate_stage2_season(ds, **season_options)
+    except Exception:
+        ds.close()
+        raise
+    return ds
 
 
 def default_harmonized_timeseries_path(

@@ -8,13 +8,11 @@ from HW_analysis.scripts.event_features import (
 )
 
 
-def test_parse_args_requires_explicit_baseline_universe(monkeypatch):
+def test_parse_args_defaults_to_jja_endpoints(monkeypatch):
     monkeypatch.setattr("sys.argv", ["build_stage2_baseline_features.py"])
-
-    with pytest.raises(SystemExit) as excinfo:
-        build_baseline.parse_args()
-
-    assert excinfo.value.code == 2
+    args = build_baseline.parse_args()
+    assert args.season_months == [6, 7, 8]
+    assert not args.all_seasons
 
 
 def test_parse_args_has_no_require_full_event_option(monkeypatch):

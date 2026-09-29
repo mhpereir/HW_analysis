@@ -212,6 +212,7 @@ the diagnostic they make rather than a product stage they produce.
 
 - [001: event-feature windows](decisions/001_event_feature_windows.md)
 - [004: baseline season and window boundaries](decisions/004_baseline_season_windows.md)
+- [010: seasonal analysis defaults and consumer guards](decisions/010_season_selection_defaults.md)
 - [005: Stage-1 event peak semantics](decisions/005_stage1_event_peak_semantics.md)
 - [006: regional hourly climatology baseline](decisions/006_regional_hourly_climatology.md)
 - [007: in-memory I_dyn sign matching](decisions/007_idyn_sign_matching.md)

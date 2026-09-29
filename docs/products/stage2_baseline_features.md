@@ -87,6 +87,10 @@ Season selection applies to `reference_time` only. Fixed windows use the
 complete Stage-1 time axis and may cross selected-season boundaries; see
 [decision 004](../decisions/004_baseline_season_windows.md).
 
+JJA reference times are the default. `--all-seasons` explicitly restores the
+full saved population. Consumers validate both metadata and actual reference
+dates, as described in [decision 010](../decisions/010_season_selection_defaults.md).
+
 ## Event-only Variables
 
 Event-summary reductions remain event-only and are intentionally absent:
@@ -115,6 +119,10 @@ Global attrs include:
 
 ```text
 pipeline_stage = "stage_2_baseline_features"
+all_seasons = 0 or 1
+season_months = comma-separated months or empty
+season_selection_rule = anchor_month or all_seasons
+season_anchor = reference_time
 feature_method = "fixed_windows_relative_to_reference_time"
 event_id_source = ...
 baseline_definition = ...

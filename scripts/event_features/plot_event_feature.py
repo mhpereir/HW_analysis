@@ -19,13 +19,13 @@ import matplotlib
 import numpy as np
 import xarray as xr
 
+from src import analysis_io, plot_style, season_selection
 from src.artifact_paths import artifact_root
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-from src import plot_style
 
 REGION = "pnw_bartusek"
 
@@ -109,6 +109,7 @@ def parse_args() -> argparse.Namespace:
             "change from an event-feature table."
         )
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument(
         "--input-path",
         type=Path,
@@ -139,7 +140,7 @@ def parse_args() -> argparse.Namespace:
         default=0.75,
         help="Scatter marker opacity.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -155,7 +156,9 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
 
-    features = open_event_features(args.input_path)
+    features = open_event_features(
+        args.input_path, **season_selection.season_kwargs(args)
+    )
     try:
         written = write_tendency_scatter_plot(
             features,
@@ -180,10 +183,11 @@ def main() -> int:
     return 0
 
 
-def open_event_features(path: str | Path) -> xr.Dataset:
-    """Open an event-feature NetCDF table."""
-    input_path = Path(path).expanduser().resolve()
-    return xr.open_dataset(input_path, engine="h5netcdf", decode_timedelta=True)
+def open_event_features(path: str | Path, **season_options) -> xr.Dataset:
+    """Open a Stage-2 event table with validated seasonal membership."""
+    return analysis_io.open_stage2_features(
+        path, expected_stage="stage_2_event_features", **season_options
+    )
 
 
 def write_tendency_scatter_plot(

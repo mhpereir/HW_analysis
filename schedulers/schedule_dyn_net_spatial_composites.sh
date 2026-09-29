@@ -5,6 +5,8 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
 source "${PROJECT_ROOT}/config/artifact_paths.sh"
@@ -37,11 +39,13 @@ mamba activate "${VENUS_MAMBA_ENV:-dev_env}"
 cd "${PROJECT_ROOT}"
 echo "[info] $(date -Is) starting daily dynamical-sign composites on $(hostname)"
 /usr/bin/time -v python scripts/spatial_composites/build_dyn_net_spatial_composites.py \
+  "${season_args[@]}" \
     --event-features-path "${EVENT_FEATURES_PATH}" \
     --daily-dir "${DAILY_DIR}" \
     --climatology-path "${CLIMATOLOGY_PATH}" \
     --output-path "${COMPOSITE_OUTPUT_PATH}"
 /usr/bin/time -v python scripts/spatial_composites/plot_dyn_net_spatial_composites.py \
+    "${season_args[@]}" \
     --input-path "${COMPOSITE_OUTPUT_PATH}" \
     --output-path "${FIGURE_OUTPUT_PATH}"
 test -s "${COMPOSITE_OUTPUT_PATH}"

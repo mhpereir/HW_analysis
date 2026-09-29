@@ -16,7 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src import config
+from src import analysis_io, config, season_selection
 from src.artifact_paths import artifact_root
 
 DEFAULT_EVENT_FEATURES_PATH = (
@@ -58,6 +58,7 @@ def parse_args() -> argparse.Namespace:
             "negative event I_dyn_net populations."
         )
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument(
         "--event-features-path",
         type=Path,
@@ -91,7 +92,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Replace an existing composite product.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -115,10 +116,10 @@ def main() -> int:
     validate_args(args)
 
     event_path = args.event_features_path.expanduser().resolve()
-    with xr.open_dataset(
+    with analysis_io.open_stage2_features(
         event_path,
-        engine="h5netcdf",
-        decode_timedelta=True,
+        expected_stage="stage_2_event_features",
+        **season_selection.season_kwargs(args),
     ) as features:
         events = prepare_events(features.load())
 
@@ -294,6 +295,13 @@ def build_spatial_composites(
         }
     )
     copy_event_audit_variables(out, events)
+    out.attrs.update(
+        {
+            name: events.attrs[name]
+            for name in season_selection.SEASON_ATTRS
+            if name in events.attrs
+        }
+    )
     out.attrs.update(
         {
             "pipeline_stage": "daily_dyn_net_spatial_composites",
@@ -574,7 +582,7 @@ def copy_event_audit_variables(out: xr.Dataset, events: xr.Dataset) -> None:
         "I_dyn_net",
         "event_dyn_sign",
     )
-    optional = ("matched_pair_id", "matched_pair_distance")
+    optional = ("start_time", "end_time", "matched_pair_id", "matched_pair_distance")
     audit_names = required + tuple(name for name in optional if name in events)
     for name in audit_names:
         out[name] = events[name]

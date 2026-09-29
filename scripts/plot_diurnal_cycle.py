@@ -69,7 +69,7 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         default=list(DEFAULT_SEASON_MONTHS),
         metavar="MONTH",
-        help="Local-time calendar months to retain, default: 6 7 8.",
+        help="Native-timestamp calendar months to retain before local-hour grouping (default: 6 7 8).",
     )
     parser.add_argument(
         "--local-utc-offset-hours",
@@ -139,7 +139,9 @@ def build_diurnal_composite(
         selected = source.where(mask, drop=True)
         sample_count = int(selected.sizes.get(time_dim, 0))
         if sample_count == 0:
-            raise ValueError(f"No {label.lower()} samples remain after local-season filtering.")
+            raise ValueError(
+                f"No {label.lower()} samples remain after native-month filtering."
+            )
         class_composites.append(
             _build_one_class_diurnal_composite(
                 selected,
@@ -167,6 +169,7 @@ def build_diurnal_composite(
         {
             "composite_reduction": "mean by local hour and heatwave class",
             "season_months": " ".join(str(month) for month in months),
+            "season_time_basis": "native Stage-1 timestamps before local-hour grouping",
             "local_utc_offset_hours": int(offset),
             "local_timezone_label": _utc_offset_label(offset),
             "sample_percentiles": ", ".join(str(float(q)) for q in qs),

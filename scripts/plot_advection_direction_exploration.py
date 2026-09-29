@@ -19,6 +19,7 @@ from src import (
     composites,
     data_io,
     plot_paths,
+    season_selection,
     selectors,
 )
 
@@ -32,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot peak-aligned face and grouped advection tendencies."
     )
+    season_selection.add_season_arguments(parser, default_full_event=True)
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(
         "--output-path",
@@ -46,24 +48,11 @@ def parse_args() -> argparse.Namespace:
         help="Number of complete days on each side of event peak time.",
     )
     parser.add_argument(
-        "--season-months",
-        type=int,
-        nargs="+",
-        default=None,
-        metavar="MONTH",
-        help="Optional calendar months to retain, e.g. 6 7 8.",
-    )
-    parser.add_argument(
-        "--require-full-event",
-        action="store_true",
-        help="Require complete event intervals within --season-months.",
-    )
-    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Allow replacement of an existing standalone exploration PNG.",
     )
-    args = parser.parse_args()
+    args = season_selection.parse_args(parser)
     try:
         return finalize_args(args)
     except ValueError as exc:

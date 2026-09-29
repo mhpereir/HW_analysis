@@ -62,6 +62,12 @@ behavior and compatibility requirements are documented.
 
 ## Active system at a glance
 
+Seasonal analysis defaults and their regression safeguards are specified in
+[decision 010](decisions/010_season_selection_defaults.md): Stage-1 population
+plots use complete JJA events; Stage-2 tables use JJA integration endpoints
+while retaining the complete antecedent history. Consumers validate membership
+before plotting. Explicit all-season analysis remains available.
+
 The repository has two active data paths.
 
 ### Regional analysis products

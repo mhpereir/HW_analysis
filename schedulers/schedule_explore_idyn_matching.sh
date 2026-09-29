@@ -6,6 +6,8 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
@@ -68,6 +70,7 @@ echo "[info] started=$(date -Is)"
 mkdir -p "${STAGED_OUTPUT_DIR}"
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v python scripts/idyn_matching_exploration/explore_idyn_matching.py \
+  "${season_args[@]}" \
     --input-path "${INPUT_PATH}" \
     --settings-path "${SETTINGS_PATH}" \
     --output-dir "${STAGED_OUTPUT_DIR}"

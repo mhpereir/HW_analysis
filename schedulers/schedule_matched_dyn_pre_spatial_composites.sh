@@ -6,6 +6,8 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
@@ -83,6 +85,7 @@ echo "[info] started=$(date -Is)"
 
 /usr/bin/time -v python \
     scripts/spatial_composites/build_matched_dyn_pre_spatial_composites.py \
+    "${season_args[@]}" \
     --event-features-path "${EVENT_FEATURES_PATH}" \
     --daily-dir "${DAILY_DIR}" \
     --climatology-path "${CLIMATOLOGY_PATH}" \
@@ -92,6 +95,7 @@ echo "[info] started=$(date -Is)"
 
 /usr/bin/time -v python \
     scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py \
+    "${season_args[@]}" \
     --input-path "${STAGED_COMPOSITE}" \
     --output-path "${STAGED_FIGURE}" \
     --matching-specification "${MATCHING_SPECIFICATION}" \

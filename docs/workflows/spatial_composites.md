@@ -1,5 +1,12 @@
 # Workflow: Spatial Composites
 
+Season selection follows [decision 010](../decisions/010_season_selection_defaults.md).
+Builders guard their Stage-2 inputs, defaulting to JJA peak endpoints. They
+retain season metadata and event audit timestamps in the averaged product;
+plotting entrypoints check these before rendering. Old spatial products without
+this provenance must be rebuilt from a validated Stage-2 table. An averaged
+all-season field cannot be converted to JJA by filtering its event audit rows.
+
 ## Purpose
 
 The spatial-composite workflow shows daily evolution of ERA5 2 m temperature

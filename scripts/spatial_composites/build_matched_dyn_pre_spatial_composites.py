@@ -20,7 +20,7 @@ from scripts.idyn_matching_exploration import matching_settings
 from scripts.spatial_composites import (
     build_dyn_net_spatial_composites as spatial_builder,
 )
-from src import selectors
+from src import analysis_io, season_selection, selectors
 from src.artifact_paths import artifact_root
 
 DEFAULT_EVENT_FEATURES_PATH = spatial_builder.DEFAULT_EVENT_FEATURES_PATH
@@ -58,6 +58,7 @@ def parse_args() -> argparse.Namespace:
             "I_dyn_pre populations."
         )
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument(
         "--event-features-path",
         type=Path,
@@ -114,7 +115,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Replace an existing matched composite product.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -151,22 +152,11 @@ def validate_args(args: argparse.Namespace) -> None:
         )
 
 
-def open_event_features(path: str | Path) -> xr.Dataset:
-    """Open and validate the canonical Stage-2 event-feature product."""
-    input_path = Path(path).expanduser().resolve()
-    ds = xr.open_dataset(
-        input_path,
-        engine="h5netcdf",
-        decode_timedelta=True,
+def open_event_features(path: str | Path, **season_options) -> xr.Dataset:
+    """Open a Stage-2 event table with validated seasonal membership."""
+    return analysis_io.open_stage2_features(
+        path, expected_stage="stage_2_event_features", **season_options
     )
-    if ds.attrs.get("pipeline_stage") != EXPECTED_EVENT_FEATURE_STAGE:
-        actual = ds.attrs.get("pipeline_stage")
-        ds.close()
-        raise ValueError(
-            "Expected Stage-2 event features with "
-            f"pipeline_stage={EXPECTED_EVENT_FEATURE_STAGE!r}; got {actual!r}."
-        )
-    return ds
 
 
 def prepare_matched_events(
@@ -365,7 +355,7 @@ def main() -> int:
         args.matching_settings_path
     )
     event_features_sha256 = sha256_file(event_path)
-    features = open_event_features(event_path)
+    features = open_event_features(event_path, **season_selection.season_kwargs(args))
     try:
         composite, selected = build_matched_spatial_composites(
             features.load(),
