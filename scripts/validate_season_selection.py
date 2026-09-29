@@ -271,7 +271,9 @@ def main() -> int:
                     source, n=10
                 ).event_id.values.tolist(),
                 "ranked_peak_times": ranked.peak_time.values.astype(str).tolist(),
-                "stage1_contract_version": source.attrs.get("stage1_contract_version"),
+                "stage1_contract_version": int(
+                    source.attrs.get("stage1_contract_version", 1)
+                ),
                 "time_samples": source.sizes["time"],
                 "input_hashes_verified": True,
             }

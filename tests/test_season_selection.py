@@ -2,6 +2,7 @@
 
 import argparse
 import importlib
+import json
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -125,6 +126,37 @@ def test_production_audit_checks_boundary_membership_and_restores_windows(tmp_pa
     assert audit.event_builder.fixed.config.WINDOWS == original_windows
     with analysis_io.open_stage2_features(tmp_path / "stage2_events_21day.nc") as ds:
         assert ds.event_id.values.tolist() == [2, 3, 4, 5]
+
+
+def test_production_audit_writes_decoded_netcdf_metadata(monkeypatch, tmp_path):
+    from HW_analysis.scripts import validate_season_selection as audit
+
+    source = seasonal_source()
+    source.attrs["stage1_contract_version"] = np.int64(1)
+    monkeypatch.setattr(audit, "artifact_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        audit.analysis_io, "open_harmonized_timeseries", lambda _: source
+    )
+    monkeypatch.setattr(
+        audit, "audit_reference", lambda *args: {"ranked_event_ids": [4, 3]}
+    )
+    inputs = {}
+    for name in ("input", "climatology"):
+        path = tmp_path / f"{name}.nc"
+        path.write_bytes(b"synthetic IO fixture; loader is patched")
+        inputs[name] = str(path)
+        inputs[f"{name}_sha256"] = audit.sha256(path)
+    manifest = tmp_path / "inputs.json"
+    manifest.write_text(json.dumps({"regions": {"alaska": inputs}}))
+    output = tmp_path / "audit"
+    monkeypatch.setattr(
+        "sys.argv", ["audit", "--manifest", str(manifest), "--output-dir", str(output)]
+    )
+    assert audit.main() == 0
+    report = json.loads((output / "validation.json").read_text())
+    assert report["passed"]
+    assert report["regions"]["alaska"]["stage1_contract_version"] == 1
+    assert report["regions"]["alaska"]["jja_full_events"] == 2
 
 
 @pytest.mark.parametrize("anomaly", [False, True])
