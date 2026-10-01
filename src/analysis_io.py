@@ -131,10 +131,7 @@ def default_harmonized_timeseries_path(
         str(start_year),
         str(end_year),
     )
-    filename = (
-        "harmonized_regional_timeseries_"
-        f"{'_'.join(run_tokens)}.nc"
-    )
+    filename = f"harmonized_regional_timeseries_{'_'.join(run_tokens)}.nc"
     return DEFAULT_STAGE1_OUTPUT_DIR / filename
 
 
@@ -233,8 +230,7 @@ def _validate_harmonized_timeseries(ds: xr.Dataset) -> None:
     missing = sorted(REQUIRED_HARMONIZED_VARIABLES.difference(ds.data_vars))
     if missing:
         raise ValueError(
-            "Harmonized dataset is missing required variables: "
-            f"{', '.join(missing)}."
+            f"Harmonized dataset is missing required variables: {', '.join(missing)}."
         )
 
     contract_version = int(ds.attrs.get("stage1_contract_version", 1))
@@ -284,14 +280,31 @@ def _prepare_for_netcdf(ds: xr.Dataset) -> xr.Dataset:
     return out
 
 
-def _write_netcdf_atomically(ds: xr.Dataset, output_path: Path) -> None:
+def save_diurnal_composite(ds: xr.Dataset, path: str | Path) -> Path:
+    """Save plotted hourly statistics to a new, atomically published NetCDF."""
+    if not {"hw_class", "local_hour", "quantile"}.issubset(ds.dims):
+        raise ValueError(
+            "Diurnal composite requires hw_class, local_hour and quantile dimensions."
+        )
+    output_path = Path(path).expanduser().absolute()
+    if output_path.exists() or output_path.is_symlink():
+        raise FileExistsError(f"Output already exists: {output_path}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_netcdf_atomically(_prepare_for_netcdf(ds), output_path, overwrite=False)
+    return output_path
+
+
+def _write_netcdf_atomically(
+    ds: xr.Dataset, output_path: Path, *, overwrite: bool = True
+) -> None:
     """Write beside the destination and publish only a complete NetCDF file."""
-    temporary_path = output_path.with_name(
-        f".{output_path.name}.{uuid4().hex}.partial"
-    )
+    temporary_path = output_path.with_name(f".{output_path.name}.{uuid4().hex}.partial")
     try:
         ds.to_netcdf(temporary_path, engine="h5netcdf")
-        os.replace(temporary_path, output_path)
+        if overwrite:
+            os.replace(temporary_path, output_path)
+        else:
+            os.link(temporary_path, output_path)
     finally:
         temporary_path.unlink(missing_ok=True)
 

@@ -46,6 +46,8 @@ require explicit `INPUT_PATH` and `OUTPUT_PATH` (or threshold `OUTPUT_DIR`),
 and the combined spatial job requires `COMPOSITE_OUTPUT_PATH` and
 `FIGURE_OUTPUT_PATH`. The older q75 split wrapper also requires `INPUT_PATH`.
 Their former implicit overwrite behavior is not retained.
+The [GMT diurnal workflow](diurnal_cycle.md) also requires a fresh
+`COMPOSITE_OUTPUT_PATH` for the numerical values and sample counts.
 The Stage-1 and region-inventory schedulers also reject existing outputs.
 Existing builder publication checks remain in force; do not infer a product's
 generating commit from the current code checkout. Record exact input/output

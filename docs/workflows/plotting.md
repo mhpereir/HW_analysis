@@ -60,6 +60,9 @@ $HWA_ARTIFACT_ROOT/plots_<plot_name>/
 Scripts under `scripts/event_features/old/` are legacy and are not active
 figure entrypoints.
 
+For GMT hour grouping, pressure-layer inputs, sample counts and numerical
+companions, follow the [diurnal-cycle workflow](diurnal_cycle.md).
+
 ## Required behavior
 
 - Use the non-interactive Matplotlib `Agg` backend for batch rendering.

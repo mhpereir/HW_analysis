@@ -10,13 +10,20 @@ from HW_analysis.src import analysis_io
 from HW_analysis.src.artifact_paths import artifact_root
 
 RUN_ARGS = [
-    "--region", "pnw_hotz",
-    "--bottom-boundary", "surface",
-    "--top-boundary", "700",
-    "--threshold-variable", "tas",
-    "--quantile", "90",
-    "--start-year", "1940",
-    "--end-year", "2024",
+    "--region",
+    "pnw_hotz",
+    "--bottom-boundary",
+    "surface",
+    "--top-boundary",
+    "700",
+    "--threshold-variable",
+    "tas",
+    "--quantile",
+    "90",
+    "--start-year",
+    "1940",
+    "--end-year",
+    "2024",
 ]
 
 
@@ -44,10 +51,10 @@ def test_parse_args_builds_default_paths(monkeypatch):
         / "region_pnw_hotz"
         / "boundary_surface_700hPa"
         / "time_range_1940_2024"
-        / "hw_non_hw_diurnal_cycle_jja_local.png"
+        / "hw_non_hw_diurnal_cycle_jja_GMT.png"
     )
     assert args.season_months == [6, 7, 8]
-    assert args.local_utc_offset_hours == -7
+    assert args.local_utc_offset_hours == 0
 
 
 def test_parse_args_accepts_custom_options(monkeypatch, tmp_path):
@@ -57,15 +64,15 @@ def test_parse_args_accepts_custom_options(monkeypatch, tmp_path):
         "sys.argv",
         [
             *_argv(
-            "--input-path",
-            str(input_path),
-            "--output-path",
-            str(output_path),
-            "--season-months",
-            "7",
-            "8",
-            "--local-utc-offset-hours",
-            "-8",
+                "--input-path",
+                str(input_path),
+                "--output-path",
+                str(output_path),
+                "--season-months",
+                "7",
+                "8",
+                "--local-utc-offset-hours",
+                "-8",
             ),
         ],
     )
@@ -170,22 +177,22 @@ def test_write_diurnal_cycle_plot_writes_png_and_plot_draws_iqr_lines(tmp_path):
         local_utc_offset_hours=-7,
     )
 
-    path = plot_diurnal_cycle.write_diurnal_cycle_plot(composite, tmp_path / "diurnal.png")
+    path = plot_diurnal_cycle.write_diurnal_cycle_plot(
+        composite, tmp_path / "diurnal.png"
+    )
     fig = plot_diurnal_cycle.plot_diurnal_cycle(composite)
     try:
         assert path.exists()
         assert path.name == "diurnal.png"
-        assert any(
-            line.get_alpha() == 0.28
-            for ax in fig.axes
-            for line in ax.lines
-        )
+        assert any(line.get_alpha() == 0.28 for ax in fig.axes for line in ax.lines)
         assert fig.axes[4].get_legend().get_texts()[-1].get_text() == "IQR bounds"
     finally:
         plt.close(fig)
 
 
-def test_main_orchestrates_open_composite_write_and_close(monkeypatch, tmp_path, capsys):
+def test_main_orchestrates_open_composite_write_and_close(
+    monkeypatch, tmp_path, capsys
+):
     input_path = tmp_path / "stage1.nc"
     output_path = tmp_path / "diurnal.png"
     opened = _ClosableDataset()
@@ -210,14 +217,14 @@ def test_main_orchestrates_open_composite_write_and_close(monkeypatch, tmp_path,
         "sys.argv",
         [
             *_argv(
-            "--input-path",
-            str(input_path),
-            "--output-path",
-            str(output_path),
-            "--season-months",
-            "6",
-            "--local-utc-offset-hours",
-            "-7",
+                "--input-path",
+                str(input_path),
+                "--output-path",
+                str(output_path),
+                "--season-months",
+                "6",
+                "--local-utc-offset-hours",
+                "-7",
             ),
         ],
     )
@@ -241,7 +248,7 @@ def test_main_orchestrates_open_composite_write_and_close(monkeypatch, tmp_path,
     }
     assert captured["plot_ds"] is composite
     assert captured["output_path"] == output_path
-    assert "Wrote HW/non-HW local diurnal-cycle figure:" in capsys.readouterr().out
+    assert "Wrote HW/non-HW diurnal-cycle figure:" in capsys.readouterr().out
 
 
 class _ClosableDataset:
@@ -255,7 +262,7 @@ class _ClosableDataset:
 def _make_diurnal_dataset() -> xr.Dataset:
     time = np.array(
         [
-            "2000-06-01T06:00",  # local May 31 23:00, excluded from JJA-local.
+            "2000-06-01T06:00",  # GMT June 1, retained even at local May 31 23:00.
             "2000-06-01T07:00",  # local Jun 01 00:00, non-HW.
             "2000-06-02T07:00",  # local Jun 02 00:00, non-HW.
             "2000-06-03T07:00",  # local Jun 03 00:00, HW.
@@ -267,8 +274,7 @@ def _make_diurnal_dataset() -> xr.Dataset:
     )
     values = np.array([999.0, 10.0, 14.0, 30.0, 34.0, 20.0, 40.0])
     data_vars = {
-        name: ("time", values.copy())
-        for name in plot_diurnal_cycle.DIURNAL_VARIABLES
+        name: ("time", values.copy()) for name in plot_diurnal_cycle.DIURNAL_VARIABLES
     }
     data_vars["hw_event_id"] = (
         "time",
@@ -279,3 +285,163 @@ def _make_diurnal_dataset() -> xr.Dataset:
         coords={"time": time},
         attrs={"region": "pnw_bartusek"},
     )
+
+
+def _make_gmt_dataset():
+    dates = np.array(
+        ["2000-05-31", "2000-06-01", "2000-06-02", "2000-08-31", "2000-09-01"],
+        dtype="datetime64[D]",
+    )
+    time = (dates[:, None] + np.arange(24).astype("timedelta64[h]")).ravel()
+    values = (100 * np.arange(5)[:, None] + np.arange(24)).ravel().astype(float)
+    ds = xr.Dataset(
+        {
+            name: ("time", values.copy())
+            for name in plot_diurnal_cycle.DIURNAL_VARIABLES
+        },
+        coords={"time": time},
+        attrs={
+            "region": "pnw_bartusek",
+            "threshold_variable": "tas",
+            "quantile": 90,
+            "heat_budget_bottom_boundary": "700hPa",
+            "heat_budget_top_boundary": "500hPa",
+            "start_year": 2000,
+            "end_year": 2000,
+        },
+    )
+    ds["hw_event_id"] = ("time", np.repeat([0, 7, 0, 8, 0], 24))
+    ds["diabatic"].attrs["units"] = "K hr-1"
+    return ds
+
+
+def test_gmt_jja_values_counts_and_layer_metadata():
+    ds = _make_gmt_dataset()
+    original = ds.copy(deep=True)
+    composite = plot_diurnal_cycle.build_diurnal_composite(ds)
+    hw = composite.sel(hw_class="Heatwave days")
+    non_hw = composite.sel(hw_class="Non-heatwave days")
+
+    assert composite.attrs["local_utc_offset_hours"] == 0
+    assert composite.attrs["season_time_basis"].startswith("native Stage-1")
+    assert composite.attrs["heat_budget_bottom_boundary"] == "700hPa"
+    assert composite.attrs["heat_budget_top_boundary"] == "500hPa"
+    np.testing.assert_array_equal(composite.class_sample_count, [48, 24])
+    np.testing.assert_array_equal(composite.class_day_count, [2, 1])
+    np.testing.assert_array_equal(hw.class_hour_sample_count, np.full(24, 2))
+    np.testing.assert_array_equal(non_hw.class_hour_sample_count, np.ones(24))
+    np.testing.assert_allclose(hw.diabatic, 200 + np.arange(24))
+    np.testing.assert_allclose(
+        hw.sample_percentile_diabatic.sel(local_hour=9), [159, 209, 259]
+    )
+    assert hw.diabatic.attrs["units"] == "K hr-1"
+    xr.testing.assert_identical(ds, original)
+
+
+def test_shift_only_permutes_hour_bins_without_reclassifying_days():
+    ds = _make_gmt_dataset()
+    gmt = plot_diurnal_cycle.build_diurnal_composite(ds)
+    shifted = plot_diurnal_cycle.build_diurnal_composite(ds, local_utc_offset_hours=-7)
+    for name in [*plot_diurnal_cycle.DIURNAL_VARIABLES, "class_hour_sample_count"]:
+        np.testing.assert_allclose(shifted[name], gmt[name].roll(local_hour=-7))
+    np.testing.assert_array_equal(shifted.class_day_count, gmt.class_day_count)
+    np.testing.assert_array_equal(shifted.class_sample_count, gmt.class_sample_count)
+
+
+def test_missing_data_counts_do_not_hide_partial_dates():
+    ds = _make_gmt_dataset()
+    ds["diabatic"].loc[{"time": np.datetime64("2000-06-01T09:00")}] = np.nan
+    # Lose an entire timestamp too: day totals must not be rounded down.
+    ds = ds.drop_sel(time=np.datetime64("2000-06-01T08:00"))
+    hw = plot_diurnal_cycle.build_diurnal_composite(ds).sel(hw_class="Heatwave days")
+    assert hw.class_day_count.item() == 2
+    assert hw.class_sample_count.item() == 47
+    assert hw.class_hour_sample_count.sel(local_hour=8).item() == 1
+    assert hw.class_hour_sample_count.sel(local_hour=9).item() == 2
+    assert hw.sample_count_diabatic.sel(local_hour=9).item() == 1
+    assert hw.diabatic.sel(local_hour=9).item() == 309
+
+
+def test_gmt_title_axis_and_fresh_output(tmp_path):
+    composite = plot_diurnal_cycle.build_diurnal_composite(_make_gmt_dataset())
+    fig = plot_diurnal_cycle.plot_diurnal_cycle(composite)
+    try:
+        assert fig.axes[3].get_xlabel() == "GMT hour (UTC+0)"
+        assert "700-500 hPa" in fig._suptitle.get_text()
+        assert "2000-2000" in fig._suptitle.get_text()
+        assert "HW days=2, non-HW days=1" in fig._suptitle.get_text()
+    finally:
+        plt.close(fig)
+    path = tmp_path / "existing.png"
+    path.write_bytes(b"preserved")
+    with pytest.raises(FileExistsError, match="already exists"):
+        plot_diurnal_cycle.write_diurnal_cycle_plot(composite, path)
+    assert path.read_bytes() == b"preserved"
+
+
+def test_netcdf_round_trip_and_no_overwrite(tmp_path):
+    composite = plot_diurnal_cycle.build_diurnal_composite(_make_gmt_dataset())
+    path = tmp_path / "diurnal.nc"
+    analysis_io.save_diurnal_composite(composite, path)
+    with xr.open_dataset(path, engine="h5netcdf") as saved:
+        xr.testing.assert_identical(saved, composite)
+    before = path.read_bytes()
+    with pytest.raises(FileExistsError, match="already exists"):
+        analysis_io.save_diurnal_composite(composite, path)
+    assert path.read_bytes() == before
+    assert not list(tmp_path.glob("*.partial"))
+
+
+def test_cli_saves_actual_source_hash(monkeypatch, tmp_path):
+    import hashlib
+
+    ds = _make_gmt_dataset()
+    ds.attrs.update(pipeline_stage=analysis_io.EXPECTED_PIPELINE_STAGE)
+    for name in analysis_io.REQUIRED_HARMONIZED_VARIABLES:
+        if name not in ds:
+            ds[name] = xr.zeros_like(ds["T_mean"])
+    source = tmp_path / "stage1.nc"
+    analysis_io.save_harmonized_timeseries(ds, source)
+    figure = tmp_path / "diurnal.png"
+    numerical = tmp_path / "diurnal.nc"
+    monkeypatch.setattr(
+        "sys.argv",
+        _argv(
+            "--input-path",
+            str(source),
+            "--output-path",
+            str(figure),
+            "--composite-output-path",
+            str(numerical),
+        ),
+    )
+    assert plot_diurnal_cycle.main() == 0
+    with xr.open_dataset(numerical, engine="h5netcdf") as saved:
+        assert saved.attrs["source_path"] == str(source.resolve())
+        assert (
+            saved.attrs["source_sha256"]
+            == hashlib.sha256(source.read_bytes()).hexdigest()
+        )
+        assert saved.attrs["heat_budget_bottom_boundary"] == "700hPa"
+        np.testing.assert_array_equal(saved.class_sample_count, [48, 24])
+    assert figure.is_file()
+
+
+def test_independent_validator_detects_wrong_statistics_and_membership():
+    from HW_analysis.src.diurnal_validation import validate_gmt_diurnal
+
+    ds = _make_gmt_dataset()
+    ds["dTdt"] = ds.advection + ds.adiabatic + ds.diabatic
+    composite = plot_diurnal_cycle.build_diurnal_composite(ds)
+    report = validate_gmt_diurnal(ds, composite)
+    assert report["status"] == "numerical_checks_passed"
+    assert report["jja_year_hour_counts"] == {"2000": 72}
+    assert report["maximum_closure_error_K_per_hour"] == 0
+    modified = composite.copy(deep=True)
+    modified["diabatic"][0, 9] += 0.1
+    with pytest.raises(AssertionError):
+        validate_gmt_diurnal(ds, modified)
+    modified = composite.copy(deep=True)
+    modified["class_hour_sample_count"][0, 9] -= 1
+    with pytest.raises(AssertionError):
+        validate_gmt_diurnal(ds, modified)
