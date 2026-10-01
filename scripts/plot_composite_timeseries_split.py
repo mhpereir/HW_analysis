@@ -14,7 +14,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src import analysis_io, composites, plot_paths, plotting, selectors
+from src import (
+    analysis_io,
+    composites,
+    plot_paths,
+    plotting,
+    season_selection,
+    selectors,
+)
 from src.artifact_paths import artifact_root
 
 PLOT_NAME = "composite_timeseries_split"
@@ -60,6 +67,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot peak-aligned composite time series for all HW events."
     )
+    season_selection.add_season_arguments(parser, default_full_event=True)
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(
         "--output-path",
@@ -101,19 +109,6 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--season-months",
-        type=int,
-        nargs="+",
-        default=None,
-        metavar="MONTH",
-        help="Optional calendar months to retain before compositing, e.g. 6 7 8.",
-    )
-    parser.add_argument(
-        "--require-full-event",
-        action="store_true",
-        help="Require the full event interval to fall within --season-months.",
-    )
-    parser.add_argument(
         "--plot-extended-variables",
         action="store_true",
         help="Plot optional extended diagnostics when present in the input dataset.",
@@ -124,7 +119,7 @@ def parse_args() -> argparse.Namespace:
         default=plotting.PAPER_COMPOSITE_LAYOUT,
         help="Figure layout. Presentation uses a widescreen six-panel grid.",
     )
-    args = parser.parse_args()
+    args = season_selection.parse_args(parser)
     plot_name, default_output_filename = _default_plot_destination(args.layout)
     return plot_paths.finalize_stage1_plot_paths(
         args,

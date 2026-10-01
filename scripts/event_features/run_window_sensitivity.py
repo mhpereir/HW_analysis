@@ -95,6 +95,7 @@ def main() -> int:
                 str(output),
                 "--layout",
                 layout,
+                "--require-full-event",
             ],
             check=True,
             cwd=REPO_ROOT,

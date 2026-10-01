@@ -27,6 +27,7 @@ from uuid import uuid4
 import numpy as np
 import xarray as xr
 
+from . import season_selection
 from .artifact_paths import artifact_root
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +78,37 @@ REQUIRED_STAGE1_V2_VARIABLES: frozenset[str] = frozenset(
         "advection_top",
     }
 )
+
+
+def open_stage2_features(
+    path: str | Path,
+    *,
+    expected_stage: str | tuple[str, ...] | None = None,
+    **season_options: Any,
+) -> xr.Dataset:
+    """Open a Stage-2 table and guard its seasonal population before use."""
+    ds = xr.open_dataset(
+        Path(path).expanduser().resolve(), engine="h5netcdf", decode_timedelta=True
+    )
+    try:
+        allowed_stages = (
+            (expected_stage,) if isinstance(expected_stage, str) else expected_stage
+        )
+        stage = ds.attrs.get("pipeline_stage")
+        if allowed_stages is not None and stage not in allowed_stages:
+            raise ValueError(f"Expected pipeline_stage={expected_stage!r}.")
+        if stage in {
+            "stage_2_event_component_anomalies",
+            "stage_2_baseline_component_anomalies",
+        }:
+            from .stage2_component_anomalies import validate_component_anomalies
+
+            validate_component_anomalies(ds)
+        season_selection.validate_stage2_season(ds, **season_options)
+    except Exception:
+        ds.close()
+        raise
+    return ds
 
 
 def default_harmonized_timeseries_path(

@@ -5,6 +5,8 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
 source "${PROJECT_ROOT}/config/artifact_paths.sh"
@@ -44,6 +46,7 @@ cd "${PROJECT_ROOT}/scripts"
 
 echo "[info] $(date -Is) starting event-versus-clean-baseline plot generation on host $(hostname)"
 /usr/bin/time -v python event_features/plot_adiabatic_diabatic_advection_baseline.py \
+  "${season_args[@]}" \
     --input-path "${INPUT_PATH}" \
     --event-input-path "${EVENT_INPUT_PATH}" \
     --output-path "${OUTPUT_PATH}" \

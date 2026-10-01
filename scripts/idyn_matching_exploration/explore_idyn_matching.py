@@ -28,7 +28,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.idyn_matching_exploration import matching_settings
-from src import plot_style, selectors
+from src import analysis_io, plot_style, season_selection, selectors
 from src.artifact_paths import artifact_root
 
 DEFAULT_INPUT_PATH = (
@@ -83,6 +83,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Explore matching positive and negative Stage-2 I_dyn_pre events."
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument(
         "--input-path",
         type=Path,
@@ -106,7 +107,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Replace existing exploratory figures.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -144,12 +145,10 @@ def artifact_paths(output_dir: str | Path) -> dict[str, Path]:
     return paths
 
 
-def open_event_features(path: str | Path) -> xr.Dataset:
-    input_path = Path(path).expanduser().resolve()
-    with xr.open_dataset(
-        input_path,
-        engine="h5netcdf",
-        decode_timedelta=True,
+def open_event_features(path: str | Path, **season_options) -> xr.Dataset:
+    """Open a Stage-2 event table with validated seasonal membership."""
+    with analysis_io.open_stage2_features(
+        path, expected_stage="stage_2_event_features", **season_options
     ) as ds:
         return ds.load()
 
@@ -916,7 +915,9 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
     settings = matching_settings.load_matching_settings(args.settings_path)
-    features = open_event_features(args.input_path)
+    features = open_event_features(
+        args.input_path, **season_selection.season_kwargs(args)
+    )
     exploration = prepare_exploration(features, settings=settings)
     written = write_figures(exploration, args.output_dir)
     summary = add_input_provenance(

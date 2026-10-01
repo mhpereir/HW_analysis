@@ -16,13 +16,12 @@ def test_config_uses_expected_default_windows():
     assert feature_config.WINDOWS["antecedent_state"] == (-168, -24)
 
 
-def test_parse_args_requires_explicit_event_universe(monkeypatch):
+def test_parse_args_defaults_to_jja_endpoints(monkeypatch):
     monkeypatch.setattr("sys.argv", ["build_stage2_event_features.py"])
-
-    with pytest.raises(SystemExit) as excinfo:
-        build_event_features.parse_args()
-
-    assert excinfo.value.code == 2
+    args = build_event_features.parse_args()
+    assert args.season_months == [6, 7, 8]
+    assert not args.all_seasons
+    assert not args.require_full_event
 
 
 def test_parse_args_accepts_all_seasons(monkeypatch, tmp_path):

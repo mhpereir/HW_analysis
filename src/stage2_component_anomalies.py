@@ -7,7 +7,7 @@ import pandas as pd
 import xarray as xr
 
 from scripts.event_features.fixed_window_features import WindowReducer
-from src import climatology
+from src import climatology, season_selection
 
 TENDENCIES = ("dTdt", "advection", "adiabatic", "diabatic")
 RAW_TO_ANOMALY = {
@@ -52,8 +52,7 @@ def _validate_reference(table: xr.Dataset, kind: str, hours: int) -> None:
             raise ValueError(f"Reference {kind} requires {key}={expected!r}.")
     if table.attrs.get("heat_budget_representation", "absolute") != "absolute":
         raise ValueError("The reference must be an accepted absolute Stage-2 table.")
-    if kind == "event" and int(table.attrs.get("require_full_event", 0)) != 1:
-        raise ValueError("The reference requires full JJA events.")
+    season_selection.validate_stage2_season(table, require_full_event=True)
     dim, anchor = (
         ("event", "peak_time")
         if kind == "event"
@@ -237,6 +236,7 @@ def validate_component_anomalies(table: xr.Dataset) -> None:
         raise ValueError(
             "Missing component-anomaly representation or contract version."
         )
+    season_selection.validate_stage2_season(table, require_full_event=True)
     if any(name in table for name in RAW_TO_ANOMALY):
         raise ValueError("Anomaly products must not contain raw budget features.")
     if any(key not in table.attrs for key in PAIR_METADATA):

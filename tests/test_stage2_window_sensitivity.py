@@ -1,14 +1,18 @@
 """Scientific regressions for independent per-run integration windows."""
 
+import json
+
 import numpy as np
 import pytest
 import xarray as xr
 
 from scripts.event_features import event_feature_config as config
+from scripts.event_features import run_window_sensitivity as runner
 from scripts.event_features.build_stage2_baseline_features import (
     build_baseline_features,
 )
 from scripts.event_features.build_stage2_event_features import build_event_features
+from src import analysis_io
 from src.stage2_validation import validate_core_pair
 
 
@@ -110,6 +114,54 @@ def test_resolved_windows_control_boundary_selection(source):
     assert long_events.attrs["dropped_boundary_events"] == 1
     assert long_base.attrs["dropped_boundary_days"] > 0
     validate_core_pair(clipped, long_events, long_base, 504)
+
+
+def test_runner_preserves_full_jja_cohort_through_plot_cli(
+    source, tmp_path, monkeypatch
+):
+    source["start_time"] = source.start_time.copy(deep=True)
+    source.start_time.values[0] = np.datetime64("2021-05-30", "ns")
+    source.hw_event_id.loc[{"time": slice("2021-05-30", "2021-05-31")}] = 1
+    # Generic endpoint selection includes the crossing event; this campaign must not.
+    assert build_event_features(source).event_id.values.tolist() == [1, 2, 3]
+    path = tmp_path / "source.nc"
+    source.to_netcdf(path, engine="h5netcdf")
+
+    # The small synthetic source omits unrelated Stage-1 diagnostics. The actual
+    # builders, independent validator, saved-table readers and plotting CLI run.
+    monkeypatch.setattr(
+        analysis_io,
+        "open_harmonized_timeseries",
+        lambda path: xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True),
+    )
+    monkeypatch.setenv("EXPECTED_COMMIT", "synthetic-test")
+    monkeypatch.setenv("PBS_JOBID", "synthetic-test")
+    output = tmp_path / "sensitivity"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_window_sensitivity",
+            "--input-path",
+            str(path),
+            "--integration-hours",
+            "504",
+            "--output-dir",
+            str(output),
+        ],
+    )
+    assert runner.main() == 0
+    with analysis_io.open_stage2_features(
+        output / "event_features.nc", require_full_event=True
+    ) as events:
+        np.testing.assert_array_equal(events.event_id, [2, 3])
+        assert events.attrs["season_selection_rule"] == "full_event"
+    manifest = json.loads((output / "manifest.json").read_text())
+    assert manifest["validation"]["event"]["rows"] == 2
+    assert manifest["windows"]["heat_budget_pre"] == [-504, 0]
+    for layout in ("full", "presentation"):
+        figure = output / f"event_vs_clean_baseline_{layout}.png"
+        assert figure.stat().st_size > 1000
+        assert runner.sha256(figure) == manifest["sha256"][figure.name]
 
 
 @pytest.mark.parametrize("hours", [0, -1, 1.5, True, "168"])

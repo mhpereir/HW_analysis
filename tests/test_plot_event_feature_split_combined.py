@@ -125,7 +125,12 @@ def test_main_writes_one_raw_combined_output(monkeypatch, tmp_path):
     output_path = tmp_path / "combined.png"
     written = []
 
-    def fake_open(path):
+    def fake_open(path, **season_options):
+        assert season_options == {
+            "season_months": [6, 7, 8],
+            "all_seasons": False,
+            "require_full_event": False,
+        }
         assert path == input_path
         return _make_feature_table()
 

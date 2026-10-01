@@ -68,8 +68,10 @@ def test_build_matched_spatial_composites_writes_separate_contract(tmp_path):
     )
     _write_spatial_file(climatology_path, year=2004)
 
+    features = _event_features()
+    features.attrs.update(all_seasons=0, season_months="6,7,8", require_full_event=0)
     output, selected = matched_builder.build_matched_spatial_composites(
-        _event_features(),
+        features,
         settings=matching_settings.load_matching_settings(),
         specification_id="peak_anomaly_0p20",
         daily_dir=daily_dir,
@@ -83,6 +85,8 @@ def test_build_matched_spatial_composites_writes_separate_contract(tmp_path):
 
     assert selected.match.pair_count == 4
     assert output.attrs["pipeline_stage"] == ("daily_matched_idyn_spatial_composites")
+    matched_builder.season_selection.validate_inherited_event_season(output)
+    assert output.attrs["season_months"] == "6,7,8"
     assert output.attrs["matching_specification"] == "peak_anomaly_0p20"
     assert output.attrs["matching_caliper_sd"] == 0.2
     assert output.attrs["matching_pair_count"] == 4

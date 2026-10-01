@@ -104,5 +104,9 @@ product/figure contract, recorded commit, and log location. Only then use that
 revision for subsequent scheduled tasks. Other unfinished branches must absorb
 this change and validate their branch-specific schedulers before production.
 
+Synthetic shell tests isolate their environment from the submitting PBS job's
+input/output routing. Path assertions compare normalized paths, including
+resolved symlinks, so local and Venus checks enforce the same storage contract.
+
 At branch/worktree retirement, retain artifacts and logs independently. The
 Git lifecycle and shared cleanup skill still govern removal of source paths.

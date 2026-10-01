@@ -32,6 +32,55 @@ def test_select_events_by_season_uses_peak_month_with_drop_true():
     assert out.attrs["n_selected_events"] == 3
 
 
+@pytest.mark.parametrize(
+    "selector,kwargs",
+    [
+        (selectors.select_events_by_season, {"season_months": list(range(1, 13))}),
+        (selectors.select_events_by_season, {"season_months": [6, 7, 8]}),
+        (selectors.select_events_by_season, {"season_months": [6], "drop": False}),
+        (
+            selectors.select_events_by_season,
+            {"season_months": [6, 7, 8], "require_full_event": True},
+        ),
+        (selectors.select_events_by_id, {"event_ids": [3, 1]}),
+        (selectors.select_top_n_events, {"metric": "tas_peak", "n": 2}),
+        (
+            selectors.select_events_by_metric,
+            {"metric": "tas_peak", "min_value": 0},
+        ),
+        (
+            selectors.select_event_quantile_bin,
+            {"metric": "tas_peak", "qmin": 0, "qmax": 0.5},
+        ),
+    ],
+)
+def test_selection_provenance_does_not_modify_source(selector, kwargs):
+    source = _make_event_table()
+    source.attrs["provenance"] = "accepted source"
+    original = source.copy(deep=True)
+    result = selector(source, **kwargs)
+    assert "selection_type" in result.attrs
+    xr.testing.assert_identical(source, original)
+
+
+@pytest.mark.parametrize(
+    "selector", [selectors.select_top_n_events, selectors.select_event_quantile_bin]
+)
+def test_empty_selection_preserves_source_provenance(selector):
+    source = _make_event_table()
+    source["tas_peak"][:] = np.nan
+    source.attrs["provenance"] = "accepted source"
+    original = source.copy(deep=True)
+    kwargs = (
+        {"n": 2}
+        if selector == selectors.select_top_n_events
+        else {"qmin": 0, "qmax": 0.5}
+    )
+    result = selector(source, "tas_peak", **kwargs)
+    assert result.sizes["event"] == 0
+    xr.testing.assert_identical(source, original)
+
+
 def test_select_events_by_season_drop_false_masks_only_event_variables():
     event_table = _make_event_table()
 

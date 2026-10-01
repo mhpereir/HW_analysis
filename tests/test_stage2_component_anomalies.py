@@ -14,6 +14,9 @@ import pytest
 import xarray as xr
 
 from scripts.event_features import event_feature_config as config
+from scripts.event_features import (
+    plot_adiabatic_advection_comparison_baseline as comparison_cli,
+)
 from scripts.event_features.build_stage2_baseline_features import (
     build_baseline_features,
 )
@@ -154,6 +157,68 @@ def test_raw_integrals_are_neither_used_nor_recalculated(source):
     assert ae.I_dTdt_anom_pre.values[-1] == pytest.approx(97 * 0.025)
 
 
+def test_early_june_anomalies_keep_full_21_day_may_history(source):
+    peaks = source.peak_time.values - np.timedelta64(24, "D")
+    source["peak_time"] = ("event", peaks)
+    source["start_time"] = ("event", peaks)
+    source["end_time"] = ("event", peaks + np.timedelta64(2, "D"))
+    source.hw_event_id.values[:] = 0
+    for identifier, peak in zip(source.event_id.values, peaks, strict=True):
+        mask = (source.time >= peak) & (source.time < peak + np.timedelta64(3, "D"))
+        source.hw_event_id.values[mask.values] = identifier
+    climate, events, baseline = inputs(source, hours=504)
+    ae, ab = build_component_anomaly_pair(source, climate, events, baseline)
+    report = validate_anomalies_against_sources(
+        source, climate, ae, ab, events, baseline
+    )
+    assert report["expected_hourly_samples"] == 505
+    np.testing.assert_array_equal(ae.event_id, [101, 102, 103])
+    np.testing.assert_array_equal(ae.n_samples_heat_budget_pre, [505, 505, 505])
+    np.testing.assert_allclose(
+        ae.I_dTdt_anom_pre, [-505 * 0.025, 0, 505 * 0.025], atol=1e-12
+    )
+    june1 = ab.where(ab.reference_time == np.datetime64("2021-06-01"), drop=True)
+    assert june1.sizes["baseline_day"] == 1
+    assert june1.n_samples_heat_budget_pre.item() == 505
+    assert june1.I_dTdt_anom_pre.item() == pytest.approx(505 * 0.025)
+
+
+@pytest.mark.parametrize(
+    "problem,match",
+    [
+        ("endpoint_events", "membership differs"),
+        ("all_seasons", "season mismatch"),
+        ("crossing_event", "intervals outside"),
+        ("baseline_date", "outside declared season"),
+        ("contradictory_rule", "Contradictory Stage-2"),
+    ],
+)
+@pytest.mark.parametrize("derived", [False, True])
+def test_reference_and_anomaly_season_guards_reject_false_cohorts(
+    source, problem, match, derived
+):
+    climate, events, baseline = inputs(source)
+    if derived:
+        events, baseline = build_component_anomaly_pair(
+            source, climate, events, baseline
+        )
+    if problem == "endpoint_events":
+        events.attrs["require_full_event"] = 0
+    elif problem == "all_seasons":
+        baseline.attrs["all_seasons"] = 1
+    elif problem == "crossing_event":
+        events.start_time.values[0] = np.datetime64("2019-05-31", "ns")
+    elif problem == "baseline_date":
+        baseline.reference_time.values[0] = np.datetime64("2019-05-31", "ns")
+    else:
+        events.attrs["season_selection_rule"] = "anchor_month"
+    with pytest.raises(ValueError, match=match):
+        if derived:
+            comparison_plot_views(baseline, events)
+        else:
+            build_component_anomaly_pair(source, climate, events, baseline)
+
+
 @pytest.mark.parametrize(
     "problem", ["gap", "nan", "inf", "missing_key", "count", "units", "closure"]
 )
@@ -265,6 +330,51 @@ def test_plot_rejects_mixed_or_incompatible_anomaly_inputs(source):
     ab.attrs["region"] = "pnw_hotz"
     with pytest.raises(ValueError, match="region"):
         comparison_plot_views(ab, ae)
+
+
+@pytest.mark.parametrize("historical,layout", [(False, "full"), (True, "presentation")])
+def test_comparison_cli_reads_saved_anomalies_with_explicit_full_event_cohort(
+    source, tmp_path, monkeypatch, historical, layout
+):
+    climate, events, baseline = inputs(source)
+    if historical:
+        for table in (events, baseline):
+            for name in ("season_selection_rule", "season_anchor"):
+                del table.attrs[name]
+    ae, ab = build_component_anomaly_pair(source, climate, events, baseline)
+    event_path = analysis_io.save_component_anomalies(ae, tmp_path / "events.nc")
+    baseline_path = analysis_io.save_component_anomalies(ab, tmp_path / "baseline.nc")
+    with pytest.raises(ValueError, match="Expected pipeline_stage"):
+        analysis_io.open_stage2_features(
+            event_path, expected_stage="stage_2_event_features", require_full_event=True
+        )
+    for loader, path, expected in (
+        (comparison_cli.open_event_features, event_path, ae),
+        (comparison_cli.open_baseline_features, baseline_path, ab),
+    ):
+        with loader(path, require_full_event=True) as saved:
+            xr.testing.assert_identical(saved, expected)
+        with pytest.raises(ValueError, match="season mismatch"):
+            loader(path, all_seasons=True, require_full_event=True)
+    output = tmp_path / f"{layout}.png"
+    argv = [
+        "plot_comparison",
+        "--input-path",
+        str(baseline_path),
+        "--event-input-path",
+        str(event_path),
+        "--output-path",
+        str(output),
+        "--layout",
+        layout,
+    ]
+    monkeypatch.setattr("sys.argv", argv)
+    with pytest.raises(ValueError, match="--require-full-event"):
+        comparison_cli.main()
+    assert not output.exists()
+    monkeypatch.setattr("sys.argv", [*argv, "--require-full-event"])
+    assert comparison_cli.main() == 0
+    assert output.stat().st_size > 1000
 
 
 def test_runner_checks_reference_hashes_and_refuses_overwrite(tmp_path):

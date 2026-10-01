@@ -68,7 +68,10 @@ def test_parse_args_builds_inclusive_analysis_years(monkeypatch):
     assert args.threshold_variable == "tas"
     assert args.add_full_diagnostics is False
     assert args.cloud_cover_source_layout == data_io.CLOUD_COVER_LAYOUT_GLOBAL
-    assert args.cloud_cover_root == Path(config.ERA5_CLOUD_COVER_ROOT)
+    assert (
+        args.cloud_cover_root
+        == Path(config.ERA5_CLOUD_COVER_ROOT).expanduser().resolve()
+    )
     assert args.output_path == analysis_io.default_harmonized_timeseries_path(
         region="pnw_bartusek",
         bottom_boundary="surface",

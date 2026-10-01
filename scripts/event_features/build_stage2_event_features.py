@@ -17,7 +17,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.event_features import event_feature_config as config
 from scripts.event_features import fixed_window_features as fixed
-from src import analysis_io, selectors
+from src import analysis_io, season_selection, selectors
 
 SURFACE_FLUX_FEATURES = frozenset({"I_sshf_pre", "I_slhf_pre"})
 
@@ -27,6 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Build event-level fixed-window features from a Stage-1 dataset."
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument(
         "--integration-hours",
         type=int,
@@ -61,31 +62,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip unavailable extended variables instead of failing.",
     )
-    season = parser.add_mutually_exclusive_group(required=True)
-    season.add_argument(
-        "--season-months",
-        type=int,
-        nargs="+",
-        default=None,
-        metavar="MONTH",
-        help="Calendar months to retain before feature extraction, e.g. 6 7 8.",
-    )
-    season.add_argument(
-        "--all-seasons",
-        action="store_true",
-        help="Use every event in the Stage-1 event summary table.",
-    )
-    parser.add_argument(
-        "--require-full-event",
-        action="store_true",
-        help="Require event start/end months to fall within --season-months.",
-    )
     parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Allow output files to replace existing files.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -113,10 +95,12 @@ def build_event_features(
     integration_hours: int | None = None,
 ) -> xr.Dataset:
     """Return one event-level fixed-window feature table."""
-    if not all_seasons and season_months is None:
-        raise ValueError("Either season_months or all_seasons=True is required.")
-    if all_seasons and season_months is not None:
-        raise ValueError("Pass season_months or all_seasons=True, not both.")
+    season_months = season_selection.resolve_months(
+        season_months, all_seasons=all_seasons
+    )
+
+    if all_seasons and require_full_event:
+        raise ValueError("require_full_event cannot be combined with all_seasons.")
 
     windows = config.integration_windows(integration_hours)
     ds = fixed.ensure_tas_anom(ds)
@@ -498,6 +482,11 @@ def add_global_attrs(
     windows = config.WINDOWS if windows is None else windows
     for name, (start_lag, end_lag) in windows.items():
         attrs[f"{name}_window_hours"] = f"{start_lag},{end_lag}"
+    attrs.update(
+        season_selection.selection_attrs(
+            season_months, anchor="peak_time", require_full_event=require_full_event
+        )
+    )
     out.attrs.update(attrs)
 
 

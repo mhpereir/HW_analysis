@@ -17,7 +17,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.event_features import event_feature_config as config
 from scripts.event_features import fixed_window_features as fixed
-from src import analysis_io
+from src import analysis_io, season_selection
 from src.artifact_paths import artifact_root
 
 BASELINE_DIM = "baseline_day"
@@ -41,6 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Build baseline-day fixed-window features from a Stage-1 dataset."
     )
+    season_selection.add_season_arguments(parser, default_full_event=None)
     parser.add_argument(
         "--integration-hours",
         type=int,
@@ -75,26 +76,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip unavailable extended variables instead of failing.",
     )
-    season = parser.add_mutually_exclusive_group(required=True)
-    season.add_argument(
-        "--season-months",
-        type=int,
-        nargs="+",
-        default=None,
-        metavar="MONTH",
-        help="Calendar months to retain, e.g. 6 7 8.",
-    )
-    season.add_argument(
-        "--all-seasons",
-        action="store_true",
-        help="Use every selected-source non-event day in Stage 1.",
-    )
     parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Allow output files to replace existing files.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -119,10 +106,9 @@ def build_baseline_features(
     integration_hours: int | None = None,
 ) -> xr.Dataset:
     """Return one fixed-window feature row per selected-source non-event day."""
-    if not all_seasons and season_months is None:
-        raise ValueError("Either season_months or all_seasons=True is required.")
-    if all_seasons and season_months is not None:
-        raise ValueError("Pass season_months or all_seasons=True, not both.")
+    season_months = season_selection.resolve_months(
+        season_months, all_seasons=all_seasons
+    )
 
     windows = config.integration_windows(integration_hours)
     ds = fixed.ensure_tas_anom(ds)
@@ -369,6 +355,9 @@ def add_global_attrs(
     for name in window_names:
         start_lag, end_lag = windows[name]
         attrs[f"{baseline_window_name(name)}_window_hours"] = f"{start_lag},{end_lag}"
+    attrs.update(
+        season_selection.selection_attrs(season_months, anchor="reference_time")
+    )
     out.attrs.update(attrs)
 
 

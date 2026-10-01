@@ -18,6 +18,7 @@ from src import (
     climatology,
     composites,
     plot_paths,
+    season_selection,
     selectors,
 )
 
@@ -30,14 +31,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot peak-aligned face-advection climatological anomalies."
     )
+    season_selection.add_season_arguments(parser, default_full_event=True)
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument("--climatology-path", type=Path, default=None)
     parser.add_argument("--output-path", type=Path, default=None)
     parser.add_argument("--window-days", type=int, default=7)
-    parser.add_argument("--season-months", type=int, nargs="+", default=None)
-    parser.add_argument("--require-full-event", action="store_true")
     args = plot_paths.finalize_stage1_plot_paths(
-        parser.parse_args(),
+        season_selection.parse_args(parser),
         parser,
         plot_name=PLOT_NAME,
         default_output_filename=DEFAULT_OUTPUT_FILENAME,

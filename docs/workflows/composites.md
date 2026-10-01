@@ -28,6 +28,14 @@ scripts/plot_advection_direction_exploration_matched_clim_anom.py
 
 ## Expected Behavior
 
+Population selection defaults to JJA complete detected events, including for
+top-event ranking and its all-event reference. `--all-seasons` explicitly
+requests all saved events; `--no-require-full-event` allows peak-only seasonal
+membership. All/split, event-summary and face-advection entrypoints share these
+defaults. Source timestamps stay intact. See
+[decision 010](../decisions/010_season_selection_defaults.md) for Stage-2
+consumer guards, compatibility and regression examples.
+
 - Open the Stage-1 product through the analysis-product IO layer when validation
   is needed.
 - Use reusable event/composite helpers rather than rebuilding event IDs in the
@@ -89,6 +97,7 @@ Stage-1 and climatology products need no migration.
 
 The matched face-advection variant obtains matched membership from the
 canonical Stage-2 event-feature table and tracked matching settings. It then
+restricts that table to complete JJA events by default, before matching, and
 selects those event IDs from the absolute Stage-1 event table and verifies that
 their Stage-1 and Stage-2 peak timestamps agree. Stage 1 remains authoritative
 for event windows and alignment; Stage 2 supplies only the configured matched

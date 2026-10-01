@@ -17,6 +17,17 @@ The clean-baseline population can differ between windows, exactly as in the
 original campaign; it must not change between raw and anomaly representations
 of the same window.
 
+Seasonal selection follows [decision 010](../decisions/010_season_selection_defaults.md).
+This matched window-sensitivity cohort retains complete JJA events, rather
+than adopting the generic Stage-2 peak-in-JJA default. Validate both the
+reference metadata and the actual event intervals/baseline reference dates;
+reject incompatible populations without trimming or reselecting rows.
+Historical references without the newer descriptive season attributes remain
+valid when their original season metadata and timestamps establish this rule.
+Keep the complete antecedent hourly record, including May for early-June
+anchors. The climatology remains the fixed all-observation climatology;
+matching the reference population does not redefine it as an event mean.
+
 ## Calculation
 
 For each tendency X (dTdt, advection, adiabatic, diabatic), use the existing
@@ -82,6 +93,12 @@ and the reference period, and interpret diagonal sum lines as anomalous total
 heating. Reject mixed absolute/anomaly inputs or incompatible anomaly pairs.
 The plotter consumes saved products, not hourly source data.
 
+The comparison CLI accepts both raw and component-anomaly product markers and
+validates seasonal membership for either representation. Pass
+`--require-full-event` when plotting this campaign's saved tables. The raw
+window-sensitivity runner passes that option explicitly. Other Stage-2
+consumers retain their endpoint-based default and reject incompatible input.
+
 Reusable calculation and validation belong in `src/`; product I/O belongs in
 `src/analysis_io.py`. The thin CLI under `scripts/integration_window_analysis/`
 and tracked OpenPBS scheduler handle explicit paths and provenance. This
@@ -96,6 +113,11 @@ years, both populations, all four windows, input immutability and rejection of
 incompatible or incomplete inputs. Verify selection fields against the accepted
 tables and independently integrate source-minus-climatology samples for every
 row. Check dynamical and total anomaly closure, saved metadata and round trips.
+Also exercise saved anomaly products through the comparison CLI, including
+historical season metadata, rejection of mismatched season requests or falsely
+labeled JJA rows, and complete May history for a 21-day June anchor. Retain the
+shared full-JJA top-event/all-event reference regression checks in both
+absolute and climatological-anomaly representations.
 
 Require local lint/format/shell checks and the full test suite, then queued
 Venus smoke and scientific/visual acceptance for the exact deployed commit.

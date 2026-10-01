@@ -22,7 +22,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-from src import analysis_io, plot_paths, plot_style, selectors
+from src import analysis_io, plot_paths, plot_style, season_selection, selectors
 
 PLOT_NAME = "event_summary"
 DEFAULT_OUTPUT_FILENAME = "event_summary_histograms.png"
@@ -44,6 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot histograms of variables in the saved event summary table."
     )
+    season_selection.add_season_arguments(parser, default_full_event=True)
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(
         "--output-path",
@@ -67,20 +68,7 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_BINS,
         help="Number of histogram bins.",
     )
-    parser.add_argument(
-        "--season-months",
-        type=int,
-        nargs="+",
-        default=None,
-        metavar="MONTH",
-        help="Optional calendar months to retain before plotting, e.g. 6 7 8.",
-    )
-    parser.add_argument(
-        "--require-full-event",
-        action="store_true",
-        help="Require the full event interval to fall within --season-months.",
-    )
-    args = parser.parse_args()
+    args = season_selection.parse_args(parser)
     return plot_paths.finalize_stage1_plot_paths(
         args,
         parser,
