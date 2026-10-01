@@ -28,6 +28,9 @@ Counts report distinct contributing GMT dates rather than rounding hourly
 sample counts into days. The numerical composite also retains total hourly
 counts, counts by hour and nonmissing counts for each variable, so incomplete
 coverage is visible without silently changing the sample population.
+Hour ticks use integers. The volume axis uses adaptive scientific precision
+so the small volume variations in a fixed pressure layer retain distinct
+tick labels in the original m2 Pa units.
 
 ## Pressure-layer comparison
 

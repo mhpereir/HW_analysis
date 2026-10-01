@@ -445,3 +445,19 @@ def test_independent_validator_detects_wrong_statistics_and_membership():
     modified["class_hour_sample_count"][0, 9] -= 1
     with pytest.raises(AssertionError):
         validate_gmt_diurnal(ds, modified)
+
+
+def test_small_pressure_layer_volume_changes_keep_distinct_tick_labels():
+    ds = _make_gmt_dataset()
+    ds["volume"] = ("time", 6.17e16 + np.arange(ds.sizes["time"]) * 1e10)
+    composite = plot_diurnal_cycle.build_diurnal_composite(ds)
+    fig = plot_diurnal_cycle.plot_diurnal_cycle(composite)
+    try:
+        plot_diurnal_cycle.plot_style.format_numeric_axes(fig)
+        fig.canvas.draw()
+        labels = [tick.get_text() for tick in fig.axes[4].get_yticklabels()]
+        assert len(labels) > 1
+        assert len(set(labels)) == len(labels)
+        assert all("." not in tick.get_text() for tick in fig.axes[3].get_xticklabels())
+    finally:
+        plt.close(fig)

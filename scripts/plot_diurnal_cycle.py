@@ -136,6 +136,8 @@ def plot_diurnal_cycle(composite: xr.Dataset) -> Figure:
     ax3.set_xlabel(
         "GMT hour (UTC+0)" if offset == 0 else f"Local hour (UTC{offset:+d})"
     )
+    for ax in fig.axes:
+        plot_style.format_integer_axis(ax.xaxis, spacing=3)
 
     fig.suptitle(_figure_title(composite))
     plot_style.style_axes(axes)
@@ -202,6 +204,10 @@ def _plot_temperature_volume_panel(ax: Axes, composite: xr.Dataset) -> None:
     _plot_class_lines(ax_volume, composite, "volume", color=VARIABLE_COLORS["volume"])
     ax_volume.set_ylabel("volume [m2 Pa]", color=VARIABLE_COLORS["volume"])
     ax_volume.tick_params(axis="y", labelcolor=VARIABLE_COLORS["volume"])
+    # Fixed pressure layers can have tiny volume changes around a large mean.
+    # Adaptive precision keeps adjacent ticks distinct without changing units.
+    ax_volume.ticklabel_format(axis="y", style="sci", scilimits=(0, 0), useOffset=False)
+    plot_style.use_default_numeric_formatter(ax_volume.yaxis)
 
     ax.legend(
         handles=[
