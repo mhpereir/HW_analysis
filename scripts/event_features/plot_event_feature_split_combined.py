@@ -24,7 +24,6 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.patches import Patch
 
-
 REGION = "pnw_bartusek"
 
 DEFAULT_INPUT_PATH = (

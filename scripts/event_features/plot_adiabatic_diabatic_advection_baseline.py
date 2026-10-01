@@ -28,7 +28,6 @@ from matplotlib.axes import Axes
 from matplotlib.collections import PathCollection
 from matplotlib.colors import Normalize
 
-
 REGION = "pnw_bartusek"
 THRESHOLD_VARIABLE = "lwa_a"
 QUANTILE_THRESHOLD = "q90"

@@ -27,8 +27,8 @@ from uuid import uuid4
 import numpy as np
 import xarray as xr
 
-from .artifact_paths import artifact_root
 from . import season_selection
+from .artifact_paths import artifact_root
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HARMONIZED_TIMESERIES_PATH = (

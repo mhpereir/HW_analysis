@@ -26,7 +26,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-
 REGION = "pnw_bartusek"
 
 DEFAULT_INPUT_PATH = (

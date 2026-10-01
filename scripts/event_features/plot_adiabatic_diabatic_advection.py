@@ -32,7 +32,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-
 REGION = "pnw_bartusek"
 THRESHOLD_VARIABLE = "lwa_a"
 QUANTILE_THRESHOLD = "q90"

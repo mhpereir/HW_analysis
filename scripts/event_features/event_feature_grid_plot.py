@@ -26,7 +26,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-
 DEFAULT_INPUT_PATH = (
     artifact_root()
     / "stage2_event_features"

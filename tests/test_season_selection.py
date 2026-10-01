@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 import xarray as xr
-
 from HW_analysis.scripts import plot_composite_timeseries_all as all_plot
 from HW_analysis.scripts import plot_composite_timeseries_all_clim_anom as anomaly_all
 from HW_analysis.scripts import plot_top_events as top_plot

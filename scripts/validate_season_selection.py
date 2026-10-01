@@ -117,28 +117,32 @@ def audit_reference(
     ]
     if anomaly:
         flags += ["--climatology-path", inputs["climatology"]]
-    with patch.object(plotting, "write_composite_timeseries_outputs", capture_all):
-        with patch.object(
+    with (
+        patch.object(plotting, "write_composite_timeseries_outputs", capture_all),
+        patch.object(
             sys,
             "argv",
             ["all", *flags, "--output-path", str(destination / "capture.png")],
-        ):
-            assert all_module.main() == 0
-    with patch.object(top_plot, "plot_one_top_event", capture_top):
-        with patch.object(top_plot.plot_style, "save_figure", lambda *a, **kw: None):
-            with patch.object(
-                sys,
-                "argv",
-                [
-                    "top",
-                    *flags,
-                    "--output-dir",
-                    str(destination / "capture"),
-                    "--top-n",
-                    str(top_n),
-                ],
-            ):
-                assert top_module.main() == 0
+        ),
+    ):
+        assert all_module.main() == 0
+    with (
+        patch.object(top_plot, "plot_one_top_event", capture_top),
+        patch.object(top_plot.plot_style, "save_figure", lambda *a, **kw: None),
+        patch.object(
+            sys,
+            "argv",
+            [
+                "top",
+                *flags,
+                "--output-dir",
+                str(destination / "capture"),
+                "--top-n",
+                str(top_n),
+            ],
+        ),
+    ):
+        assert top_module.main() == 0
     assert len(all_references) == 1 and len(top_references) == 2 * top_n
     raw = all_references[0]
     smooth = plotting.smooth_composite_for_display(
