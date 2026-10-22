@@ -5,6 +5,9 @@
 Composite workflows consume prepared products to summarize event-centered
 trajectories. They are workflows and diagnostics, not product stages.
 
+Storage paths follow the [artifact-location contract](artifacts.md); the root
+is shared across source checkouts and may be configured before submission.
+
 ## Primary Inputs
 
 - Stage-1 harmonized regional time series
@@ -26,6 +29,14 @@ scripts/plot_advection_direction_exploration_top_events_clim_anom.py
 ```
 
 ## Expected Behavior
+
+Population selection defaults to JJA complete detected events, including for
+top-event ranking and its all-event reference. `--all-seasons` explicitly
+requests all saved events; `--no-require-full-event` allows peak-only seasonal
+membership. All/split, event-summary and face-advection entrypoints share these
+defaults. Source timestamps stay intact. See
+[decision 010](../decisions/010_season_selection_defaults.md) for Stage-2
+consumer guards, compatibility and regression examples.
 
 - Open the Stage-1 product through the analysis-product IO layer when validation
   is needed.
@@ -60,7 +71,7 @@ right column remains advection, adiabatic heating, then diabatic heating.
 
 The absolute and climatological-anomaly top-event entrypoints support the same
 `paper` and `presentation` layout choices. Their presentation views preserve
-top-event ranking, absolute-time event windows, event-boundary and peak
+top-event ranking, timestamp-based event windows, event-boundary and peak
 markers, the all-event mean and IQR reference, and raw plus 24-hour-smoothed
 output semantics. They change only the data representation, variables, and
 panel arrangement used for rendering. Climatological-anomaly top-event
@@ -69,13 +80,26 @@ the individual traces and all-event reference are calculated from anomalies.
 Every layout and representation uses a separate output namespace and filename
 token.
 
+All top-event layouts display elapsed days relative to the exact Stage-1 peak
+timestamp. The selected trace, all-event mean and IQR, and event markers share
+this axis, with the peak at zero. This display conversion preserves the
+timestamp coordinates and hourly calculations of the source products. See
+[the top-event time-axis contract](plotting.md#top-event-time-axis).
+
 The six temporal plotting Venus schedulers expose the same choice through
 `PLOT_LAYOUT`. Its default is `paper`, which retains the extended ten-panel
 production figures. Set `PLOT_LAYOUT=presentation` to pass the six-panel
 layout without the mutually exclusive extended-panel flag.
 
+The shared [extended layout](plotting.md#extended-temporal-composite-layout)
+has ten panels with one y-axis each. It shows temperature without volume,
+separates cloud cover and soil moisture, and omits latent heating. Extended
+variable selection and smoothing follow these displayed quantities; existing
+Stage-1 and climatology products need no migration.
+
 The matched face-advection variant obtains matched membership from the
 canonical Stage-2 event-feature table and tracked matching settings. It then
+restricts that table to complete JJA events by default, before matching, and
 selects those event IDs from the absolute Stage-1 event table and verifies that
 their Stage-1 and Stage-2 peak timestamps agree. Stage 1 remains authoritative
 for event windows and alignment; Stage 2 supplies only the configured matched
@@ -98,11 +122,13 @@ smoothed figure title identifies the applied window.
 The raw and climatological-anomaly top-event face-advection entrypoints rank
 events by the absolute Stage-1 `tas_peak`, using the same deterministic
 descending-rank semantics as `scripts/plot_top_events.py`. The default is the
-top 10 events. Optional seasonal and complete-event filtering is applied
-before ranking, and the filtered event table is also the population for the
+top 10 complete JJA events. Shared seasonal selection is applied before
+ranking, and the selected event table is also the population for the
 all-event reference composite. The raw variant plots the Stage-1 tendencies
 directly. The climatological-anomaly variant subtracts the timestamp-matched
-hourly climatology, which never changes event membership or rank.
+hourly climatology, which never changes event membership or rank. Explicit
+`--all-seasons`, custom `--season-months`, and `--no-require-full-event` modes
+follow decision 010. These defaults also apply to the Python preparation API.
 
 For each selected event, the entrypoint writes an hourly and a centered
 display-smoothed two-panel figure on the common peak-relative lag axis. Each
@@ -154,7 +180,20 @@ publish both the unsmoothed and smoothed PNGs as one no-overwrite operation.
 They require an explicit region and accept the pressure boundaries, threshold
 definition, analysis years, lag window, and smoothing window as runtime
 configuration so one exact deployed revision can render multiple accepted
-Stage-1 regions without source edits.
+Stage-1 regions without source edits. All five wrappers use the external
+artifact/log roots and forward `HWA_SEASON_OPTIONS` to the shared Python
+selector. Pair publication must fail on a destination collision, preserving
+any output owned by another attempt.
+
+Before integration, validate both PNW regions against the original Stage-1
+arrays: seasonal membership, absolute-TAS ranks, matched-sign membership,
+timestamp-level climatology subtraction, signed face closure, grouped curves,
+and centered display smoothing using
+`schedulers/schedule_advection_face_validation.sh` and its two-region input
+manifest. Render all five families at the exact tested
+commit, retain input/output checksums, and compare old and new figures with
+original-resolution review. Historical figures retain their original cohort
+and generating-commit provenance.
 
 The production split-composite schedulers render the same complete
 split-variable matrix. The five numeric split variables are `duration`,
@@ -181,7 +220,7 @@ changing the tracked source between submissions.
 
 ## Outputs
 
-Outputs are figures and diagnostic tables under `results/plots_*`. They are not
+Outputs are figures and diagnostic tables under `$HWA_ARTIFACT_ROOT/plots_*`. They are not
 durable pipeline product stages unless a later implementation explicitly writes
 and documents a composite dataset contract.
 

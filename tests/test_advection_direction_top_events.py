@@ -63,7 +63,7 @@ def test_build_inputs_uses_filtered_absolute_events_for_rank_and_reference(
     season_source, season_months, require_full_event = captured["season"]
     assert season_source is not stage1
     xr.testing.assert_identical(season_source, stage1)
-    assert season_months == [6, 7, 8]
+    assert tuple(season_months) == (6, 7, 8)
     assert require_full_event is True
     reference_source, reference_kwargs = captured["reference"]
     assert reference_source is plot_source
@@ -215,3 +215,38 @@ def _make_realistic_stage1() -> xr.Dataset:
         coords={"time": time, "event": np.arange(3)},
         attrs={"region": "synthetic"},
     )
+
+
+@pytest.mark.parametrize("representation", ["absolute", "climatological_anomaly"])
+def test_default_population_excludes_boundary_events_from_rank_and_reference(
+    representation,
+):
+    stage1 = _make_realistic_stage1()
+    peaks = np.array(
+        ["2000-06-01T12", "2000-07-15T12", "2000-08-31T12"], dtype="datetime64[h]"
+    )
+    stage1["peak_time"] = ("event", peaks)
+    stage1["start_time"] = ("event", peaks - np.timedelta64(1, "D"))
+    stage1["end_time"] = ("event", peaks + np.timedelta64(1, "D"))
+    stage1["tas_peak"] = ("event", [320.0, 307.0, 315.0])
+    original = stage1.copy(deep=True)
+    reference, events = advection_direction_top_events.build_top_event_inputs(
+        stage1,
+        stage1,
+        data_representation=representation,
+        top_n=3,
+    )
+    assert reference.attrs["n_events"] == 1
+    assert events.event_id.values.tolist() == [20]
+    assert events.attrs["season_selection_rule"] == "full_event"
+    for options in ({"all_seasons": True}, {"require_full_event": False}):
+        reference, events = advection_direction_top_events.build_top_event_inputs(
+            stage1,
+            stage1,
+            data_representation=representation,
+            top_n=3,
+            **options,
+        )
+        assert reference.attrs["n_events"] == 3
+        assert events.event_id.values.tolist() == [10, 30, 20]
+    xr.testing.assert_identical(stage1, original)

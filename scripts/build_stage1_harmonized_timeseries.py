@@ -164,8 +164,7 @@ def parse_args() -> argparse.Namespace:
         parser.error(str(exc))
 
     if (
-        args.cloud_cover_source_layout
-        == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
+        args.cloud_cover_source_layout == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
         and not args.add_full_diagnostics
     ):
         parser.error(
@@ -173,8 +172,7 @@ def parse_args() -> argparse.Namespace:
             "--add-full-diagnostics."
         )
     if (
-        args.cloud_cover_source_layout
-        == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
+        args.cloud_cover_source_layout == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
         and args.cloud_cover_root is None
     ):
         parser.error(
@@ -310,7 +308,7 @@ def describe_event_ids(name: str, mask: xr.DataArray, event_id: xr.DataArray) ->
 def describe_analysis_dataset(ds: xr.Dataset) -> None:
     """Print a compact summary of the assembled hourly analysis dataset."""
     dims_str = ", ".join(f"{dim}={size}" for dim, size in ds.sizes.items())
-    vars_str = ", ".join(ds.data_vars) #type: ignore
+    vars_str = ", ".join(ds.data_vars)  # type: ignore
     print("Harmonized Stage-1 regional dataset:")
     print(f"  dims: {dims_str}")
     print(f"  vars: {vars_str}")
@@ -319,7 +317,7 @@ def describe_analysis_dataset(ds: xr.Dataset) -> None:
 def describe_event_summary_table(ds: xr.Dataset) -> None:
     """Print a compact summary of the event summary table."""
     dims_str = ", ".join(f"{dim}={size}" for dim, size in ds.sizes.items())
-    vars_str = ", ".join(ds.data_vars) #type: ignore
+    vars_str = ", ".join(ds.data_vars)  # type: ignore
     print("Event summary table:")
     print(f"  dims: {dims_str}")
     print(f"  vars: {vars_str}")
@@ -368,10 +366,7 @@ def require_dataset(value: Any) -> xr.Dataset:
 
 def full_diagnostic_datasets(datasets: dict[str, object]) -> dict[str, xr.Dataset]:
     """Return optional full-diagnostic datasets from the loaded input mapping."""
-    return {
-        key: require_dataset(datasets[key])
-        for key in FULL_DIAGNOSTIC_DATASET_KEYS
-    }
+    return {key: require_dataset(datasets[key]) for key in FULL_DIAGNOSTIC_DATASET_KEYS}
 
 
 def main() -> int:
@@ -445,15 +440,15 @@ def main() -> int:
         lwa_c_products["lwa_c_event_id"],
     )
 
-    heat_budget_dataset = require_dataset(datasets["heat_budget"]) #ensuring correct type
+    heat_budget_dataset = require_dataset(
+        datasets["heat_budget"]
+    )  # ensuring correct type
     analysis_ds = harmonize.build_regional_analysis_dataset(
         heat_budget=heat_budget_dataset,
         hw_event_products=hw_products,
         lwa_event_products=[lwa_products, lwa_a_products, lwa_c_products],
         full_diagnostics=(
-            full_diagnostic_datasets(datasets)
-            if args.add_full_diagnostics
-            else None
+            full_diagnostic_datasets(datasets) if args.add_full_diagnostics else None
         ),
         region=args.region,
         attrs={
@@ -471,14 +466,10 @@ def main() -> int:
             "min_duration": min_duration,
             "add_full_diagnostics": args.add_full_diagnostics,
             "cloud_cover_source_layout": (
-                args.cloud_cover_source_layout
-                if args.add_full_diagnostics
-                else ""
+                args.cloud_cover_source_layout if args.add_full_diagnostics else ""
             ),
             "cloud_cover_root": (
-                str(args.cloud_cover_root)
-                if args.add_full_diagnostics
-                else ""
+                str(args.cloud_cover_root) if args.add_full_diagnostics else ""
             ),
             "temporary_legacy_cloud_cover_override": int(
                 args.add_full_diagnostics

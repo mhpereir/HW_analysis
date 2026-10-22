@@ -48,12 +48,16 @@ def test_project_daily_to_hourly_preserves_original_hourly_timestamps():
         coords={"time": np.array(["2000-01-01"], dtype="datetime64[D]")},
         name="daily_value",
     )
-    hourly_values = np.array(["2000-01-01T03:00", "2000-01-01T18:00"], dtype="datetime64[m]")
+    hourly_values = np.array(
+        ["2000-01-01T03:00", "2000-01-01T18:00"], dtype="datetime64[m]"
+    )
     hourly_time = xr.DataArray(hourly_values, dims=("hourly_time",))
 
     out = harmonize.project_daily_to_hourly(daily, hourly_time)
 
-    np.testing.assert_array_equal(out["hourly_time"].values, hourly_values.astype("datetime64[ns]"))
+    np.testing.assert_array_equal(
+        out["hourly_time"].values, hourly_values.astype("datetime64[ns]")
+    )
 
 
 def test_project_daily_to_hourly_applies_custom_name_and_attrs():
@@ -140,7 +144,9 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
     lwa_a_products = {
         "lwa_a_region": _daily_array([1.0, 2.0], name="LWA_a"),
         "lwa_a_threshold": _daily_array([1.5, 1.5], name="lwa_a_threshold"),
-        "lwa_a_exceedance_mask": _daily_array([False, True], name="lwa_a_exceedance_mask"),
+        "lwa_a_exceedance_mask": _daily_array(
+            [False, True], name="lwa_a_exceedance_mask"
+        ),
         "lwa_a_event_id": _daily_array([0, 1], name="lwa_a_event_id"),
     }
     lwa_products = {
@@ -162,7 +168,9 @@ def test_build_regional_analysis_dataset_projects_daily_products_to_hourly_time(
     assert out.attrs["stage1_contract_version"] == 2
     assert out.attrs["analysis_time_resolution"] == "hourly"
     assert out.attrs["region"] == "pnw_bartusek"
-    assert {"T_mean", "volume", "dTdt", "advection", "adiabatic", "diabatic"} <= set(out)
+    assert {"T_mean", "volume", "dTdt", "advection", "adiabatic", "diabatic"} <= set(
+        out
+    )
     np.testing.assert_allclose(out["T_mean"].values, [1.0, 2.0, 3.0])
     np.testing.assert_allclose(out["volume"].values, [2.0, 3.0, 4.0])
     np.testing.assert_allclose(out["dTdt"].values, [5400.0, 4800.0, 4500.0])
@@ -271,7 +279,9 @@ def test_build_regional_analysis_dataset_adds_optional_full_diagnostics():
     assert out["nssr"].attrs["source_variable"] == "ssr"
     assert out["nssr"].attrs["alignment_method"] == "exact_time_selection"
 
-    region_area = preprocess.compute_region_area(full_diagnostics["nssr"]["ssr"], "pnw_bartusek")
+    region_area = preprocess.compute_region_area(
+        full_diagnostics["nssr"]["ssr"], "pnw_bartusek"
+    )
     expected_rate = (
         out["nssr"].values
         * region_area
@@ -285,7 +295,9 @@ def test_build_regional_analysis_dataset_adds_optional_full_diagnostics():
         + out["slhf_heating_rate_approx"]
         + out["sshf_heating_rate_approx"]
     )
-    xr.testing.assert_allclose(out["surface_energy_heating_rate_approx"], expected_total)
+    xr.testing.assert_allclose(
+        out["surface_energy_heating_rate_approx"], expected_total
+    )
 
 
 def test_build_regional_analysis_dataset_requires_region_for_full_diagnostics():

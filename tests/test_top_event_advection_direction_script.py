@@ -7,6 +7,7 @@ from HW_analysis.scripts import (
     plot_advection_direction_exploration_top_events_clim_anom as script,
 )
 from HW_analysis.src import analysis_io
+from HW_analysis.src.artifact_paths import artifact_root
 
 RUN_ARGS = [
     "--region",
@@ -50,13 +51,15 @@ def test_parse_args_builds_isolated_default_paths(monkeypatch):
         ).resolve()
     )
     assert args.output_dir == (
-        script.REPO_ROOT
-        / "results"
+        artifact_root()
         / "plots_advection_direction_exploration_top_events_clim_anom"
         / "region_pnw_hotz"
         / "boundary_surface_700hPa"
         / "time_range_1940_2024"
     )
+    assert args.season_months == [6, 7, 8]
+    assert args.require_full_event is True
+    assert args.all_seasons is False
     assert args.top_n == 10
     assert args.window_days == 7
     assert args.smoothing_window == 24
@@ -77,6 +80,7 @@ def test_validate_args_rejects_nonpositive_values(attribute, value, message):
         smoothing_window=24,
         season_months=None,
         require_full_event=False,
+        all_seasons=False,
     )
     setattr(args, attribute, value)
 
@@ -149,6 +153,7 @@ def test_build_inputs_uses_filtered_absolute_events_for_rank_and_reference(
         "window_days": 5,
         "season_months": [6, 7, 8],
         "require_full_event": True,
+        "all_seasons": False,
     }
     assert out_reference is reference
     assert out_events is stacked
@@ -192,3 +197,17 @@ def _make_stage1() -> xr.Dataset:
         },
         coords={"time": time, "event": [0, 1, 2]},
     )
+
+
+def test_explicit_all_seasons_and_anchor_only_modes(monkeypatch):
+    monkeypatch.setattr("sys.argv", [script.__file__, *RUN_ARGS, "--all-seasons"])
+    args = script.parse_args()
+    assert args.season_months is None
+    assert args.require_full_event is False
+    assert args.all_seasons is True
+    monkeypatch.setattr(
+        "sys.argv", [script.__file__, *RUN_ARGS, "--no-require-full-event"]
+    )
+    args = script.parse_args()
+    assert args.season_months == [6, 7, 8]
+    assert args.require_full_event is False

@@ -6,9 +6,12 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 REGION="${REGION:?REGION is required}"
 INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"
@@ -22,8 +25,11 @@ TIME_START="${TIME_START:-1940}"
 TIME_END="${TIME_END:-2024}"
 WINDOW_DAYS="${WINDOW_DAYS:-7}"
 SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 SMOOTHED_OUTPUT_PATH="${OUTPUT_PATH%.*}_smoothed.${OUTPUT_PATH##*.}"
+
+hwa_start_log "plot_advection_direction_clim_anom"
+hwa_validate_artifact_paths INPUT_PATH CLIMATOLOGY_PATH OUTPUT_PATH SMOOTHED_OUTPUT_PATH
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
@@ -34,9 +40,7 @@ test "${OUTPUT_PATH##*.}" = "png"
 test ! -e "${OUTPUT_PATH}"
 test ! -e "${SMOOTHED_OUTPUT_PATH}"
 
-mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_plot_advection_direction_clim_anom.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
+mkdir -p "$(dirname "${OUTPUT_PATH}")"
 
 STAGING_DIR="${OUTPUT_PATH}.staging.${PBS_JOBID}"
 test ! -e "${STAGING_DIR}"
@@ -90,6 +94,7 @@ echo "[info] started=$(date -Is)"
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v "${python_executable}" \
   scripts/plot_advection_direction_exploration_clim_anom.py \
+  "${season_args[@]}" \
   --region "${REGION}" \
   --bottom-boundary "${BOTTOM_BOUNDARY}" \
   --top-boundary "${TOP_BOUNDARY}" \
@@ -101,18 +106,17 @@ cd "${PROJECT_ROOT}"
   --climatology-path "${CLIMATOLOGY_PATH}" \
   --output-path "${STAGED_OUTPUT}" \
   --window-days "${WINDOW_DAYS}" \
-  --smoothing-window "${SMOOTHING_WINDOW}" \
-  --season-months 6 7 8 \
-  --require-full-event
+  --smoothing-window "${SMOOTHING_WINDOW}"
 
 test -s "${STAGED_OUTPUT}"
 test -s "${STAGED_SMOOTHED_OUTPUT}"
 test ! -e "${OUTPUT_PATH}"
 test ! -e "${SMOOTHED_OUTPUT_PATH}"
-mv --no-clobber "${STAGED_OUTPUT}" "${OUTPUT_PATH}"
+ln -T -- "${STAGED_OUTPUT}" "${OUTPUT_PATH}"
 published_outputs+=("${OUTPUT_PATH}")
-mv --no-clobber "${STAGED_SMOOTHED_OUTPUT}" "${SMOOTHED_OUTPUT_PATH}"
+ln -T -- "${STAGED_SMOOTHED_OUTPUT}" "${SMOOTHED_OUTPUT_PATH}"
 published_outputs+=("${SMOOTHED_OUTPUT_PATH}")
+rm -- "${STAGED_OUTPUT}" "${STAGED_SMOOTHED_OUTPUT}"
 rmdir "${STAGING_DIR}"
 trap - EXIT
 test -s "${OUTPUT_PATH}"

@@ -19,6 +19,7 @@ from src import (
     advection_direction_top_events,
     analysis_io,
     plot_paths,
+    season_selection,
 )
 
 PLOT_NAME = "advection_direction_exploration_top_events"
@@ -51,10 +52,9 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=advection_direction_plotting.DEFAULT_SMOOTHING_WINDOW,
     )
-    parser.add_argument("--season-months", type=int, nargs="+", default=None)
-    parser.add_argument("--require-full-event", action="store_true")
+    season_selection.add_season_arguments(parser, default_full_event=True)
     args = plot_paths.finalize_stage1_plot_paths(
-        parser.parse_args(),
+        season_selection.parse_args(parser),
         parser,
         plot_name=PLOT_NAME,
     )
@@ -71,6 +71,7 @@ def validate_args(args: argparse.Namespace) -> None:
         smoothing_window=args.smoothing_window,
         season_months=args.season_months,
         require_full_event=args.require_full_event,
+        all_seasons=args.all_seasons,
     )
 
 
@@ -80,7 +81,8 @@ def build_top_event_inputs(
     top_n: int = DEFAULT_TOP_N,
     window_days: int = DEFAULT_WINDOW_DAYS,
     season_months: list[int] | None = None,
-    require_full_event: bool = False,
+    require_full_event: bool | None = None,
+    all_seasons: bool = False,
 ) -> tuple[xr.Dataset, xr.Dataset]:
     """Build the all-event mean and ranked raw Stage-1 event windows."""
     return advection_direction_top_events.build_top_event_inputs(
@@ -91,6 +93,7 @@ def build_top_event_inputs(
         window_days=window_days,
         season_months=season_months,
         require_full_event=require_full_event,
+        all_seasons=all_seasons,
     )
 
 
@@ -105,8 +108,7 @@ def main() -> int:
             stage1,
             top_n=args.top_n,
             window_days=args.window_days,
-            season_months=args.season_months,
-            require_full_event=args.require_full_event,
+            **season_selection.season_kwargs(args),
         )
         written = advection_direction_plotting.write_top_event_advection_direction_exploration_outputs(
             reference,

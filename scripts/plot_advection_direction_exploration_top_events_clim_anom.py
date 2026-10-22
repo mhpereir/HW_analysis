@@ -19,6 +19,7 @@ from src import (
     analysis_io,
     climatology,
     plot_paths,
+    season_selection,
 )
 
 PLOT_NAME = "advection_direction_exploration_top_events_clim_anom"
@@ -55,10 +56,9 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=advection_direction_plotting.DEFAULT_SMOOTHING_WINDOW,
     )
-    parser.add_argument("--season-months", type=int, nargs="+", default=None)
-    parser.add_argument("--require-full-event", action="store_true")
+    season_selection.add_season_arguments(parser, default_full_event=True)
     args = plot_paths.finalize_stage1_plot_paths(
-        parser.parse_args(),
+        season_selection.parse_args(parser),
         parser,
         plot_name=PLOT_NAME,
     )
@@ -83,6 +83,7 @@ def validate_args(args: argparse.Namespace) -> None:
         smoothing_window=args.smoothing_window,
         season_months=args.season_months,
         require_full_event=args.require_full_event,
+        all_seasons=args.all_seasons,
     )
 
 
@@ -93,7 +94,8 @@ def build_top_event_anomaly_inputs(
     top_n: int = DEFAULT_TOP_N,
     window_days: int = DEFAULT_WINDOW_DAYS,
     season_months: list[int] | None = None,
-    require_full_event: bool = False,
+    require_full_event: bool | None = None,
+    all_seasons: bool = False,
 ) -> tuple[xr.Dataset, xr.Dataset]:
     """Build the all-event anomaly mean and ranked event anomaly windows."""
     variables = advection_direction_top_events.top_event_variables(stage1)
@@ -110,6 +112,7 @@ def build_top_event_anomaly_inputs(
         window_days=window_days,
         season_months=season_months,
         require_full_event=require_full_event,
+        all_seasons=all_seasons,
     )
 
 
@@ -126,8 +129,7 @@ def main() -> int:
             climate,
             top_n=args.top_n,
             window_days=args.window_days,
-            season_months=args.season_months,
-            require_full_event=args.require_full_event,
+            **season_selection.season_kwargs(args),
         )
         reference.attrs["climatology_path"] = str(args.climatology_path)
         event_windows.attrs["climatology_path"] = str(args.climatology_path)

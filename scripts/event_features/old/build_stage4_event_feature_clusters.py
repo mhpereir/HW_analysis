@@ -387,7 +387,9 @@ def heat_budget_fraction_values(pca_ds: xr.Dataset, variable: str) -> np.ndarray
     numerator = data_array_to_float_vector(pca_ds[numerator_name])
     denominator = np.zeros_like(numerator, dtype=float)
     for source_name in INTEGRATED_HEAT_BUDGET_VARIABLES:
-        denominator = denominator + np.abs(data_array_to_float_vector(pca_ds[source_name]))
+        denominator = denominator + np.abs(
+            data_array_to_float_vector(pca_ds[source_name])
+        )
     out = np.full(numerator.shape, np.nan, dtype=float)
     np.divide(numerator, denominator, out=out, where=denominator != 0.0)
     return out
@@ -419,7 +421,9 @@ def summarize_clusters(
     values = np.asarray(tracked_values.values, dtype=float)
     labels = np.asarray(labels, dtype=np.int64)
     if values.shape[0] != labels.size:
-        raise ValueError("Tracked values and cluster labels must have the same event length.")
+        raise ValueError(
+            "Tracked values and cluster labels must have the same event length."
+        )
 
     n_variables = values.shape[1]
     shape = (n_clusters, n_variables)
@@ -485,7 +489,9 @@ def summarize_clusters(
 
 def add_summary_attrs(summary: xr.Dataset) -> None:
     """Attach metadata to cluster summary variables."""
-    summary["cluster_count"].attrs["description"] = "Number of events assigned to each cluster."
+    summary["cluster_count"].attrs["description"] = (
+        "Number of events assigned to each cluster."
+    )
     summary["cluster_variable_mean"].attrs["description"] = (
         "Cluster mean of each tracked variable over finite event values."
     )

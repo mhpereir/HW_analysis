@@ -220,6 +220,9 @@ def test_matched_plot_main_routes_raw_and_smoothed_outputs(monkeypatch, tmp_path
         output_path=output,
         window_days=7,
         smoothing_window=24,
+        season_months=None,
+        all_seasons=True,
+        require_full_event=False,
     )
     stage1 = _face_source()
     climate = xr.Dataset()
@@ -252,7 +255,7 @@ def test_matched_plot_main_routes_raw_and_smoothed_outputs(monkeypatch, tmp_path
         lambda path: climate,
     )
     monkeypatch.setattr(
-        matched_script, "open_event_features", lambda path: event_features
+        matched_script, "open_event_features", lambda path, **kwargs: event_features
     )
     monkeypatch.setattr(matched_script, "sha256_file", lambda path: "features-sha")
     monkeypatch.setattr(

@@ -30,6 +30,16 @@ Read in this order:
 `AGENTS.md` defines execution, validation, and contribution constraints. It
 routes to these documents rather than defining a separate pipeline contract.
 
+Before creating, resuming, integrating, pausing, or retiring a branch or
+checkout, follow the [Git branch lifecycle](workflows/git_lifecycle.md).
+Branch retirement, scientific acceptance, and task/run completion are separate
+decisions. The shared cleanup skill owns the deletion and archival procedure.
+
+Before configuring or submitting production work, follow the
+[artifact and log location contract](workflows/artifacts.md). Prepared inputs
+and outputs live outside source checkouts, with scheduler logs in a separate
+stable sibling directory.
+
 ## Documentation-first change process
 
 Before implementing new development:
@@ -51,6 +61,12 @@ remain isolated from the active production pipeline until their intended
 behavior and compatibility requirements are documented.
 
 ## Active system at a glance
+
+Seasonal analysis defaults and their regression safeguards are specified in
+[decision 010](decisions/010_season_selection_defaults.md): Stage-1 population
+plots use complete JJA events; Stage-2 tables use JJA integration endpoints
+while retaining the complete antecedent history. Consumers validate membership
+before plotting. Explicit all-season analysis remains available.
 
 The repository has two active data paths.
 
@@ -99,11 +115,15 @@ a figure.
 
 | Area | Canonical document |
 | --- | --- |
+| Git branches, integration, and retirement | [Git branch lifecycle](workflows/git_lifecycle.md) |
+| Prepared inputs, outputs, and scheduler logs | [Artifact locations](workflows/artifacts.md) |
 | Active architecture and ownership | [Pipeline overview](pipeline_overview.md) |
 | Stage 1 regional dataset | [Stage 1 product contract](products/stage1_harmonized_timeseries.md) |
 | Stage 1 regional hourly climatology | [Regional hourly climatology contract](products/stage1_regional_hourly_climatology.md) |
 | Stage 2 event features | [Event-feature contract](products/stage2_event_features.md) |
 | Stage 2 baseline features | [Baseline-day contract](products/stage2_baseline_features.md) |
+| Component-anomaly budgets | [Derived Stage-2 contract](products/stage2_component_anomalies.md) |
+| Integration-window exploration | [Heating-rank contract](products/integration_window_ranks.md), [workflow and further plans](../scripts/integration_window_analysis/README.md) |
 | Temporal composites | [Composite workflow](workflows/composites.md) |
 | Spatial ERA5 preparation and composites | [Spatial composite workflow](workflows/spatial_composites.md) |
 | Figure conventions and shared style | [Plotting workflow](workflows/plotting.md) |

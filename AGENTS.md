@@ -12,6 +12,33 @@ EHB calculations themselves are out of scope. Treat EHB files as immutable
 upstream inputs. The active pipeline is dataset-first: assemble shared products
 once, then make all figures and analyses consume those products.
 
+## Git branches and worktrees
+
+Follow [the Git branch lifecycle](docs/workflows/git_lifecycle.md) before
+creating, resuming, integrating, pausing, or retiring branches and checkouts.
+
+- `master` is the sole protected integration branch. Develop on task branches
+  from refreshed `origin/master`; reuse a branch for the same unfinished
+  outcome. Record explicit dependencies when branching from another task.
+- Keep one stable `master` checkout and additional worktrees only while their
+  paths are needed. Preserve the existing data-bearing main checkout and its
+  generated results; do not reorganize them as incidental cleanup.
+- Preserve published and run-pinned history. Merge an advanced `origin/master`
+  into the task branch locally, validate the exact candidate, then integrate
+  with `git merge --ff-only`. Do not force a divergent integration.
+- Require the full local suite and applicable checks before integration, plus
+  representative Venus scientific/visual validation for production-affecting
+  changes. Code integration and full campaign acceptance are separate gates.
+- Invoke `git-worktree-cleanup` for audits and retirement, including a
+  post-integration audit. Inspect ancestry, files, and active dependencies;
+  protect run checkouts, artifacts, and necessary preservation refs.
+- At integration, pause, and handoff, report branch and checkout retirement
+  eligibility separately, outstanding validation, and the next action. Keep
+  task/run history through `command-center`; Git retirement is not completion.
+- Respect the request's authorization for commits, integration, publication,
+  deployment, and cleanup. A merge-only request does not authorize deletion;
+  local and remote retirement are separately scoped.
+
 ## Venus-only execution
 
 The scripts and production paths in this repository are exclusively for the
@@ -24,13 +51,19 @@ the inputs are unavailable in a local checkout.
   diagnosing Venus work.
 - Develop and test code in the local Git checkout.
 - Never edit source directly on Venus.
-- Use Git commits and clean fast-forward deployment to move code to
-  `/home/mhpereir/HW_analysis` on Venus.
+- Use Git commits and clean, commit-pinned deployments under
+  `/home/mhpereir/HW-analysis/HW-analysis-production/` on Venus. Do not advance
+  a checkout needed by a queued or running job.
 - Use the Mamba-managed `dev_env` environment on Venus.
 - Run data-intensive scripts through the tracked OpenPBS schedulers, not on the
   Venus login node.
 - Treat raw data, assembled datasets, figures, logs, caches, and environments as
   external or generated artifacts. Do not commit them.
+- Follow [artifact locations](docs/workflows/artifacts.md): prepared inputs and
+  outputs default to `~/HW-analysis/artifacts/`, and scheduler logs to the
+  sibling `~/HW-analysis/logs/`. Never derive these paths from a source checkout.
+  Old pinned checkouts and unfinished branches need the updated path contract
+  before they can be used for new production submissions.
 - Do not transfer a mixed code-and-data repository root with `rsync`.
 - Require explicit authorization before pushing, deploying, transferring data,
   or submitting or modifying PBS jobs.

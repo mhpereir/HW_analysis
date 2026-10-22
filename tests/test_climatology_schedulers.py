@@ -160,7 +160,7 @@ def test_matched_advection_scheduler_requires_stage2_settings_and_atomic_output(
     assert '--matching-settings-path "${MATCHING_SETTINGS_PATH}"' in text
     assert '--matching-specification "${MATCHING_SPECIFICATION}"' in text
     assert "export PYTHONWARNINGS=error" in text
-    assert 'mv --no-clobber "${STAGED_OUTPUT}" "${OUTPUT_PATH}"' in text
+    assert 'ln -T -- "${STAGED_OUTPUT}" "${OUTPUT_PATH}"' in text
     assert text.count('test ! -e "${OUTPUT_PATH}"') == 2
 
 
@@ -200,7 +200,7 @@ def test_advection_anomaly_schedulers_publish_raw_and_smoothed_outputs():
         assert text.count('test ! -e "${SMOOTHED_OUTPUT_PATH}"') == 2
         assert 'test -s "${STAGED_SMOOTHED_OUTPUT}"' in text
         assert (
-            'mv --no-clobber "${STAGED_SMOOTHED_OUTPUT}" '
+            'ln -T -- "${STAGED_SMOOTHED_OUTPUT}" '
             '"${SMOOTHED_OUTPUT_PATH}"' in text
         )
         assert 'test -s "${SMOOTHED_OUTPUT_PATH}"' in text

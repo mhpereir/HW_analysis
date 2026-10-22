@@ -26,7 +26,9 @@ def test_approximate_surface_energy_heating_rate_applies_pressure_volume_formula
         name="nssr_heating_rate_approx",
     )
 
-    expected = energy.values * 1000.0 * config.G_M_S2 / (config.CP_J_KG_K * volume.values)
+    expected = (
+        energy.values * 1000.0 * config.G_M_S2 / (config.CP_J_KG_K * volume.values)
+    )
     np.testing.assert_allclose(out.values, expected)
     assert out.name == "nssr_heating_rate_approx"
     assert out.attrs["units"] == "K hr-1"

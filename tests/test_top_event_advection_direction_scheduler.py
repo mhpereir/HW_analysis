@@ -31,8 +31,9 @@ def test_top_event_advection_scheduler_is_commit_verified_and_atomic():
     assert "python_executable=$(command -v python)" in text
     assert '/usr/bin/time -v "${python_executable}"' in text
     assert "plot_advection_direction_exploration_top_events_clim_anom.py" in text
-    assert "--season-months 6 7 8" in text
-    assert "--require-full-event" in text
+    assert '"${season_args[@]}"' in text
+    assert "HWA_SEASON_OPTIONS" in text
+    assert "hwa_validate_artifact_paths" in text
     assert 'test ! -e "${OUTPUT_DIR}"' in text
     assert 'STAGING_DIR="${OUTPUT_DIR}.staging.${PBS_JOBID}"' in text
     assert 'mv --no-clobber -T "${STAGING_DIR}" "${OUTPUT_DIR}"' in text

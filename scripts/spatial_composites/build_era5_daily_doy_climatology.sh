@@ -3,9 +3,10 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "${REPO_ROOT}/config/artifact_paths.sh"
 
-DAILY_DIR="${REPO_ROOT}/results/spatial_composites/daily"
-OUTPUT_PATH="${REPO_ROOT}/results/spatial_composites/climatology/era5_daily_doy_climatology_t2m_z500_global_1940_2024.nc"
+DAILY_DIR="${HWA_ARTIFACT_ROOT}/spatial_composites/daily"
+OUTPUT_PATH="${HWA_ARTIFACT_ROOT}/spatial_composites/climatology/era5_daily_doy_climatology_t2m_z500_global_1940_2024.nc"
 START_YEAR=1940
 END_YEAR=2024
 THREADS=4

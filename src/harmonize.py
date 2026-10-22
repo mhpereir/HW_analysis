@@ -72,7 +72,9 @@ def build_regional_analysis_dataset(
     resolution.
     """
     if time_dim not in heat_budget.coords:
-        raise ValueError(f"heat_budget is missing required time coordinate {time_dim!r}.")
+        raise ValueError(
+            f"heat_budget is missing required time coordinate {time_dim!r}."
+        )
 
     hourly_time = heat_budget[time_dim]
     data_vars: dict[str, xr.DataArray] = {}
@@ -204,7 +206,9 @@ def _validate_daily_projection_inputs(
 ) -> None:
     """Validate inputs for date-based daily-to-hourly projection."""
     if not isinstance(daily, xr.DataArray):
-        raise TypeError("project_daily_to_hourly expects daily to be an xarray.DataArray.")
+        raise TypeError(
+            "project_daily_to_hourly expects daily to be an xarray.DataArray."
+        )
 
     if daily_time_dim not in daily.coords:
         raise ValueError(
@@ -227,9 +231,13 @@ def _prepare_heat_budget_variables(
     time_dim: str,
 ) -> dict[str, xr.DataArray]:
     """Rename and normalize hourly heat-budget variables into analysis names."""
-    missing = sorted(source for source in HEAT_BUDGET_VARIABLE_MAP if source not in heat_budget)
+    missing = sorted(
+        source for source in HEAT_BUDGET_VARIABLE_MAP if source not in heat_budget
+    )
     if missing:
-        raise ValueError(f"heat_budget is missing required variables: {', '.join(missing)}")
+        raise ValueError(
+            f"heat_budget is missing required variables: {', '.join(missing)}"
+        )
 
     volume = heat_budget["domain_volume"]
     out: dict[str, xr.DataArray] = {}
@@ -282,7 +290,9 @@ def _prepare_full_diagnostic_variables(
 ) -> dict[str, xr.DataArray]:
     """Reduce and align optional full diagnostic source datasets."""
     missing = sorted(
-        name for name in FULL_DIAGNOSTIC_SOURCE_VARIABLES if name not in full_diagnostics
+        name
+        for name in FULL_DIAGNOSTIC_SOURCE_VARIABLES
+        if name not in full_diagnostics
     )
     if missing:
         raise ValueError(f"full_diagnostics are missing datasets: {', '.join(missing)}")
@@ -460,7 +470,9 @@ def _align_hourly_series(
 
     missing = target_time.difference(source_time)
     if len(missing) > 0:
-        preview = ", ".join(timestamp.strftime("%Y-%m-%dT%H:%M") for timestamp in missing[:5])
+        preview = ", ".join(
+            timestamp.strftime("%Y-%m-%dT%H:%M") for timestamp in missing[:5]
+        )
         suffix = "" if len(missing) <= 5 else f", ... ({len(missing)} total)"
         raise ValueError(f"{name!r} is missing target timestamps: {preview}{suffix}.")
 
@@ -495,7 +507,9 @@ def _project_daily_product_variables(
     """Project selected daily product variables to the hourly analysis axis."""
     missing = sorted(source for source in specs if source not in products)
     if missing:
-        raise ValueError(f"daily event products are missing variables: {', '.join(missing)}")
+        raise ValueError(
+            f"daily event products are missing variables: {', '.join(missing)}"
+        )
 
     return {
         output_name: _project_daily_analysis_variable(

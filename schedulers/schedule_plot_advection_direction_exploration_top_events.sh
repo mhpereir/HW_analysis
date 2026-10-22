@@ -6,9 +6,12 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 REGION="${REGION:?REGION is required}"
 INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"
@@ -22,7 +25,10 @@ TIME_END="${TIME_END:-2024}"
 TOP_N="${TOP_N:-10}"
 WINDOW_DAYS="${WINDOW_DAYS:-7}"
 SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
+
+hwa_start_log "plot_advection_top_events"
+hwa_validate_artifact_paths INPUT_PATH OUTPUT_DIR
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
@@ -30,9 +36,7 @@ test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)
 test -s "${INPUT_PATH}"
 test ! -e "${OUTPUT_DIR}"
 
-mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_DIR}")"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_plot_advection_top_events.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
+mkdir -p "$(dirname "${OUTPUT_DIR}")"
 
 STAGING_DIR="${OUTPUT_DIR}.staging.${PBS_JOBID}"
 test ! -e "${STAGING_DIR}"
@@ -78,6 +82,7 @@ echo "[info] started=$(date -Is)"
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v "${python_executable}" \
   scripts/plot_advection_direction_exploration_top_events.py \
+  "${season_args[@]}" \
   --region "${REGION}" \
   --bottom-boundary "${BOTTOM_BOUNDARY}" \
   --top-boundary "${TOP_BOUNDARY}" \
@@ -89,9 +94,7 @@ cd "${PROJECT_ROOT}"
   --output-dir "${STAGING_DIR}" \
   --top-n "${TOP_N}" \
   --window-days "${WINDOW_DAYS}" \
-  --smoothing-window "${SMOOTHING_WINDOW}" \
-  --season-months 6 7 8 \
-  --require-full-event
+  --smoothing-window "${SMOOTHING_WINDOW}"
 
 test -d "${STAGING_DIR}"
 expected_png_count=$((2 * TOP_N))

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import xarray as xr
 
-from . import advection_direction, composites, selectors
+from . import advection_direction, composites, season_selection, selectors
 
 DEFAULT_TOP_N = 10
 DEFAULT_WINDOW_DAYS = 7
@@ -18,7 +18,8 @@ def validate_options(
     window_days: int,
     smoothing_window: int,
     season_months: list[int] | None,
-    require_full_event: bool,
+    require_full_event: bool | None,
+    all_seasons: bool = False,
 ) -> None:
     """Validate shared top-event selection and display options."""
     if top_n < 1:
@@ -27,13 +28,9 @@ def validate_options(
         raise ValueError("--window-days must be >= 1.")
     if smoothing_window < 1:
         raise ValueError("--smoothing-window must be >= 1.")
-    if require_full_event and season_months is None:
-        raise ValueError("--require-full-event requires --season-months.")
-    if season_months is not None:
-        invalid = [month for month in season_months if month < 1 or month > 12]
-        if invalid:
-            values = ", ".join(str(month) for month in invalid)
-            raise ValueError(f"Season months must be between 1 and 12; got {values}.")
+    season_selection.resolve_months(season_months, all_seasons=all_seasons)
+    if all_seasons and require_full_event:
+        raise ValueError("--all-seasons cannot require full-season events.")
 
 
 def top_event_variables(stage1: xr.Dataset) -> tuple[str, ...]:
@@ -55,16 +52,16 @@ def select_reference_events(
     stage1: xr.Dataset,
     *,
     season_months: list[int] | None,
-    require_full_event: bool,
+    require_full_event: bool | None,
+    all_seasons: bool = False,
 ) -> xr.Dataset:
     """Return the absolute event population used for rank and reference."""
     selection_source = stage1.copy(deep=False)
     selection_source.attrs = dict(stage1.attrs)
-    if season_months is None:
-        return selection_source
-    selected = selectors.select_events_by_season(
+    selected = season_selection.select_event_population(
         selection_source,
-        season_months,
+        season_months=season_months,
+        all_seasons=all_seasons,
         require_full_event=require_full_event,
     )
     if selected.sizes.get("event", 0) == 0:
@@ -95,7 +92,8 @@ def build_top_event_inputs(
     top_n: int = DEFAULT_TOP_N,
     window_days: int = DEFAULT_WINDOW_DAYS,
     season_months: list[int] | None = None,
-    require_full_event: bool = False,
+    require_full_event: bool | None = None,
+    all_seasons: bool = False,
 ) -> tuple[xr.Dataset, xr.Dataset]:
     """Build an all-event mean and ranked event windows from one population.
 
@@ -122,6 +120,7 @@ def build_top_event_inputs(
         absolute_stage1,
         season_months=season_months,
         require_full_event=require_full_event,
+        all_seasons=all_seasons,
     )
     selected_events = select_top_tas_events(event_table, n=top_n)
     if selected_events.sizes.get("event", 0) == 0:
@@ -144,6 +143,13 @@ def build_top_event_inputs(
     )
 
     selection_attrs = {
+        **season_selection.selection_attrs(
+            season_selection.resolve_months(season_months, all_seasons=all_seasons),
+            anchor="event_peak",
+            require_full_event=(
+                not all_seasons if require_full_event is None else require_full_event
+            ),
+        ),
         "data_representation": data_representation,
         "top_event_rank_metric": DEFAULT_RANK_METRIC,
         "top_event_rank_largest": 1,

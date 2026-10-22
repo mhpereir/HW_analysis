@@ -29,10 +29,10 @@ top-event figures. Its callers therefore use the shared style indirectly even
 when they do not import `plot_style` themselves.
 
 `src/plot_paths.py` owns structured default output directories for Stage-1
-plots:
+plots beneath the [external artifact root](artifacts.md):
 
 ```text
-results/plots_<plot_name>/
+$HWA_ARTIFACT_ROOT/plots_<plot_name>/
   region_<region>/
   boundary_<bottom>_<top>/
   time_range_<start>_<end>/
@@ -56,6 +56,7 @@ results/plots_<plot_name>/
 | Stage 2 event features | adiabatic, advection, and diabatic event diagnostics | `plot_adiabatic_advection_comparison.py`, `plot_adiabatic_diabatic_advection.py` under `scripts/event_features/` |
 | Stage 2 event and baseline features | event-versus-baseline comparisons | `plot_adiabatic_advection_comparison_baseline.py`, `plot_adiabatic_diabatic_advection_baseline.py` under `scripts/event_features/` |
 | Stage 2 event features plus tracked settings | matched positive/negative `I_dyn` diagnostics | `scripts/idyn_matching_exploration/explore_idyn_matching.py` |
+| Saved integration-window heating-rank tables | target-event raw and climatology-corrected rank curves | `scripts/integration_window_analysis/plot_heating_comparison.py` |
 | Spatial composite product | sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |
 | Matched spatial composite product | matched positive/negative `I_dyn_pre` sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py` |
 
@@ -63,6 +64,22 @@ Scripts under `scripts/event_features/old/` are legacy and are not active
 figure entrypoints.
 
 ## Required behavior
+
+The event-versus-clean-baseline comparison also consumes the saved
+[component-anomaly products](../products/stage2_component_anomalies.md).
+Both inputs must use the same representation, region, pressure layer, window
+and climatological reference. Anomaly figures label all heating integrals with
+primes and identify the reference period; lower-panel diagonals represent the
+anomalous total. Peak-TAS coloring and accepted population membership are
+unchanged. Absolute inputs retain their existing rendering.
+
+The integration-window rank figure follows the
+[heating-rank product contract](../products/integration_window_ranks.md).
+It reads saved comparisons, uses `HEATING_RANK_STYLES`, displays one regional
+panel per input, and puts rank 1 at the top of an integer axis. Both curves
+use the same fixed cohort across all integration windows. Identify the
+climatological atmospheric-temperature endpoint correction, reference years
+and population size. PNG and PDF outputs must not overwrite earlier figures.
 
 - Use the non-interactive Matplotlib `Agg` backend for batch rendering.
 - The regional-domain overview discovers unique regions from the Stage 1
@@ -143,16 +160,64 @@ figure entrypoints.
   figure. `presentation` retains the first panel, advection versus adiabatic
   heating, and the fourth panel, diabatic heating versus `I_dyn,net`, in a
   2-row by 1-column figure. Both retained panels show their own x-axis label
-  because their x variables differ. Point populations, finite-value masks,
-  reference lines, titles, count annotations, event-severity colors, shared
-  colorbar, and baseline-versus-event layering retain their full-layout
-  meanings. When no output path is supplied, presentation figures use a
+  because their x variables differ. Stored values, event-severity colour
+  mapping, the shared colorbar, and baseline-versus-event layering retain
+  their full-layout meanings. The presentation-specific population and
+  annotations are defined below. When no output path is supplied, figures use a
   distinct `_presentation.png` filename so they cannot overwrite the default
   four-panel product. The presentation canvas is 7.5 inches wide by 9 inches
   high, widening the original single-column canvas by 25% without changing its
   height so the scatter panels and shared colorbar have more horizontal space.
   Synthetic plot tests must confirm both layouts, presentation dimensions, and
   their CLI routing.
+- In both adiabatic/advection comparison layouts, the event-only x-axes pad
+  the finite plotted range by 5% on either side, including zero in the range,
+  so extreme event markers are not cut in half. The presentation layout uses
+  the shared major-tick limiter with at most four intervals on each x-axis;
+  retain the shared two-decimal formatting and existing font and canvas sizes.
+- The adiabatic/advection baseline comparison uses a stable, visible Events
+  legend proxy sampled from the midpoint of the shared severity colormap,
+  with a contrasting outline. The proxy identifies the event population,
+  not an individual event or severity value; the unchanged colorbar remains
+  the quantitative severity key. Do not derive the legend marker from the
+  first event, whose color may be white. Keep the legend in the first panel.
+- Both comparison presentation layouts selectively adopt the budget guides
+  from `agent/stage2-antecedent-temperature` (`955f12d`, refined in `cd10710`).
+  The lower panel is titled `Diabatic Residual vs I_dyn,net`: `I_diabatic_pre`
+  is a closure residual, not a separately measured direct heating term. Add
+  labelled dotted `x+y=c` guides at 5 K increments and a shared footer explaining
+  `I_dyn,net + I_diabatic = I_dT/dt`. These are constant integrated atmospheric
+  warming guides, not fitted relationships or surface-temperature anomalies.
+  The shared `plot_style` helper clips guides to existing linear-axis limits
+  without changing the plotted range. For unusually broad ranges, increase
+  spacing to an integer multiple of 5 K to cap the guide count at 17. Omit
+  corner-only segments shorter than 10% of the panel in both dimensions.
+- Each presentation uses one common finite population for all five budget
+  fields (`I_adiabatic_pre`, `I_advection_pre`, stored `I_dyn_pre`,
+  `I_dTdt_pre`, and `I_diabatic_pre`) and the requested event colour variable,
+  if any. This intentionally includes `I_dTdt_pre` even though it is represented
+  by reference guides rather than a scatter axis. Apply the shared finite-row
+  selector in `src/selectors.py`; baseline rows must also have
+  `event_adjacent == 0`. Use the retained events to normalize colours, and fail
+  clearly before allocating a figure if any required population is empty.
+  Replace per-panel count boxes with one figure-level count header. Full
+  layouts retain their existing per-panel filtering and count annotations.
+- Presentation event markers default to 40 points squared and opacity 0.9 in
+  both renderers and their PBS launchers. Explicit size/opacity overrides take
+  precedence. Baseline markers remain size 24 and opacity 0.2; full-layout
+  defaults remain unchanged. Keep the visible Events legend proxy, padded
+  limits, four-interval x ticks, two-decimal formatting, and 7.5-by-9-inch
+  canvas from the earlier presentation-legibility repair.
+- No Stage-2 rebuild, climatology input, new temperature variables, or budget
+  window change is required for these presentation additions. They do not
+  modify source datasets or the separate antecedent-temperature diagnostic.
+  Test common masks (including missing values in different fields), retained
+  colour normalization, empty populations, source immutability, guide values
+  and clipping, shared counts, size/opacity defaults and overrides, and full
+  layout compatibility. Check marker clearance, guide labels, footer and tick
+  legibility after shared 300 DPI export, including negative ranges and constant
+  data. Validate fresh, non-overwriting Venus renders at original resolution
+  before production acceptance.
 - Event-versus-clean-baseline figures pad each finite plotted data range by 5%
   on both sides while keeping zero reference lines inside the padded range.
   Shared x-axes use the combined plotted x-data, while each panel derives its
@@ -171,19 +236,43 @@ figure entrypoints.
 ### Extended temporal-composite layout
 
 Extended all-event, split-event, climatological-anomaly, and top-event figures
-use a 5x2 panel grid. The left column contains temperature and volume, `dTdt`,
-advection, adiabatic heating, and diabatic heating. The right column contains:
+use a 5x2 panel grid with exactly ten axes, one y-axis per panel:
 
-1. anticyclonic and cyclonic LWA;
-2. soil moisture and cloud cover on independent y-axes;
-3. longwave and shortwave radiative heating;
-4. sensible surface heating; and
-5. latent surface heating.
+| Row | Left column | Right column |
+| --- | --- | --- |
+| 1 | temperature (`T_mean`) | anticyclonic and cyclonic LWA |
+| 2 | `dTdt` | cloud cover |
+| 3 | advection | soil moisture |
+| 4 | adiabatic heating | longwave and shortwave radiative heating |
+| 5 | diabatic heating | sensible surface heating |
 
-Soil moisture uses the left y-axis and cloud cover uses the right y-axis in
-their shared panel. Absolute cloud cover is bounded to the physical fraction
-range from zero to one, while a climatological anomaly is not. PBL diagnostics
-and panels are inactive under
+The temperature panel contains no volume trace. Cloud cover and soil moisture
+have separate panels, and latent surface heating is omitted. Absolute cloud
+cover is bounded to the physical fraction range from zero to one, while a
+climatological anomaly is not. Anomalous temperature, cloud cover, and soil
+moisture include a zero reference. Keep the IQR, split-bin style, and top-event
+all-event-reference keys in the first panel as applicable, alongside the
+temperature key. Preserve the existing variable colors and sensible-heating
+sign convention.
+
+This changes the shared extended renderer and the variables selected and
+smoothed by its six absolute/anomaly entrypoints. Volume and latent heating
+are no longer required for extended rendering; existing Stage-1 and climatology
+products remain compatible and retain those stored variables. Compact paper
+and presentation layouts, event selection and ranking, peak alignment,
+percentile reductions, smoothing of retained variables, CLI flags, and output
+naming remain unchanged. Historical figures remain valid artifacts; new
+production validation and subsequent regeneration use fresh output namespaces.
+
+Synthetic tests must check the panel order, exactly ten axes, separated cloud
+and soil traces, absence of volume and latent heating, reference and percentile
+displays, legend keys, bounds, signs, and source immutability for all-event,
+split-event, and top-event figures in both representations. Extended entrypoints
+must select only the displayed variables and retain unsmoothed daily LWA.
+Before production acceptance, run the full local suite and representative
+Venus PBS renders, inspecting the saved figures at original resolution.
+
+PBL diagnostics and panels are inactive under
 [decision 008](../decisions/008_retire_pbl_diagnostics.md).
 
 ### Presentation temporal layout
@@ -212,7 +301,7 @@ must not overwrite the paper-layout products. `--layout presentation` and
 
 The absolute and climatological-anomaly top-event entrypoints accept the same
 presentation layout and panel order. They preserve the selected event trace,
-the all-event mean and IQR reference, absolute-time x-axis, event start/end
+the all-event mean and IQR reference, peak-relative day x-axis, event start/end
 markers, event-peak marker, ranking, and raw plus 24-hour-smoothed output
 behavior. The temperature panel contains only `T_mean`, with the event trace
 and reference keys both retained. Climatological anomalies are constructed
@@ -220,6 +309,39 @@ before the event trace, all-event reference, IQR, or smoothing is calculated,
 while selection and ranking remain absolute. Presentation and anomaly outputs
 use distinct plot directories and filename tokens so they cannot overwrite
 the extended absolute paper figures.
+
+### Top-event time axis
+
+All top-event layouts, including the compact paper, extended 5x2 paper, and
+3x2 presentation views, label the x-axis `Lag from event peak (days)`. Plot
+each source timestamp at its elapsed time from the exact Stage-1 `peak_time`,
+divided by 24 hours. Negative values precede the peak, zero marks the peak,
+and positive values follow it. Preserve fractional days and sub-hour offsets;
+do not round timestamps to calendar dates or resample the hourly traces.
+
+Convert the all-event reference's `lag_hour` coordinate to days for both its
+mean and IQR. Place the event start and end markers on the same elapsed-day
+axis and the peak marker at zero. Use shared numeric tick formatting that
+prefers whole-day major ticks when the range permits and retains fractional
+major ticks for short windows. Minor ticks fall at integer days, spaced one
+day apart, with ticks coincident with major ticks omitted. Do not subdivide
+days into fractional minor ticks, even for short windows. Preserve this
+formatting on export, including twin axes.
+
+This is a display-only change for both absolute and climatological-anomaly
+top-event figures, including raw and smoothed outputs. Stage-1 timestamps,
+event selection and ranking, window extraction, reference reductions,
+smoothing, y-values, and output naming remain unchanged. Composite plots
+continue to use their existing lag-hour axes. Existing figures remain
+historical artifacts; production validation uses a fresh output namespace.
+
+Synthetic regressions must check elapsed-day coordinates across every panel,
+reference means and IQRs, exact peak and boundary markers, non-midnight peaks,
+source immutability, and whole-day minor ticks after export in each layout.
+Check that major and minor ticks together mark every integer day in the
+standard event window, while short windows retain distinct major labels.
+Before production acceptance, render representative presentation and extended
+paper figures through Venus PBS and inspect the saved axes at original resolution.
 
 ### Composite labels and surface-flux signs
 
@@ -233,11 +355,12 @@ climatological-anomaly representation explicitly.
 
 ERA5 sensible and latent surface heat fluxes use the source convention that
 positive values are directed toward the surface. In every extended temporal
-figure, render `sshf_heating_rate_approx` and `slhf_heating_rate_approx` with
-the opposite sign, so positive plotted values denote heat transfer into the
-atmosphere and can be compared directly with the atmospheric diabatic-heating
-sign. Apply the same sign reversal to composite means, event-percentile bounds,
-top-event traces, and their reference composites.
+figure, render sensible heating (`sshf_heating_rate_approx`) with the opposite
+sign, so positive plotted values denote heat transfer into the atmosphere and
+can be compared directly with the atmospheric diabatic-heating sign. Apply the
+same sign reversal to composite means, event-percentile bounds, top-event
+traces, and their reference composites. Latent heating retains its stored
+source convention but is no longer displayed in this layout.
 
 This is a display transform only. It must not mutate Stage 1, the climatology
 companion, or any assembled composite or top-event dataset. Synthetic plotting
@@ -267,3 +390,11 @@ dashed-event line semantics, independent display smoothing,
 grouped-component identities, stable filenames, source-data immutability,
 no-overwrite behavior, and complete scheduler publication. The anomaly variant
 must additionally verify timestamp-level climatology subtraction.
+
+For the presentation feature comparisons, first run the commit-pinned
+`schedulers/schedule_presentation_feature_smoke.sh` on Venus. It exercises the
+synthetic plotting/export regressions in `dev_env` with warnings treated as
+errors. Then render the unchanged accepted Stage-2 inputs through the existing
+event-only and baseline-comparison schedulers into fresh commit-scoped paths.
+Record input/output checksums, counts, clean logs and original-resolution
+inspection; a successful PBS job alone does not establish visual acceptance.

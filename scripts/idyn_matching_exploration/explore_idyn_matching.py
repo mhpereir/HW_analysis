@@ -28,14 +28,15 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.idyn_matching_exploration import matching_settings
-from src import plot_style, selectors
+from src import analysis_io, plot_style, season_selection, selectors
+from src.artifact_paths import artifact_root
 
 DEFAULT_INPUT_PATH = (
-    REPO_ROOT
-    / "results/stage2_event_features"
+    artifact_root()
+    / "stage2_event_features"
     / "hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc"
 )
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results/Idyn_matching_exploration"
+DEFAULT_OUTPUT_DIR = artifact_root() / "Idyn_matching_exploration"
 
 OVERVIEW_FILENAME = "idyn_population_overview.png"
 MATCHING_FILENAME = "tas_anom_matching_diagnostics.png"
@@ -82,6 +83,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Explore matching positive and negative Stage-2 I_dyn_pre events."
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument(
         "--input-path",
         type=Path,
@@ -105,7 +107,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Replace existing exploratory figures.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -117,9 +119,7 @@ def validate_args(args: argparse.Namespace) -> None:
         )
 
     existing = [
-        path
-        for path in artifact_paths(args.output_dir).values()
-        if path.exists()
+        path for path in artifact_paths(args.output_dir).values() if path.exists()
     ]
     if existing and not args.overwrite:
         listed = ", ".join(str(path) for path in existing)
@@ -145,12 +145,10 @@ def artifact_paths(output_dir: str | Path) -> dict[str, Path]:
     return paths
 
 
-def open_event_features(path: str | Path) -> xr.Dataset:
-    input_path = Path(path).expanduser().resolve()
-    with xr.open_dataset(
-        input_path,
-        engine="h5netcdf",
-        decode_timedelta=True,
+def open_event_features(path: str | Path, **season_options) -> xr.Dataset:
+    """Open a Stage-2 event table with validated seasonal membership."""
+    with analysis_io.open_stage2_features(
+        path, expected_stage="stage_2_event_features", **season_options
     ) as ds:
         return ds.load()
 
@@ -175,8 +173,7 @@ def prepare_exploration(
     missing = sorted(required.difference(features.data_vars))
     if missing:
         raise ValueError(
-            "Event-feature table is missing required variables: "
-            + ", ".join(missing)
+            "Event-feature table is missing required variables: " + ", ".join(missing)
         )
     if "event" not in features.dims:
         raise ValueError("Event-feature table is missing the 'event' dimension.")
@@ -633,12 +630,8 @@ def plot_balance_and_sensitivity(
 
     variables = list(exploration.settings.balance_variables)
     positions = np.arange(len(variables))
-    before = np.array(
-        [exploration.balance[name]["smd_before"] for name in variables]
-    )
-    after = np.array(
-        [exploration.balance[name]["smd_after"] for name in variables]
-    )
+    before = np.array([exploration.balance[name]["smd_before"] for name in variables])
+    after = np.array([exploration.balance[name]["smd_after"] for name in variables])
     balance_ax.axvspan(-0.1, 0.1, color=plot_style.COLORS["grid"], alpha=0.7)
     balance_ax.axvline(
         0,
@@ -672,9 +665,7 @@ def plot_balance_and_sensitivity(
         zorder=3,
     )
     balance_ax.set_yticks(positions)
-    balance_ax.set_yticklabels(
-        [VARIABLE_LABELS.get(name, name) for name in variables]
-    )
+    balance_ax.set_yticklabels([VARIABLE_LABELS.get(name, name) for name in variables])
     plot_style.use_default_numeric_formatter(balance_ax.yaxis)
     balance_ax.invert_yaxis()
     balance_ax.set_xlabel("Standardized mean difference\n(positive minus negative)")
@@ -713,8 +704,7 @@ def plot_balance_and_sensitivity(
     sensitivity_ax.invert_yaxis()
     sensitivity_ax.set_xlabel("Matched pairs")
     sensitivity_calipers = {
-        specification.caliper_sd
-        for specification in sensitivity_specifications
+        specification.caliper_sd for specification in sensitivity_specifications
     }
     if len(sensitivity_calipers) == 1:
         sensitivity_subtitle = (
@@ -793,9 +783,7 @@ def plot_matching_specification_tradeoff(
             smds = np.full(len(variables), np.nan)
         else:
             balance = balance_for_match(exploration, match)
-            smds = np.array(
-                [balance[name]["smd_after"] for name in variables]
-            )
+            smds = np.array([balance[name]["smd_after"] for name in variables])
         balance_ax.scatter(
             smds,
             positions,
@@ -806,9 +794,7 @@ def plot_matching_specification_tradeoff(
             zorder=3,
         )
     balance_ax.set_yticks(positions)
-    balance_ax.set_yticklabels(
-        [VARIABLE_LABELS.get(name, name) for name in variables]
-    )
+    balance_ax.set_yticklabels([VARIABLE_LABELS.get(name, name) for name in variables])
     plot_style.use_default_numeric_formatter(balance_ax.yaxis)
     balance_ax.invert_yaxis()
     balance_ax.set_xlabel("Standardized mean difference\n(positive minus negative)")
@@ -860,9 +846,7 @@ def plot_matching_specification_tradeoff(
                 None,
             )
             if existing_index is None:
-                annotation_groups.append(
-                    (pair_count, worst_smd, [comparison_caliper])
-                )
+                annotation_groups.append((pair_count, worst_smd, [comparison_caliper]))
             else:
                 annotation_groups[existing_index][2].append(comparison_caliper)
         for pair_count, worst_smd, group_calipers in annotation_groups:
@@ -898,8 +882,7 @@ def plot_matching_specification_tradeoff(
         f"Worst absolute SMD across {len(variables)} audit variables"
     )
     frontier_ax.set_title(
-        "Retention versus worst-case balance\n"
-        "(labels are calipers in pooled SD)"
+        "Retention versus worst-case balance\n(labels are calipers in pooled SD)"
     )
     frontier_ax.set_xlim(0, exploration.negative_indices.size * 1.05)
     frontier_ax.set_ylim(0, 1.18)
@@ -932,7 +915,9 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
     settings = matching_settings.load_matching_settings(args.settings_path)
-    features = open_event_features(args.input_path)
+    features = open_event_features(
+        args.input_path, **season_selection.season_kwargs(args)
+    )
     exploration = prepare_exploration(features, settings=settings)
     written = write_figures(exploration, args.output_dir)
     summary = add_input_provenance(

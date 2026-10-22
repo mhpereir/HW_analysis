@@ -23,6 +23,7 @@ from src import (
     climatology,
     composites,
     plot_paths,
+    season_selection,
     selectors,
 )
 
@@ -50,6 +51,7 @@ def parse_args() -> argparse.Namespace:
         )
     )
     plot_paths.add_stage1_path_arguments(parser)
+    season_selection.add_season_arguments(parser)
     parser.add_argument("--climatology-path", type=Path, default=None)
     parser.add_argument(
         "--event-features-path",
@@ -76,7 +78,7 @@ def parse_args() -> argparse.Namespace:
         default=advection_direction_plotting.DEFAULT_SMOOTHING_WINDOW,
     )
     args = plot_paths.finalize_stage1_plot_paths(
-        parser.parse_args(),
+        season_selection.parse_args(parser),
         parser,
         plot_name=PLOT_NAME,
         default_output_filename=DEFAULT_OUTPUT_FILENAME,
@@ -118,22 +120,13 @@ def validate_args(args: argparse.Namespace) -> None:
         raise FileExistsError(f"Matched anomaly plot output already exists: {paths}.")
 
 
-def open_event_features(path: str | Path) -> xr.Dataset:
-    """Open and validate the canonical Stage-2 event-feature table."""
-    input_path = Path(path).expanduser().resolve()
-    ds = xr.open_dataset(
-        input_path,
-        engine="h5netcdf",
-        decode_timedelta=True,
+def open_event_features(path: str | Path, **season_options) -> xr.Dataset:
+    """Validate the source population before explicitly selecting full events."""
+    return analysis_io.open_stage2_features(
+        path,
+        expected_stage=EXPECTED_EVENT_FEATURE_STAGE,
+        **season_options,
     )
-    if ds.attrs.get("pipeline_stage") != EXPECTED_EVENT_FEATURE_STAGE:
-        actual = ds.attrs.get("pipeline_stage")
-        ds.close()
-        raise ValueError(
-            "Expected Stage-2 event features with "
-            f"pipeline_stage={EXPECTED_EVENT_FEATURE_STAGE!r}; got {actual!r}."
-        )
-    return ds
 
 
 def build_matched_composites(
@@ -271,10 +264,21 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
     settings = matching_settings.load_matching_settings(args.matching_settings_path)
-    stage1 = analysis_io.open_harmonized_timeseries(args.input_path)
-    climate = analysis_io.open_regional_hourly_climatology(args.climatology_path)
-    event_features = open_event_features(args.event_features_path)
-    try:
+    source_options = season_selection.season_kwargs(args)
+    # A peak-selected table contains the complete-event subset. A full-event
+    # table cannot supply a peak-selected population that includes boundary HWs.
+    if args.require_full_event:
+        source_options["require_full_event"] = None
+    with (
+        analysis_io.open_harmonized_timeseries(args.input_path) as stage1,
+        analysis_io.open_regional_hourly_climatology(args.climatology_path) as climate,
+        open_event_features(
+            args.event_features_path, **source_options
+        ) as event_features,
+    ):
+        selected_features = season_selection.select_event_population(
+            event_features, **season_selection.season_kwargs(args)
+        )
         event_features_sha256 = sha256_file(args.event_features_path)
         variables = (
             "advection",
@@ -291,7 +295,7 @@ def main() -> int:
         prepared = build_matched_composites(
             stage1,
             anomaly_source,
-            event_features,
+            selected_features,
             settings=settings,
             specification_id=args.matching_specification,
             window_days=args.window_days,
@@ -309,10 +313,6 @@ def main() -> int:
             ),
             smoothing_window=args.smoothing_window,
         )
-    finally:
-        event_features.close()
-        climate.close()
-        stage1.close()
 
     print("Wrote matched advection-direction anomaly plots:")
     for path in written:
