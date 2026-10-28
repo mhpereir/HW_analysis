@@ -7,6 +7,8 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
@@ -27,6 +29,7 @@ THRESHOLD_VARIABLE="${THRESHOLD_VARIABLES[ARRAY_INDEX]}"
 QUANTILE_THRESHOLD="${QUANTILE_THRESHOLD:-q90}"
 TIME_START="${TIME_START:-1940}"
 TIME_END="${TIME_END:-2024}"
+INTEGRATION_HOURS="${INTEGRATION_HOURS:-96}"
 INPUT_PATH="${INPUT_PATH:-${HWA_ARTIFACT_ROOT}/stage1/harmonized_regional_timeseries_${REGION}_surface_700hPa_${THRESHOLD_VARIABLE}_${QUANTILE_THRESHOLD}_${TIME_START}_${TIME_END}.nc}"
 OUTPUT_PATH="${OUTPUT_PATH:-${HWA_ARTIFACT_ROOT}/stage2_baseline_features/non_event_day_features_fixed_windows_${REGION}_${THRESHOLD_VARIABLE}_${QUANTILE_THRESHOLD}.nc}"
 LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
@@ -60,15 +63,17 @@ echo "[info] host=$(hostname)"
 echo "[info] commit=${actual_commit}"
 echo "[info] python=$(command -v python)"
 echo "[info] threshold_variable=${THRESHOLD_VARIABLE}"
+echo "[info] integration_hours=${INTEGRATION_HOURS}"
 echo "[info] input_path=${INPUT_PATH}"
 echo "[info] output_path=${OUTPUT_PATH}"
 echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v python scripts/event_features/build_stage2_baseline_features.py \
+  "${season_args[@]}" \
     --input-path "${INPUT_PATH}" \
     --output-path "${STAGED_OUTPUT_PATH}" \
-    --season-months 6 7 8
+    --integration-hours "${INTEGRATION_HOURS}"
 
 test -s "${STAGED_OUTPUT_PATH}"
 mv -n -- "${STAGED_OUTPUT_PATH}" "${OUTPUT_PATH}"

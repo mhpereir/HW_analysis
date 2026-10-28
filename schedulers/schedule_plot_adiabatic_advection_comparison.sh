@@ -6,6 +6,8 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
@@ -59,6 +61,7 @@ echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v python scripts/event_features/plot_adiabatic_advection_comparison.py \
+  "${season_args[@]}" \
   --input-path "${EVENT_INPUT_PATH}" \
   --output-path "${OUTPUT_PATH}" \
   --color-variable "${COLOR_VARIABLE}" \

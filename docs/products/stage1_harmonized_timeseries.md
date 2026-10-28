@@ -45,6 +45,36 @@ stable save/open behavior and validates the product marker on read.
 | `time` | Harmonized analysis time axis, currently hourly for the primary product. |
 | `event` | Heatwave event-summary axis. |
 
+## Production hourly coverage
+
+Both production entrypoints, `build_stage1_harmonized_timeseries.py` and
+`build_stage1_pressure_layer.py`, use the same coverage check in
+`src.harmonize.validate_production_hourly_coverage`. For the current
+May-October EHB campaigns, each requested analysis year must contain exactly
+the hourly timestamps from May 1 at 01:00 UTC through October 31 at 22:00 UTC,
+inclusive (4,414 samples per year). These are the centered-hour EHB timestamps;
+the first and last hours of the upstream May-October input period are absent.
+The off-season gap between annual blocks is expected.
+
+This expectation is independent of the lower and upper pressure boundaries.
+Missing years or hours, duplicate or unordered timestamps, shifted hours, and
+extra timestamps fail before assembly. The reference-based builder applies
+the same check to both its annual EHB sources and the selected reference
+years, then requires exact source/reference alignment. Its optional validation
+of additional upstream years uses the same annual coverage contract.
+
+The raw-source entrypoint now rejects incomplete seasonal EHB inputs that
+previously could pass through to assembly. Complete production inputs retain
+their numerical results and schema. Existing product readers and low-level
+harmonization helpers continue to support historical products and short
+synthetic datasets; they do not impose this production calendar implicitly.
+Changing the production season requires updating this shared expectation for
+both entrypoints together, not a pressure-layer-specific exception.
+
+Validation must exercise both entrypoints with complete and incomplete
+coverage, including missing requested years, and retain the independent
+pressure-layer source, reference-identity, and numerical-closure checks.
+
 ## Core Time-indexed Variables
 
 Required and expected variables include:
@@ -227,7 +257,7 @@ metadata states this limitation. They must not be substituted for the EHB
 residual `diabatic`.
 
 Before publication, validate the EHB manifest's horizontal region and pressure
-bounds, every requested year's complete seasonal hourly axis, finite numeric
+bounds, every requested year's shared production hourly coverage, finite numeric
 fields, positive volume, six-face reconstruction and budget closure. Validate
 the complete upstream annual inventory, including years outside the analysis
 period, in the production run. Validate exact equality of reused fields and

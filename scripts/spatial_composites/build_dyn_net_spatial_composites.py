@@ -16,7 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src import config
+from src import analysis_io, config, season_selection
 from src.artifact_paths import artifact_root
 
 DEFAULT_EVENT_FEATURES_PATH = (
@@ -58,6 +58,7 @@ def parse_args() -> argparse.Namespace:
             "negative event I_dyn_net populations."
         )
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument(
         "--event-features-path",
         type=Path,
@@ -91,7 +92,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Replace an existing composite product.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -115,10 +116,10 @@ def main() -> int:
     validate_args(args)
 
     event_path = args.event_features_path.expanduser().resolve()
-    with xr.open_dataset(
+    with analysis_io.open_stage2_features(
         event_path,
-        engine="h5netcdf",
-        decode_timedelta=True,
+        expected_stage="stage_2_event_features",
+        **season_selection.season_kwargs(args),
     ) as features:
         events = prepare_events(features.load())
 
@@ -151,7 +152,9 @@ def prepare_events(features: xr.Dataset) -> xr.Dataset:
     finite = (~np.isnat(peak_values)) & np.isfinite(dyn_net)
     if not finite.all():
         bad = int((~finite).sum())
-        raise ValueError(f"Event-feature table contains {bad} non-finite required rows.")
+        raise ValueError(
+            f"Event-feature table contains {bad} non-finite required rows."
+        )
 
     nonzero = dyn_net != 0
     keep = np.flatnonzero(nonzero)
@@ -268,9 +271,7 @@ def build_spatial_composites(
         np.array(
             [
                 float(
-                    events["I_dyn_pre"]
-                    .where(events["event_dyn_sign"] == group)
-                    .mean()
+                    events["I_dyn_pre"].where(events["event_dyn_sign"] == group).mean()
                 )
                 for group in GROUPS
             ]
@@ -294,6 +295,13 @@ def build_spatial_composites(
         }
     )
     copy_event_audit_variables(out, events)
+    out.attrs.update(
+        {
+            name: events.attrs[name]
+            for name in season_selection.SEASON_ATTRS
+            if name in events.attrs
+        }
+    )
     out.attrs.update(
         {
             "pipeline_stage": "daily_dyn_net_spatial_composites",
@@ -350,9 +358,9 @@ def timestamp_weights(
         group_index = GROUPS.index(str(sign))
         sample_weight = 1.0 / group_counts[group_index]
         for lag_index, value in enumerate(row):
-            weights[pd.Timestamp(value).normalize()][
-                group_index, lag_index
-            ] += sample_weight
+            weights[pd.Timestamp(value).normalize()][group_index, lag_index] += (
+                sample_weight
+            )
     assert_normalized_weights(weights)
     return dict(weights)
 
@@ -372,9 +380,9 @@ def calendar_key_weights(
         sample_weight = 1.0 / group_counts[group_index]
         for lag_index, value in enumerate(row):
             timestamp = pd.Timestamp(value)
-            weights[(timestamp.month, timestamp.day)][
-                group_index, lag_index
-            ] += sample_weight
+            weights[(timestamp.month, timestamp.day)][group_index, lag_index] += (
+                sample_weight
+            )
     assert_normalized_weights(weights)
     return dict(weights)
 
@@ -496,12 +504,16 @@ def standardize_spatial_dataset(
         pressure_dim = pressure_dims[0]
         levels = np.asarray(out[pressure_dim].values, dtype=float)
         if levels.size != 1 or not np.isclose(levels[0], 500.0):
-            raise ValueError(f"Expected only Z500; found pressure levels {levels.tolist()}.")
+            raise ValueError(
+                f"Expected only Z500; found pressure levels {levels.tolist()}."
+            )
         out = out.isel({pressure_dim: 0}, drop=True)
     elif "pressure_level" in out.coords:
         levels = np.asarray(out["pressure_level"].values, dtype=float)
         if levels.size != 1 or not np.isclose(levels[0], 500.0):
-            raise ValueError(f"Expected only Z500; found pressure levels {levels.tolist()}.")
+            raise ValueError(
+                f"Expected only Z500; found pressure levels {levels.tolist()}."
+            )
 
     latitude = np.asarray(out["latitude"].values, dtype=float)
     longitude = np.asarray(out["longitude"].values, dtype=float)
@@ -542,7 +554,9 @@ def load_weighted_fields(
     t2m = np.asarray(ds["t2m"].isel(time=indices).load().values, dtype=np.float64)
     z = np.asarray(ds["z"].isel(time=indices).load().values, dtype=np.float64)
     if t2m.ndim != 3 or z.ndim != 3:
-        raise ValueError(f"{context} fields must have time/latitude/longitude dimensions.")
+        raise ValueError(
+            f"{context} fields must have time/latitude/longitude dimensions."
+        )
     if not np.isfinite(t2m).all() or not np.isfinite(z).all():
         raise ValueError(f"{context} contains non-finite selected spatial fields.")
     return {
@@ -574,7 +588,7 @@ def copy_event_audit_variables(out: xr.Dataset, events: xr.Dataset) -> None:
         "I_dyn_net",
         "event_dyn_sign",
     )
-    optional = ("matched_pair_id", "matched_pair_distance")
+    optional = ("start_time", "end_time", "matched_pair_id", "matched_pair_distance")
     audit_names = required + tuple(name for name in optional if name in events)
     for name in audit_names:
         out[name] = events[name]

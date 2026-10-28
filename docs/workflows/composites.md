@@ -24,9 +24,19 @@ scripts/plot_composite_timeseries_all_clim_anom.py
 scripts/plot_composite_timeseries_split_clim_anom.py
 scripts/plot_advection_direction_exploration_clim_anom.py
 scripts/plot_advection_direction_exploration_matched_clim_anom.py
+scripts/plot_advection_direction_exploration_top_events.py
+scripts/plot_advection_direction_exploration_top_events_clim_anom.py
 ```
 
 ## Expected Behavior
+
+Population selection defaults to JJA complete detected events, including for
+top-event ranking and its all-event reference. `--all-seasons` explicitly
+requests all saved events; `--no-require-full-event` allows peak-only seasonal
+membership. All/split, event-summary and face-advection entrypoints share these
+defaults. Source timestamps stay intact. See
+[decision 010](../decisions/010_season_selection_defaults.md) for Stage-2
+consumer guards, compatibility and regression examples.
 
 - Open the Stage-1 product through the analysis-product IO layer when validation
   is needed.
@@ -81,13 +91,64 @@ The six temporal plotting Venus schedulers expose the same choice through
 production figures. Set `PLOT_LAYOUT=presentation` to pass the six-panel
 layout without the mutually exclusive extended-panel flag.
 
+The shared [extended layout](plotting.md#extended-temporal-composite-layout)
+has ten panels with one y-axis each. It shows temperature without volume,
+separates cloud cover and soil moisture, and omits latent heating. Extended
+variable selection and smoothing follow these displayed quantities; existing
+Stage-1 and climatology products need no migration.
+
 The matched face-advection variant obtains matched membership from the
 canonical Stage-2 event-feature table and tracked matching settings. It then
+restricts that table to complete JJA events by default, before matching, and
 selects those event IDs from the absolute Stage-1 event table and verifies that
 their Stage-1 and Stage-2 peak timestamps agree. Stage 1 remains authoritative
 for event windows and alignment; Stage 2 supplies only the configured matched
 membership. The positive and negative groups are composited separately with
 the same event count and lag window.
+
+Each face-resolved advection entrypoint writes two figures from the same
+prepared composite: the existing unsmoothed figure and a sibling whose filename
+ends in `_smoothed.png`. The second figure applies a centered running mean to
+the signed face tendencies, with a default window of 24 hourly samples and a
+complete-window requirement at the lag boundaries. Grouped zonal,
+meridional, horizontal, vertical, and all-face curves are derived from the
+smoothed face tendencies, so their identities remain exact. For the matched
+variant, the display smoothing is applied independently to the positive and
+negative composites after event reduction. It does not change event selection,
+matching, climatology subtraction, or any Stage-1 or Stage-2 product. The
+running-mean window remains configurable through `--smoothing-window`, and the
+smoothed figure title identifies the applied window.
+
+The raw and climatological-anomaly top-event face-advection entrypoints rank
+events by the absolute Stage-1 `tas_peak`, using the same deterministic
+descending-rank semantics as `scripts/plot_top_events.py`. The default is the
+top 10 complete JJA events. Shared seasonal selection is applied before
+ranking, and the selected event table is also the population for the
+all-event reference composite. The raw variant plots the Stage-1 tendencies
+directly. The climatological-anomaly variant subtracts the timestamp-matched
+hourly climatology, which never changes event membership or rank. Explicit
+`--all-seasons`, custom `--season-months`, and `--no-require-full-event` modes
+follow decision 010. These defaults also apply to the Python preparation API.
+
+For each selected event, the entrypoint writes an hourly and a centered
+display-smoothed two-panel figure on the common peak-relative lag axis. Each
+component keeps its face or grouped-component color. Solid lines show the
+all-event mean and dashed lines show the selected top event. The raw figures
+retain absolute `K hr-1` tendencies, while the anomaly figures use anomaly
+labels and values. The smoothed figure applies the same configurable
+running-mean window, defaulting to 24 hourly samples, independently to the
+all-event mean and the individual event trace. Face tendencies are smoothed
+before grouped curves are derived, preserving the grouped identities. Titles
+identify the rank, event ID, peak date, reference population size, data
+representation, lag range, and smoothing window when present.
+
+Raw and climatological-anomaly top-event face-advection outputs use the
+isolated `plots_advection_direction_exploration_top_events` and
+`plots_advection_direction_exploration_top_events_clim_anom` namespaces,
+respectively. Each corresponding Venus scheduler publishes the complete
+`2 * TOP_N` PNG directory atomically and refuses to overwrite an existing
+output directory. These variants do not change the existing absolute,
+all-event climatological-anomaly, or matched-population face-advection figures.
 
 The Venus scheduler wrappers are likewise one operation per PBS job:
 
@@ -95,12 +156,16 @@ The Venus scheduler wrappers are likewise one operation per PBS job:
 schedulers/schedule_plot_composite_timeseries_all_clim_anom.sh
 schedulers/schedule_plot_composite_timeseries_split_clim_anom.sh
 schedulers/schedule_plot_top_events_clim_anom.sh
+schedulers/schedule_plot_advection_direction_exploration.sh
 schedulers/schedule_plot_advection_direction_exploration_clim_anom.sh
 schedulers/schedule_plot_advection_direction_exploration_matched_clim_anom.sh
+schedulers/schedule_plot_advection_direction_exploration_top_events.sh
+schedulers/schedule_plot_advection_direction_exploration_top_events_clim_anom.sh
 ```
 
-They require explicit Stage-1, climatology, and output paths plus a verified
-runtime commit. The two all-event schedulers and the two split-event schedulers
+They require explicit Stage-1 and output paths plus a verified runtime commit;
+climatological-anomaly variants additionally require the hourly climatology.
+The two all-event schedulers and the two split-event schedulers
 accept the same regional, boundary, threshold, year, lag-window, smoothing, and
 output/log configuration at submission time. They do not build prerequisites
 inside plotting jobs.
@@ -109,6 +174,26 @@ The climatological-anomaly top-event scheduler likewise requires explicit
 Stage-1, climatology, output-directory, and log paths. It defaults to the full
 5x2 paper layout and writes one raw and one 24-hour-smoothed figure for every
 selected event without overwriting the absolute top-event namespace.
+
+The five face-resolved advection schedulers preflight, stage, validate, and
+publish both the unsmoothed and smoothed PNGs as one no-overwrite operation.
+They require an explicit region and accept the pressure boundaries, threshold
+definition, analysis years, lag window, and smoothing window as runtime
+configuration so one exact deployed revision can render multiple accepted
+Stage-1 regions without source edits. All five wrappers use the external
+artifact/log roots and forward `HWA_SEASON_OPTIONS` to the shared Python
+selector. Pair publication must fail on a destination collision, preserving
+any output owned by another attempt.
+
+Before integration, validate both PNW regions against the original Stage-1
+arrays: seasonal membership, absolute-TAS ranks, matched-sign membership,
+timestamp-level climatology subtraction, signed face closure, grouped curves,
+and centered display smoothing using
+`schedulers/schedule_advection_face_validation.sh` and its two-region input
+manifest. Render all five families at the exact tested
+commit, retain input/output checksums, and compare old and new figures with
+original-resolution review. Historical figures retain their original cohort
+and generating-commit provenance.
 
 The production split-composite schedulers render the same complete
 split-variable matrix. The five numeric split variables are `duration`,

@@ -5,7 +5,7 @@ import pytest
 from HW_analysis.src import plot_style
 
 
-def test_day_lag_axis_keeps_fractional_ticks_for_short_windows():
+def test_day_lag_axis_keeps_fractional_major_ticks_for_short_windows():
     fig, ax = plot_style.plt.subplots()
     try:
         ax.plot([-1 / 24, 0, 1 / 24], [1, 2, 1])
@@ -17,6 +17,8 @@ def test_day_lag_axis_keeps_fractional_ticks_for_short_windows():
         assert len(visible) >= 3
         assert 0 in visible
         assert np.any(visible != np.round(visible))
+        minor_ticks = ax.get_xticks(minor=True)
+        np.testing.assert_array_equal(minor_ticks, np.round(minor_ticks))
         labels = [tick.get_text() for tick in ax.get_xticklabels()]
         assert len(set(labels)) == len(labels)
     finally:

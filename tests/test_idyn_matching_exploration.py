@@ -72,7 +72,18 @@ def test_proposed_match_and_tradeoff_specs_are_prepared():
 def test_main_writes_four_nonempty_figures(monkeypatch, tmp_path):
     input_path = tmp_path / "features.nc"
     output_dir = tmp_path / "plots"
-    make_event_features().to_netcdf(input_path, engine="h5netcdf")
+    features = make_event_features()
+    features.attrs.update(
+        pipeline_stage="stage_2_event_features",
+        all_seasons=0,
+        season_months="6,7,8",
+        require_full_event=0,
+    )
+    features["peak_time"] = (
+        "event",
+        np.full(features.sizes["event"], np.datetime64("2000-07-01", "ns")),
+    )
+    features.to_netcdf(input_path, engine="h5netcdf")
     monkeypatch.setattr(
         "sys.argv",
         [
@@ -102,7 +113,18 @@ def test_main_writes_four_nonempty_figures(monkeypatch, tmp_path):
 def test_validate_args_treats_summary_as_an_output(monkeypatch, tmp_path):
     input_path = tmp_path / "features.nc"
     output_dir = tmp_path / "plots"
-    make_event_features().to_netcdf(input_path, engine="h5netcdf")
+    features = make_event_features()
+    features.attrs.update(
+        pipeline_stage="stage_2_event_features",
+        all_seasons=0,
+        season_months="6,7,8",
+        require_full_event=0,
+    )
+    features["peak_time"] = (
+        "event",
+        np.full(features.sizes["event"], np.datetime64("2000-07-01", "ns")),
+    )
+    features.to_netcdf(input_path, engine="h5netcdf")
     output_dir.mkdir()
     (output_dir / exploration.SUMMARY_FILENAME).write_text("{}")
     monkeypatch.setattr(

@@ -271,7 +271,7 @@ def select_events_by_metric(
     metric_units = _selection_metric_units(event_table[metric])
     if metric_units is not None:
         attrs["selection_metric_units"] = metric_units
-    out.attrs.update(attrs)
+    out = out.assign_attrs(attrs)
     return out
 
 
@@ -352,7 +352,7 @@ def select_top_n_events(
     out = event_table.isel({event_dim: selected_idx})
     rank_values = _rank_values_for_selected_indices(selected_idx, ranked_idx)
     out["selection_rank"] = (event_dim, rank_values)
-    out.attrs.update(
+    out = out.assign_attrs(
         {
             "selection_type": "top_n",
             "selection_metric": metric,
@@ -442,7 +442,7 @@ def select_event_quantile_bin(
     }
     if metric_units is not None:
         attrs["selection_metric_units"] = metric_units
-    out.attrs.update(attrs)
+    out = out.assign_attrs(attrs)
     return out
 
 
@@ -504,7 +504,7 @@ def select_events_by_season(
         selected = _event_time_month_mask(event_table[time_name], months)
 
     out = _apply_event_selection(event_table, selected, event_dim=event_dim, drop=drop)
-    out.attrs.update(
+    out = out.assign_attrs(
         {
             "selection_type": "season",
             "selection_months": ",".join(str(month) for month in months),
@@ -579,7 +579,7 @@ def select_events_by_id(
         dtype=np.int64,
     )
     out = event_table.isel({event_dim: selected_indices})
-    out.attrs.update(
+    out = out.assign_attrs(
         {
             "selection_type": "event_id",
             "selection_event_ids": ",".join(str(int(value)) for value in requested),
@@ -645,7 +645,7 @@ def filter_dataset_to_events(
 
     mask = event_id_mask(ds[event_id_name], ids)
     out = ds.where(mask, drop=drop)
-    out.attrs.update(
+    out = out.assign_attrs(
         {
             "event_filter_source": event_id_name,
             "event_filter_ids": ",".join(str(int(eid)) for eid in ids),
@@ -1001,7 +1001,7 @@ def _empty_ranked_selection(
     """Return an empty event-table selection with rank metadata."""
     out = event_table.isel({event_dim: slice(0, 0)})
     out["selection_rank"] = (event_dim, np.asarray([], dtype=np.int64))
-    out.attrs.update(
+    out = out.assign_attrs(
         {
             "selection_type": selection_type,
             "selection_metric": metric,
@@ -1031,5 +1031,5 @@ def _empty_quantile_selection(
     }
     if metric_units is not None:
         attrs["selection_metric_units"] = metric_units
-    out.attrs.update(attrs)
+    out = out.assign_attrs(attrs)
     return out

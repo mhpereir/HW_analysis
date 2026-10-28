@@ -79,6 +79,7 @@ def test_main_ranks_absolute_events_and_anomalizes_before_plotting(
     monkeypatch.setattr(
         "sys.argv",
         _argv(
+            "--all-seasons",
             "--input-path",
             str(input_path),
             "--climatology-path",

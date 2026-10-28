@@ -6,6 +6,8 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
@@ -59,6 +61,7 @@ split_variable_list=(
 for split_variable in "${split_variable_list[@]}"; do
     echo "[info] $(date -Is) starting ${split_variable}"
     /usr/bin/time -v python plot_composite_timeseries_split.py \
+      "${season_args[@]}" \
         --input-path "${INPUT_PATH}" \
         --region "${REGION}" \
         --bottom-boundary "${BOTTOM_BOUNDARY}" \
@@ -71,8 +74,6 @@ for split_variable in "${split_variable_list[@]}"; do
         --window-days 7 \
         --split-variable "${split_variable}" \
         --split-quantiles "${SPLIT_QUANTILE}" \
-        --season-months 6 7 8 \
-        --require-full-event \
         --plot-extended-variables
     echo "[info] $(date -Is) finished ${split_variable}"
 done

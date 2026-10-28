@@ -51,6 +51,16 @@ PRESENTATION_EVENT_ALPHA = 0.9
 BUDGET_REFERENCE_CAPTION = (
     r"Lower-panel lines: $I_{dyn,net}+I_{diabatic}=I_{dT/dt}$ (K)"
 )
+ANOMALY_BUDGET_REFERENCE_CAPTION = (
+    r"Lower-panel lines: $I'_{dyn,net}+I'_{diabatic}=I'_{dT/dt}$ (K)"
+)
+HEAT_BUDGET_ANOMALY_LABELS = {
+    "I_advection_pre": r"$I'_{advective}$ (K)",
+    "I_adiabatic_pre": r"$I'_{adiabatic}$ (K)",
+    "I_dyn_pre": r"$I'_{dyn,net}$ (K)",
+    "I_dTdt_pre": r"$I'_{dT/dt}$ (K)",
+    "I_diabatic_pre": r"$I'_{diabatic}$ (K)",
+}
 THREE_PANEL_STACK_ASPECT = 0.62
 SQUARE_PANEL_ASPECT = 0.95
 
@@ -113,6 +123,21 @@ FACE_COLORS = {
     "west": "#009E9E",
     "top": "#E69F00",
     "bottom": "#D55E00",
+}
+
+HEATING_RANK_STYLES = {
+    "raw": {
+        "color": COLORS["storage"],
+        "linestyle": "-",
+        "marker": "o",
+        "label": "Raw rank",
+    },
+    "corrected": {
+        "color": COLORS["temperature_tendency"],
+        "linestyle": "--",
+        "marker": "s",
+        "label": "Climatology-corrected rank",
+    },
 }
 
 REGION_NAME_MAPPING = {
@@ -242,18 +267,29 @@ def format_time_axis(ax) -> None:
 
 
 def format_day_lag_axis(axis) -> None:
-    """Prefer whole-day ticks, allowing fractional ticks for short windows."""
+    """Use daily minor ticks and prefer whole-day major ticks when possible."""
     axis.set_major_locator(MaxNLocator(nbins="auto", integer=True))
     axis.set_major_formatter(ScalarFormatter(useOffset=False))
+    axis.set_minor_locator(MultipleLocator(1))
     use_default_numeric_formatter(axis)
 
 
-def format_integer_axis(axis, *, spacing: int = 1) -> None:
-    """Format a numeric axis with integer labels at a fixed integer spacing."""
+def format_integer_axis(
+    axis, *, spacing: int = 1, minor_spacing: int | None = None
+) -> None:
+    """Format integer labels, optionally fixing minor ticks independently."""
     if isinstance(spacing, bool) or not isinstance(spacing, int) or spacing < 1:
         raise ValueError("spacing must be a positive integer.")
+    if minor_spacing is not None and (
+        isinstance(minor_spacing, bool)
+        or not isinstance(minor_spacing, int)
+        or minor_spacing < 1
+    ):
+        raise ValueError("minor_spacing must be a positive integer.")
     axis.set_major_locator(MultipleLocator(spacing))
     axis.set_major_formatter(StrMethodFormatter("{x:.0f}"))
+    if minor_spacing is not None:
+        axis.set_minor_locator(MultipleLocator(minor_spacing))
     use_default_numeric_formatter(axis)
 
 

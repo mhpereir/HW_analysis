@@ -12,7 +12,14 @@ if str(REPO_ROOT) not in sys.path:
 
 
 from scripts import plot_composite_timeseries_split as absolute_plot
-from src import analysis_io, climatology, plot_paths, plotting, selectors
+from src import (
+    analysis_io,
+    climatology,
+    plot_paths,
+    plotting,
+    season_selection,
+    selectors,
+)
 
 PLOT_NAME = "composite_timeseries_split_clim_anom"
 DEFAULT_OUTPUT_FILENAME = "hw_events_composite_clim_anom.png"
@@ -25,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot split peak-aligned climatological-anomaly HW composites."
     )
+    season_selection.add_season_arguments(parser, default_full_event=True)
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument("--climatology-path", type=Path, default=None)
     parser.add_argument("--output-path", type=Path, default=None)
@@ -39,15 +47,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--split-variable", required=True)
     parser.add_argument("--split-quantiles", type=float, nargs="+")
     parser.add_argument("--split-years", type=int, nargs="+")
-    parser.add_argument("--season-months", type=int, nargs="+", default=None)
-    parser.add_argument("--require-full-event", action="store_true")
     parser.add_argument("--plot-extended-variables", action="store_true")
     parser.add_argument(
         "--layout",
         choices=plotting.COMPOSITE_LAYOUTS,
         default=plotting.PAPER_COMPOSITE_LAYOUT,
     )
-    parsed = parser.parse_args()
+    parsed = season_selection.parse_args(parser)
     plot_name, default_output_filename = _default_plot_destination(parsed.layout)
     args = plot_paths.finalize_stage1_plot_paths(
         parsed,

@@ -20,6 +20,7 @@ import matplotlib
 import numpy as np
 import xarray as xr
 
+from src import analysis_io, plot_style, season_selection
 from src.artifact_paths import artifact_root
 
 matplotlib.use("Agg")
@@ -28,8 +29,8 @@ from matplotlib.axes import Axes
 from matplotlib.collections import PathCollection
 from matplotlib.colors import Normalize
 
-from src import plot_style
 from src.selectors import common_finite_mask
+from src.stage2_component_anomalies import comparison_plot_views
 
 REGION = "pnw_hotz"
 THRESHOLD_VARIABLE = "tas"
@@ -106,6 +107,7 @@ def parse_args() -> argparse.Namespace:
             "adiabatic/advection net dynamical comparison."
         )
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument(
         "--input-path",
         type=Path,
@@ -163,7 +165,7 @@ def parse_args() -> argparse.Namespace:
         default=plot_style.PRESENTATION_EVENT_ALPHA,
         help="Event scatter marker opacity.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -198,9 +200,13 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
 
-    baseline_features = open_baseline_features(args.input_path)
+    baseline_features = open_baseline_features(
+        args.input_path, **season_selection.season_kwargs(args)
+    )
     try:
-        event_features = open_event_features(args.event_input_path)
+        event_features = open_event_features(
+            args.event_input_path, **season_selection.season_kwargs(args)
+        )
         try:
             output_path = args.output_path or default_output_path(args.layout)
             written = write_tendency_scatter_plot(
@@ -223,16 +229,25 @@ def main() -> int:
     return 0
 
 
-def open_baseline_features(path: str | Path) -> xr.Dataset:
-    """Open a Stage-2 baseline-day feature NetCDF table."""
-    input_path = Path(path).expanduser().resolve()
-    return xr.open_dataset(input_path, engine="h5netcdf", decode_timedelta=True)
+def open_baseline_features(path: str | Path, **season_options) -> xr.Dataset:
+    """Open a Stage-2 baseline table with validated seasonal membership."""
+    return analysis_io.open_stage2_features(
+        path,
+        expected_stage=(
+            "stage_2_baseline_features",
+            "stage_2_baseline_component_anomalies",
+        ),
+        **season_options,
+    )
 
 
-def open_event_features(path: str | Path) -> xr.Dataset:
-    """Open a Stage-2 event-feature NetCDF table."""
-    input_path = Path(path).expanduser().resolve()
-    return xr.open_dataset(input_path, engine="h5netcdf", decode_timedelta=True)
+def open_event_features(path: str | Path, **season_options) -> xr.Dataset:
+    """Open a Stage-2 event table with validated seasonal membership."""
+    return analysis_io.open_stage2_features(
+        path,
+        expected_stage=("stage_2_event_features", "stage_2_event_component_anomalies"),
+        **season_options,
+    )
 
 
 def write_tendency_scatter_plot(
@@ -278,6 +293,10 @@ def plot_tendency_scatter(
 ) -> plt.Figure:  # type: ignore[type-arg]
     """Return the selected event-versus-clean-baseline comparison figure."""
     validate_layout(layout)
+    baseline_features, event_features, anomaly = comparison_plot_views(
+        baseline_features, event_features
+    )
+    context = anomaly_context(event_features) if anomaly else ""
     validate_feature_variables(
         baseline_features,
         event_features,
@@ -301,6 +320,8 @@ def plot_tendency_scatter(
             clean,
             event_color_values,
             color_variable=color_variable,
+            anomaly=anomaly,
+            context=context,
             point_size=point_size,
             alpha=alpha,
             event_point_size=event_point_size,
@@ -341,8 +362,10 @@ def plot_tendency_scatter(
         show_legend=True,
     )
     add_one_to_negative_one_line_from_panel(axes[0])
-    axes[0].set_title("Advection vs Adiabatic Heating")
-    axes[0].set_ylabel(variable_label(ADVECTION_VARIABLE))
+    axes[0].set_title(
+        "Advection vs Adiabatic Heating" + (" Anomalies" if anomaly else "")
+    )
+    axes[0].set_ylabel(variable_label(ADVECTION_VARIABLE, anomaly=anomaly))
 
     plot_comparison_panel(
         axes[1],
@@ -359,9 +382,9 @@ def plot_tendency_scatter(
         event_alpha=event_alpha,
         show_legend=False,
     )
-    axes[1].set_title("Net Dynamical Contribution")
-    axes[1].set_ylabel(NET_DYNAMICAL_LABEL)
-    axes[1].set_xlabel(variable_label(X_VARIABLE))
+    axes[1].set_title("Net Dynamical Contribution" + (" Anomaly" if anomaly else ""))
+    axes[1].set_ylabel(variable_label(DYNAMICAL_VARIABLE, anomaly=anomaly))
+    axes[1].set_xlabel(variable_label(X_VARIABLE, anomaly=anomaly))
 
     plot_comparison_panel(
         axes[2],
@@ -378,8 +401,12 @@ def plot_tendency_scatter(
         event_alpha=event_alpha,
         show_legend=False,
     )
-    axes[2].set_title(r"Integrated dT/dt vs $I_{dyn,net}$")
-    axes[2].set_ylabel(variable_label(TEMPERATURE_CHANGE_VARIABLE))
+    axes[2].set_title(
+        r"Integrated dT/dt Anomaly vs $I'_{dyn,net}$"
+        if anomaly
+        else r"Integrated dT/dt vs $I_{dyn,net}$"
+    )
+    axes[2].set_ylabel(variable_label(TEMPERATURE_CHANGE_VARIABLE, anomaly=anomaly))
 
     plot_comparison_panel(
         axes[3],
@@ -396,16 +423,24 @@ def plot_tendency_scatter(
         event_alpha=event_alpha,
         show_legend=False,
     )
-    axes[3].set_title(r"Diabatic Heating vs $I_{dyn,net}$")
-    axes[3].set_ylabel(variable_label(DIABATIC_VARIABLE))
-    axes[3].set_xlabel(NET_DYNAMICAL_LABEL)
+    axes[3].set_title(
+        r"Diabatic Residual Anomaly vs $I'_{dyn,net}$"
+        if anomaly
+        else r"Diabatic Heating vs $I_{dyn,net}$"
+    )
+    axes[3].set_ylabel(variable_label(DIABATIC_VARIABLE, anomaly=anomaly))
+    axes[3].set_xlabel(variable_label(DYNAMICAL_VARIABLE, anomaly=anomaly))
 
     set_shared_x_data_limits(axes[:2], panel_x_values(axes[:2]))
     set_shared_x_data_limits(axes[2:], panel_x_values(axes[2:]))
 
     colorbar = fig.colorbar(event_mappable, ax=axes, shrink=0.92)
     colorbar.set_label(variable_label(color_variable))
-    fig.suptitle("Events vs Clean Baseline-Day Tendencies")
+    fig.suptitle(
+        "Events vs Clean Baseline-Day Heating Anomalies\n" + context
+        if anomaly
+        else "Events vs Clean Baseline-Day Tendencies"
+    )
     return fig
 
 
@@ -416,6 +451,8 @@ def plot_presentation_tendency_scatter(
     event_color_values: np.ndarray,
     *,
     color_variable: str,
+    anomaly: bool = False,
+    context: str = "",
     point_size: float,
     alpha: float,
     event_point_size: float,
@@ -456,9 +493,11 @@ def plot_presentation_tendency_scatter(
         show_counts=False,
     )
     add_one_to_negative_one_line_from_panel(axes[0])
-    axes[0].set_title("Advection vs Adiabatic Heating")
-    axes[0].set_ylabel(variable_label(ADVECTION_VARIABLE))
-    axes[0].set_xlabel(variable_label(X_VARIABLE))
+    axes[0].set_title(
+        "Advection vs Adiabatic Heating" + (" Anomalies" if anomaly else "")
+    )
+    axes[0].set_ylabel(variable_label(ADVECTION_VARIABLE, anomaly=anomaly))
+    axes[0].set_xlabel(variable_label(X_VARIABLE, anomaly=anomaly))
 
     event_mappable = plot_comparison_panel(
         axes[1],
@@ -476,9 +515,13 @@ def plot_presentation_tendency_scatter(
         show_legend=False,
         show_counts=False,
     )
-    axes[1].set_title(r"Diabatic Residual vs $I_{dyn,net}$")
-    axes[1].set_ylabel(variable_label(DIABATIC_VARIABLE))
-    axes[1].set_xlabel(NET_DYNAMICAL_LABEL)
+    axes[1].set_title(
+        r"Diabatic Residual Anomaly vs $I'_{dyn,net}$"
+        if anomaly
+        else r"Diabatic Residual vs $I_{dyn,net}$"
+    )
+    axes[1].set_ylabel(variable_label(DIABATIC_VARIABLE, anomaly=anomaly))
+    axes[1].set_xlabel(variable_label(DYNAMICAL_VARIABLE, anomaly=anomaly))
 
     for ax in axes:
         set_shared_x_data_limits(np.array([ax]), panel_x_values(np.array([ax])))
@@ -491,11 +534,20 @@ def plot_presentation_tendency_scatter(
     colorbar.set_label(variable_label(color_variable))
     plot_style.add_sum_reference_lines(axes[1])
     fig.supxlabel(
-        plot_style.BUDGET_REFERENCE_CAPTION, fontsize=plot_style.LEGEND_FONT_SIZE_PT
+        (
+            plot_style.ANOMALY_BUDGET_REFERENCE_CAPTION + "\n" + context
+            if anomaly
+            else plot_style.BUDGET_REFERENCE_CAPTION
+        ),
+        fontsize=plot_style.LEGEND_FONT_SIZE_PT,
     )
     fig.suptitle(
-        "Events vs Clean Baseline-Day Tendencies\n"
-        f"Clean baseline n = {int(clean.sum())}; events n = {int(event_keep.sum())}"
+        (
+            "Events vs Clean Baseline-Day Heating Anomalies\n"
+            if anomaly
+            else "Events vs Clean Baseline-Day Tendencies\n"
+        )
+        + f"Clean baseline n = {int(clean.sum())}; events n = {int(event_keep.sum())}"
     )
     return fig
 
@@ -685,9 +737,20 @@ def set_y_data_limits(ax: Axes, y_values: np.ndarray) -> None:
         ax.set_ylim(*limits)
 
 
-def variable_label(variable: str) -> str:
+def variable_label(variable: str, *, anomaly: bool = False) -> str:
     """Return a readable axis label."""
+    if anomaly and variable in plot_style.HEAT_BUDGET_ANOMALY_LABELS:
+        return plot_style.HEAT_BUDGET_ANOMALY_LABELS[variable]
     return VARIABLE_LABELS.get(variable, variable)
+
+
+def anomaly_context(features: xr.Dataset) -> str:
+    """Identify the region, actual integration window and climatological reference."""
+    hours = -int(features.attrs["heat_budget_pre_window_hours"].split(",")[0])
+    return (
+        f"{features.attrs['region']} | {hours / 24:g}-day window | "
+        f"{features.attrs['climatology_start_year']}-{features.attrs['climatology_end_year']} climatology"
+    )
 
 
 def add_zero_reference_lines(ax: Axes) -> None:

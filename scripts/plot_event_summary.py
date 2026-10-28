@@ -22,7 +22,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-from src import analysis_io, plot_paths, plot_style, selectors
+from src import analysis_io, plot_paths, plot_style, season_selection, selectors
 
 PLOT_NAME = "event_summary"
 DEFAULT_OUTPUT_FILENAME = "event_summary_histograms.png"
@@ -44,6 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot histograms of variables in the saved event summary table."
     )
+    season_selection.add_season_arguments(parser, default_full_event=True)
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(
         "--output-path",
@@ -67,20 +68,7 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_BINS,
         help="Number of histogram bins.",
     )
-    parser.add_argument(
-        "--season-months",
-        type=int,
-        nargs="+",
-        default=None,
-        metavar="MONTH",
-        help="Optional calendar months to retain before plotting, e.g. 6 7 8.",
-    )
-    parser.add_argument(
-        "--require-full-event",
-        action="store_true",
-        help="Require the full event interval to fall within --season-months.",
-    )
-    args = parser.parse_args()
+    args = season_selection.parse_args(parser)
     return plot_paths.finalize_stage1_plot_paths(
         args,
         parser,
@@ -115,7 +103,9 @@ def main() -> int:
             )
             if event_table.sizes.get(DEFAULT_EVENT_DIM, 0) == 0:
                 months = " ".join(str(month) for month in args.season_months)
-                raise ValueError(f"No events remain after filtering to season months: {months}.")
+                raise ValueError(
+                    f"No events remain after filtering to season months: {months}."
+                )
 
         variables = _selected_variables(event_table, args.variables)
         written = write_event_summary_histograms(
@@ -152,7 +142,7 @@ def plot_event_summary_histograms(
     *,
     variables: list[str],
     bins: int,
-) -> plt.Figure: # type: ignore
+) -> plt.Figure:  # type: ignore
     """Return a figure containing one histogram per requested variable."""
     n_variables = len(variables)
     ncols = 3 if n_variables > 2 else n_variables
@@ -187,7 +177,7 @@ def plot_event_summary_histograms(
 def _plot_variable_histogram(ax: Axes, da: xr.DataArray, *, bins: int) -> None:
     """Plot one event-summary variable histogram."""
     values = _finite_values(da)
-    ax.set_title(_display_name(da.name)) # type: ignore
+    ax.set_title(_display_name(da.name))  # type: ignore
     ax.set_ylabel("Events")
 
     if values.size == 0:
@@ -212,7 +202,9 @@ def _plot_variable_histogram(ax: Axes, da: xr.DataArray, *, bins: int) -> None:
             linewidth=0.6,
         )
         ax.xaxis_date()
-        ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
+        ax.xaxis.set_major_formatter(
+            mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())
+        )
     else:
         hist_bins = _histogram_bins(values, da, bins=bins)
         ax.hist(
@@ -249,7 +241,9 @@ def _event_summary_table(ds: xr.Dataset) -> xr.Dataset:
     return ds[names]
 
 
-def _selected_variables(event_table: xr.Dataset, requested: list[str] | None) -> list[str]:
+def _selected_variables(
+    event_table: xr.Dataset, requested: list[str] | None
+) -> list[str]:
     """Return variables that should be included in the histogram figure."""
     if requested is not None:
         missing = [name for name in requested if name not in event_table]
@@ -274,7 +268,7 @@ def _selected_variables(event_table: xr.Dataset, requested: list[str] | None) ->
     ]
     if not variables:
         raise ValueError("No numeric event-summary variables were found to plot.")
-    return variables 
+    return variables
 
 
 def _is_plottable(da: xr.DataArray) -> bool:
@@ -323,6 +317,7 @@ def _uses_integer_day_bins(da: xr.DataArray, values: np.ndarray) -> bool:
         and bool(np.all(np.isclose(values, np.round(values))))
     )
 
+
 def _display_name(name: str | None) -> str:
     """Return a readable title for a variable name."""
     if name is None:
@@ -346,7 +341,9 @@ def _validate_season_months(months: list[int]) -> None:
     invalid = [month for month in months if month < 1 or month > 12]
     if invalid:
         values = ", ".join(str(month) for month in invalid)
-        raise ValueError(f"--season-months values must be between 1 and 12; got {values}.")
+        raise ValueError(
+            f"--season-months values must be between 1 and 12; got {values}."
+        )
 
 
 def _display_path(path: Path) -> str:

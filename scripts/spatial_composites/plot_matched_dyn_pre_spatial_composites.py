@@ -22,6 +22,7 @@ from scripts.spatial_composites import (
 from scripts.spatial_composites import (
     plot_dyn_net_spatial_composites as spatial_plotter,
 )
+from src import season_selection
 from src.artifact_paths import artifact_root
 
 DEFAULT_INPUT_PATH = matched_builder.DEFAULT_OUTPUT_PATH
@@ -43,6 +44,7 @@ def parse_args() -> argparse.Namespace:
             "spatial composites."
         )
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument("--input-path", type=Path, default=DEFAULT_INPUT_PATH)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument(
@@ -58,7 +60,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--temperature-limit", type=float, default=None)
     parser.add_argument("--height-contour-interval", type=float, default=None)
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -84,6 +86,9 @@ def main() -> int:
         engine="h5netcdf",
         decode_timedelta=True,
     ) as ds:
+        season_selection.validate_inherited_event_season(
+            ds, **season_selection.season_kwargs(args)
+        )
         loaded = ds.load()
     figure = spatial_plotter.plot_matched_spatial_composites(
         loaded,

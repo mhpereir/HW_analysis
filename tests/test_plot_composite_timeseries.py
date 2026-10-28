@@ -53,8 +53,8 @@ def test_parse_args_builds_default_paths(monkeypatch):
         / "time_range_1940_2024"
         / "hw_all_events_composite.png"
     )
-    assert args.season_months is None
-    assert not args.require_full_event
+    assert args.season_months == [6, 7, 8]
+    assert args.require_full_event
     assert not args.plot_extended_variables
     assert args.layout == "paper"
 
@@ -161,6 +161,7 @@ def test_main_orchestrates_dataset_composite_and_plotting(
         "sys.argv",
         [
             *_argv(
+                "--all-seasons",
                 "--input-path",
                 str(input_path),
                 "--output-path",
@@ -233,6 +234,7 @@ def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
         "sys.argv",
         [
             *_argv(
+                "--all-seasons",
                 "--input-path",
                 str(input_path),
                 "--output-path",
@@ -266,6 +268,16 @@ def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
     assert captured["plot_kwargs"]["smoothed_variables"] == (
         plot_composite_timeseries.EXTENDED_SMOOTHED_VARIABLES
     )
+    selected = set(captured["composite_kwargs"]["variables"])
+    smoothed = set(captured["plot_kwargs"]["smoothed_variables"])
+    assert selected.isdisjoint({"volume", "slhf_heating_rate_approx"})
+    assert {
+        "T_mean",
+        "cloud_cover",
+        "soil_moisture",
+        "sshf_heating_rate_approx",
+    } <= smoothed
+    assert smoothed == selected - {"lwa_a_region", "lwa_c_region"}
     assert captured["plot_kwargs"]["plot_extended_variables"]
 
 
@@ -284,6 +296,7 @@ def test_main_uses_presentation_variables_and_renderer(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "sys.argv",
         _argv(
+            "--all-seasons",
             "--input-path",
             str(tmp_path / "stage1.nc"),
             "--output-path",

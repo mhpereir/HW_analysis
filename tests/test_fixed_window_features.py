@@ -10,7 +10,7 @@ from scripts.event_features import event_feature_config as config
 from scripts.event_features.fixed_window_features import WindowReducer
 
 
-@pytest.fixture(params=(48, 96))
+@pytest.fixture(params=(48, 96, 168, 336, 504))
 def integration_hours(
     request: pytest.FixtureRequest,
     monkeypatch: pytest.MonkeyPatch,

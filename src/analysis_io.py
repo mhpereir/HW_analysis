@@ -27,6 +27,7 @@ from uuid import uuid4
 import numpy as np
 import xarray as xr
 
+from . import season_selection
 from .artifact_paths import artifact_root
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -79,6 +80,37 @@ REQUIRED_STAGE1_V2_VARIABLES: frozenset[str] = frozenset(
 )
 
 
+def open_stage2_features(
+    path: str | Path,
+    *,
+    expected_stage: str | tuple[str, ...] | None = None,
+    **season_options: Any,
+) -> xr.Dataset:
+    """Open a Stage-2 table and guard its seasonal population before use."""
+    ds = xr.open_dataset(
+        Path(path).expanduser().resolve(), engine="h5netcdf", decode_timedelta=True
+    )
+    try:
+        allowed_stages = (
+            (expected_stage,) if isinstance(expected_stage, str) else expected_stage
+        )
+        stage = ds.attrs.get("pipeline_stage")
+        if allowed_stages is not None and stage not in allowed_stages:
+            raise ValueError(f"Expected pipeline_stage={expected_stage!r}.")
+        if stage in {
+            "stage_2_event_component_anomalies",
+            "stage_2_baseline_component_anomalies",
+        }:
+            from .stage2_component_anomalies import validate_component_anomalies
+
+            validate_component_anomalies(ds)
+        season_selection.validate_stage2_season(ds, **season_options)
+    except Exception:
+        ds.close()
+        raise
+    return ds
+
+
 def default_harmonized_timeseries_path(
     *,
     region: str,
@@ -110,10 +142,7 @@ def default_harmonized_timeseries_path(
         str(start_year),
         str(end_year),
     )
-    filename = (
-        "harmonized_regional_timeseries_"
-        f"{'_'.join(run_tokens)}.nc"
-    )
+    filename = f"harmonized_regional_timeseries_{'_'.join(run_tokens)}.nc"
     return DEFAULT_STAGE1_OUTPUT_DIR / filename
 
 
@@ -212,8 +241,7 @@ def _validate_harmonized_timeseries(ds: xr.Dataset) -> None:
     missing = sorted(REQUIRED_HARMONIZED_VARIABLES.difference(ds.data_vars))
     if missing:
         raise ValueError(
-            "Harmonized dataset is missing required variables: "
-            f"{', '.join(missing)}."
+            f"Harmonized dataset is missing required variables: {', '.join(missing)}."
         )
 
     contract_version = int(ds.attrs.get("stage1_contract_version", 1))
@@ -263,11 +291,35 @@ def _prepare_for_netcdf(ds: xr.Dataset) -> xr.Dataset:
     return out
 
 
+def save_integration_window_ranks(ds: xr.Dataset, output_path: str | Path) -> Path:
+    """Publish one validated rank comparison without replacing existing data."""
+    from src.integration_window_analysis import validate_heating_comparison
+
+    validate_heating_comparison(ds)
+    path = Path(output_path)
+    if path.exists():
+        raise FileExistsError(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_netcdf_atomically(_prepare_for_netcdf(ds), path)
+    return path
+
+
+def open_integration_window_ranks(path: str | Path) -> xr.Dataset:
+    """Open and validate a prepared heating-rank comparison."""
+    from src.integration_window_analysis import validate_heating_comparison
+
+    ds = xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True)
+    try:
+        validate_heating_comparison(ds)
+    except Exception:
+        ds.close()
+        raise
+    return ds
+
+
 def _write_netcdf_atomically(ds: xr.Dataset, output_path: Path) -> None:
     """Write beside the destination and publish only a complete NetCDF file."""
-    temporary_path = output_path.with_name(
-        f".{output_path.name}.{uuid4().hex}.partial"
-    )
+    temporary_path = output_path.with_name(f".{output_path.name}.{uuid4().hex}.partial")
     try:
         ds.to_netcdf(temporary_path, engine="h5netcdf")
         os.replace(temporary_path, output_path)
@@ -333,3 +385,29 @@ def _filename_token(value: object) -> str:
     for old, new in (("/", "-"), ("\\", "-"), (" ", "-")):
         token = token.replace(old, new)
     return token
+
+
+def save_component_anomalies(ds: xr.Dataset, output_path: str | Path) -> Path:
+    """Atomically save a new validated component-anomaly feature table."""
+    from src.stage2_component_anomalies import validate_component_anomalies
+
+    validate_component_anomalies(ds)
+    path = Path(output_path).expanduser().resolve()
+    if path.exists():
+        raise FileExistsError(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_netcdf_atomically(_prepare_for_netcdf(ds), path)
+    return path
+
+
+def open_component_anomalies(path: str | Path) -> xr.Dataset:
+    """Open and validate one component-anomaly table."""
+    from src.stage2_component_anomalies import validate_component_anomalies
+
+    ds = xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True)
+    try:
+        validate_component_anomalies(ds)
+    except Exception:
+        ds.close()
+        raise
+    return ds

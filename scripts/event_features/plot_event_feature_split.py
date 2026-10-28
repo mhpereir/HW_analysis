@@ -15,13 +15,12 @@ import matplotlib
 import numpy as np
 import xarray as xr
 
+from src import analysis_io, plot_style, season_selection
 from src.artifact_paths import artifact_root
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-
-from src import plot_style
 
 REGION = "pnw_bartusek"
 
@@ -116,6 +115,7 @@ def parse_args() -> argparse.Namespace:
             "quantile."
         )
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument(
         "--input-path",
         type=Path,
@@ -155,7 +155,7 @@ def parse_args() -> argparse.Namespace:
         default=0.75,
         help="Scatter marker opacity.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -168,8 +168,7 @@ def validate_args(args: argparse.Namespace) -> None:
     if args.selection_variable not in Y_VARIABLES:
         allowed = ", ".join(Y_VARIABLES)
         raise ValueError(
-            "--selection-variable must be one of the plotted y-variables: "
-            f"{allowed}."
+            f"--selection-variable must be one of the plotted y-variables: {allowed}."
         )
 
 
@@ -178,7 +177,9 @@ def main() -> int:
     args = parse_args()
     validate_args(args)
 
-    features = open_event_features(args.input_path)
+    features = open_event_features(
+        args.input_path, **season_selection.season_kwargs(args)
+    )
     try:
         output_path = _split_output_path(args.output_path, args.selection_variable)
         written = write_tendency_scatter_plot(
@@ -206,15 +207,11 @@ def main() -> int:
     return 0
 
 
-def open_event_features(path: str | Path) -> xr.Dataset:
-    """Open a Stage-2 event-feature NetCDF table."""
-    input_path = Path(path).expanduser().resolve()
-    try:
-        return xr.open_dataset(input_path, engine="h5netcdf", decode_timedelta=True)
-    except TypeError as exc:
-        if "decode_timedelta" not in str(exc):
-            raise
-        return xr.open_dataset(input_path, engine="h5netcdf")
+def open_event_features(path: str | Path, **season_options) -> xr.Dataset:
+    """Open a Stage-2 event table with validated seasonal membership."""
+    return analysis_io.open_stage2_features(
+        path, expected_stage="stage_2_event_features", **season_options
+    )
 
 
 def write_tendency_scatter_plot(
@@ -385,8 +382,7 @@ def validate_feature_variables(
     missing = [name for name in dict.fromkeys(required) if name not in features]
     if missing:
         raise ValueError(
-            "Event-feature table is missing required variables: "
-            f"{', '.join(missing)}."
+            f"Event-feature table is missing required variables: {', '.join(missing)}."
         )
 
 
@@ -410,8 +406,7 @@ def build_quantile_split(
     if selection_variable not in Y_VARIABLES:
         allowed = ", ".join(Y_VARIABLES)
         raise ValueError(
-            "selection_variable must be one of the plotted y-variables: "
-            f"{allowed}."
+            f"selection_variable must be one of the plotted y-variables: {allowed}."
         )
     quantile = validate_selection_quantile(selection_quantile)
     values = feature_values(features, selection_variable)
@@ -448,7 +443,9 @@ def split_group_mask(split: QuantileSplit, group_name: str) -> np.ndarray:
     raise ValueError(f"Unknown split group: {group_name}")
 
 
-def split_group_statistics(values: np.ndarray, mask: np.ndarray) -> tuple[float, float, int]:
+def split_group_statistics(
+    values: np.ndarray, mask: np.ndarray
+) -> tuple[float, float, int]:
     """Return mean, standard deviation, and count for finite masked values."""
     group_values = np.asarray(values, dtype=float)[mask]
     finite_values = group_values[np.isfinite(group_values)]
@@ -618,7 +615,9 @@ def add_one_to_one_line(ax: Axes, x_values: np.ndarray, y_values: np.ndarray) ->
     )
 
 
-def set_data_driven_y_limits(ax: Axes, values: np.ndarray, *, pad_fraction: float = 0.08) -> None:
+def set_data_driven_y_limits(
+    ax: Axes, values: np.ndarray, *, pad_fraction: float = 0.08
+) -> None:
     """Set y-limits from finite data values, ignoring reference-line artists."""
     finite_values = np.asarray(values, dtype=float)
     finite_values = finite_values[np.isfinite(finite_values)]

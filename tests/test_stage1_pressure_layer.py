@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
+from HW_analysis.scripts import build_stage1_harmonized_timeseries as raw_builder
 from HW_analysis.src import analysis_io, events, harmonize, pressure_layer
 
 
@@ -133,6 +134,86 @@ def test_reused_regional_fields_match_full_raw_source_build(layer_inputs):
     report = pressure_layer.validate_product(result, reference, raw)
     assert report["event_table_exact"]
     assert report["events"] == 2
+
+
+@pytest.mark.parametrize("bottom,top", [("surface", "700"), ("700", "500")])
+@pytest.mark.parametrize("threshold_variable", ["tas", "lwa_a"])
+def test_raw_builder_preserves_complete_season_results(
+    layer_inputs, monkeypatch, tmp_path, bottom, top, threshold_variable
+):
+    raw, reference, _ = layer_inputs
+    if bottom == "surface":
+        raw = raw.drop_vars(
+            ["flux_contribution_bottom", "mass_flux_contribution_bottom"]
+        )
+        raw["advection_term"] = sum(
+            raw[f"flux_contribution_{face}"] for face in pressure_layer.FACES[:-1]
+        )
+        raw["dT_dt"] = raw.advection_term + raw.adiabatic_term + raw.diabatic_term
+
+    daily = reference.drop_dims("event").resample(time="1D").first()
+
+    def grid(name):
+        return daily[name].expand_dims(lat=[50.0], lon=[-120.0])
+
+    def threshold(name):
+        return daily[name].groupby("time.dayofyear").first()
+
+    inputs = {
+        "heat_budget": raw,
+        "tas": xr.Dataset({"tas": grid("tas_region")}),
+        "hw_threshold": xr.Dataset(
+            {
+                "threshold": threshold("hw_threshold"),
+                "climatology": threshold("tas_climatology"),
+            }
+        ),
+        "lwa": xr.Dataset(
+            {name: grid(f"{name.lower()}_region") for name in ("LWA", "LWA_a", "LWA_c")}
+        ),
+        "lwa_threshold": xr.Dataset(
+            {
+                name: threshold(f"{name.lower()}_threshold")
+                for name in ("LWA", "LWA_a", "LWA_c")
+            }
+        ),
+    }
+    output = tmp_path / "raw-source-stage1.nc"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build_stage1_harmonized_timeseries.py",
+            "--start-year",
+            "2001",
+            "--end-year",
+            "2001",
+            "--bottom-boundary",
+            bottom,
+            "--top-boundary",
+            top,
+            "--threshold-variable",
+            threshold_variable,
+            "--output-path",
+            str(output),
+        ],
+    )
+    # Replace only unavailable source I/O; exercise the production coverage gate,
+    # event detection, harmonization and atomic NetCDF publication together.
+    monkeypatch.setattr(raw_builder, "load_era5_inputs", lambda args: inputs)
+    assert raw_builder.main() == 0
+    with analysis_io.open_harmonized_timeseries(output) as product:
+        np.testing.assert_array_equal(product.time, reference.time)
+        for name in ("hw_event_id", "lwa_a_event_id", "event_id", "peak_time"):
+            np.testing.assert_array_equal(product[name], reference[name])
+        np.testing.assert_array_equal(product.T_mean, raw.T_domain_avg)
+        np.testing.assert_allclose(product.dTdt, raw.dT_dt / raw.domain_volume * 3600)
+        np.testing.assert_allclose(
+            product.advection,
+            sum(product[f"advection_{face}"] for face in pressure_layer.FACES[:-1])
+            + (product.advection_bottom if bottom != "surface" else 0),
+        )
+        assert ("advection_bottom" in product) == (bottom != "surface")
 
 
 @pytest.mark.parametrize(

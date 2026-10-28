@@ -6,7 +6,6 @@ import hashlib
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import xarray as xr
 
 from . import advection_direction, config, events, harmonize
@@ -81,9 +80,10 @@ def validate_manifest(manifest: dict, *, region: str, bottom: int, top: int) -> 
 
 
 def validate_annual_budget(ds: xr.Dataset, *, year: int, bottom: int, top: int) -> dict:
-    """Check the May-October centered-hour EHB campaign contract."""
-    expected = pd.date_range(f"{year}-05-01T01:00", f"{year}-10-31T22:00", freq="h")
-    require_equal(ds.time.values, expected.values, f"{year} seasonal hourly coverage")
+    """Check common production coverage and the fixed-layer EHB contract."""
+    harmonize.validate_production_hourly_coverage(
+        ds, years=[year], context=f"{year} seasonal hourly coverage"
+    )
     required = set(harmonize.HEAT_BUDGET_VARIABLE_MAP)
     required.update(f"flux_contribution_{face}" for face in FACES)
     required.update(f"mass_flux_contribution_{face}" for face in FACES)
@@ -127,7 +127,7 @@ def validate_annual_budget(ds: xr.Dataset, *, year: int, bottom: int, top: int) 
     )
     return {
         "year": year,
-        "hours": len(expected),
+        "hours": ds.sizes["time"],
         "minimum_volume": float(volume.min()),
         "heat_faces_max_abs_error_k_hr": face_error,
         "budget_max_abs_error_k_hr": closure_error,
@@ -159,14 +159,8 @@ def select_reference(
     if missing:
         raise ValueError(f"Reference lacks regional fields: {sorted(missing)}")
     selected = reference.sel(time=reference.time.dt.year.isin(years))
-    expected_time = np.concatenate(
-        [
-            pd.date_range(f"{year}-05-01T01:00", f"{year}-10-31T22:00", freq="h").values
-            for year in years
-        ]
-    )
-    require_equal(
-        selected.time.values, expected_time, "Reference complete-year coverage"
+    harmonize.validate_production_hourly_coverage(
+        selected, years=years, context="Reference complete-year coverage"
     )
     selected = selected.sel(event=selected.start_time.dt.year.isin(years))
     selected = selected.assign_coords(event=np.arange(selected.sizes["event"]))

@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src import plot_style
+from src import plot_style, season_selection
 from src.artifact_paths import artifact_root
 
 DEFAULT_INPUT_PATH = (
@@ -45,10 +45,9 @@ DEFAULT_PLOT_LAGS = (-2, 0, 2)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Plot event-relative daily T2m/Z500 composites by I_dyn_net sign."
-        )
+        description=("Plot event-relative daily T2m/Z500 composites by I_dyn_net sign.")
     )
+    season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument("--input-path", type=Path, default=DEFAULT_INPUT_PATH)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument(
@@ -70,7 +69,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional Z500 anomaly contour interval in metres.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -89,6 +88,9 @@ def main() -> int:
     validate_args(args)
     input_path = args.input_path.expanduser().resolve()
     with xr.open_dataset(input_path, engine="h5netcdf", decode_timedelta=True) as ds:
+        season_selection.validate_inherited_event_season(
+            ds, **season_selection.season_kwargs(args)
+        )
         fig = plot_spatial_composites(
             ds.load(),
             plot_lags=args.plot_lags,
@@ -110,7 +112,9 @@ def validate_composite(ds: xr.Dataset) -> None:
     }
     missing = sorted(required.difference(ds.data_vars))
     if missing:
-        raise ValueError("Composite dataset is missing variables: " + ", ".join(missing))
+        raise ValueError(
+            "Composite dataset is missing variables: " + ", ".join(missing)
+        )
     for coord in (GROUP_DIM, LAG_DIM, "latitude", "longitude"):
         if coord not in ds.coords:
             raise ValueError(f"Composite dataset is missing coordinate {coord!r}.")
@@ -119,7 +123,9 @@ def validate_composite(ds: xr.Dataset) -> None:
         raise ValueError(f"Expected {GROUP_DIM} groups {GROUPS}; found {groups}.")
     lags = np.asarray(ds[LAG_DIM].values)
     if lags.ndim != 1 or lags.size == 0:
-        raise ValueError(f"Coordinate {LAG_DIM!r} must be one-dimensional and nonempty.")
+        raise ValueError(
+            f"Coordinate {LAG_DIM!r} must be one-dimensional and nonempty."
+        )
     if not np.issubdtype(lags.dtype, np.integer):
         raise ValueError(f"Coordinate {LAG_DIM!r} must contain integer days.")
     if np.any(np.diff(lags) <= 0):
@@ -190,8 +196,7 @@ def validate_matched_composite(
     missing_attrs = [name for name in required_attrs if name not in ds.attrs]
     if missing_attrs:
         raise ValueError(
-            "Matched composite is missing attributes: "
-            + ", ".join(missing_attrs)
+            "Matched composite is missing attributes: " + ", ".join(missing_attrs)
         )
     if ds.attrs["matching_group_variable"] != "I_dyn_pre":
         raise ValueError("Matched composite must use I_dyn_pre as its group variable.")

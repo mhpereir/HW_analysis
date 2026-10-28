@@ -58,7 +58,10 @@ Product Stage 1: harmonized regional time series
 
 Product Stage 1
   |-> temporal composites, top events, threshold, diurnal, and event summaries
-  `-> regional hourly climatology -> climatological-anomaly composites and top events
+  |-> all-event-reference plus top-event face-advection absolute figures
+  `-> regional hourly climatology
+        |-> climatological-anomaly composites and top events
+        `-> all-event-reference plus top-event face-advection anomaly figures
 
 Product Stage 2: event-feature table + tracked matching settings
   |-> in-memory I_dyn_pre sign matching -> matched-population diagnostics
@@ -72,6 +75,8 @@ Product Stage 2: event-feature table + tracked matching settings
 | Stage 1 companion | `$HWA_ARTIFACT_ROOT/stage1_climatology/regional_hourly_climatology_*.nc` | `scripts/build_stage1_hourly_climatology.py` | climatological-anomaly composites, top-event traces, and face-advection diagnostics |
 | Stage 2 | event-feature table | `scripts/event_features/build_stage2_event_features.py` | feature plots, event comparisons, exploratory diagnostics |
 | Stage 2 | baseline-day feature table | `scripts/event_features/build_stage2_baseline_features.py` | event/baseline comparisons, exploratory diagnostics |
+| Derived Stage 2 | [Component-anomaly budgets](products/stage2_component_anomalies.md) from Stage 1, hourly climatology and accepted Stage-2 populations | `scripts/integration_window_analysis/build_component_anomalies.py` | anomaly event-versus-clean-baseline comparisons |
+| Derived exploration | [integration-window heating ranks](products/integration_window_ranks.md) from Stage 1, hourly climatology and accepted Stage-2 events | `scripts/integration_window_analysis/build_heating_comparison.py` | raw and climatology-corrected event-rank curves |
 
 ### Spatial products
 
@@ -147,6 +152,8 @@ HW_analysis/
 |   |-- plot_top_events_clim_anom.py
 |   |-- plot_advection_direction_exploration_clim_anom.py
 |   |-- plot_advection_direction_exploration_matched_clim_anom.py
+|   |-- plot_advection_direction_exploration_top_events.py
+|   |-- plot_advection_direction_exploration_top_events_clim_anom.py
 |   |-- region_vis/
 |   |   |-- plot_stage1_regions.py
 |   |   `-- schedule_plot_stage1_regions.sh
@@ -212,6 +219,7 @@ the diagnostic they make rather than a product stage they produce.
 
 - [001: event-feature windows](decisions/001_event_feature_windows.md)
 - [004: baseline season and window boundaries](decisions/004_baseline_season_windows.md)
+- [010: seasonal analysis defaults and consumer guards](decisions/010_season_selection_defaults.md)
 - [005: Stage-1 event peak semantics](decisions/005_stage1_event_peak_semantics.md)
 - [006: regional hourly climatology baseline](decisions/006_regional_hourly_climatology.md)
 - [007: in-memory I_dyn sign matching](decisions/007_idyn_sign_matching.md)

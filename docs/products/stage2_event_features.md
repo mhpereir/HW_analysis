@@ -47,6 +47,13 @@ series, and must not modify the Stage-1 product.
 
 ## Fixed Windows
 
+The default population uses JJA `peak_time` endpoints, with
+`require_full_event=0`. Detected events and integration windows may begin in
+May. `--all-seasons` preserves full-population analysis, and
+`--require-full-event` requests the historical stricter subset. Consumers must
+validate season metadata and dates; see
+[decision 010](../decisions/010_season_selection_defaults.md).
+
 Timestamp slices are inclusive. Current defaults are:
 
 | Window | Lags relative to `peak_time` |
@@ -59,6 +66,16 @@ Timestamp slices are inclusive. Current defaults are:
 | `decay` | `(0, 72)` hours |
 
 See [decision 001](../decisions/001_event_feature_windows.md).
+
+An explicit positive integer `--integration-hours H` changes the heat-budget
+and LWA integration windows to `(-H, 0)` without changing defaults, other
+windows or Stage-1 selection. API callers use `integration_hours=H`. Every
+window-derived attribute and count must describe the resolved window. PBS
+entrypoints expose the same option as `INTEGRATION_HOURS` (default 96).
+Keep sensitivity products in distinct no-overwrite namespaces; do not combine
+them with a baseline table built using a different window. Complete 7/14/21-day
+windows have 169/337/505 hourly samples. Independent campaign validation must
+reject gaps or nonfinite required samples, even if a finite-sample sum exists.
 
 ## Default Variables
 
@@ -145,6 +162,8 @@ adaptive_windows_used = 0
 all_seasons = 0 or 1
 season_months = comma-separated months or empty
 require_full_event = 0 or 1
+season_selection_rule = anchor_month or full_event or all_seasons
+season_anchor = peak_time
 dropped_boundary_events = integer count
 ```
 

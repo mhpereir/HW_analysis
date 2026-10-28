@@ -5,6 +5,8 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
 source "${PROJECT_ROOT}/config/artifact_paths.sh"
@@ -40,6 +42,7 @@ cd "${PROJECT_ROOT}/scripts"
 
 echo "[info] $(date -Is) starting event summary plotting on host $(hostname)"
 /usr/bin/time -v python plot_event_summary.py \
+  "${season_args[@]}" \
     --input-path "${INPUT_PATH}" \
     --output-path "${OUTPUT_PATH}" \
     --region "${REGION}" \
@@ -48,7 +51,5 @@ echo "[info] $(date -Is) starting event summary plotting on host $(hostname)"
     --threshold-variable "${THRESHOLD_VARIABLE}" \
     --quantile "${QUANTILE}" \
     --start-year "${TIME_START}" \
-    --end-year "${TIME_END}" \
-    --season-months 6 7 8 \
-    --require-full-event
+    --end-year "${TIME_END}"
 echo "[info] $(date -Is) done"
