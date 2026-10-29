@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import xarray as xr
 from HW_analysis.scripts import plot_composite_timeseries_split as plot_split
+from HW_analysis.src.artifact_paths import artifact_root
 
 RUN_ARGS = [
     "--region",
@@ -61,8 +62,7 @@ def test_parse_args_builds_separate_presentation_output_path(monkeypatch):
 
     assert args.layout == "presentation"
     assert args.output_path == (
-        plot_split.REPO_ROOT
-        / "results"
+        artifact_root()
         / "plots_composite_timeseries_split_presentation"
         / "region_pnw_hotz"
         / "boundary_surface_700hPa"
@@ -425,6 +425,16 @@ def test_main_uses_extended_variables_when_requested(monkeypatch, tmp_path):
     assert captured["plot_kwargs"]["smoothed_variables"] == (
         plot_split.EXTENDED_SMOOTHED_VARIABLES
     )
+    selected = set(captured["composite_kwargs"]["variables"])
+    smoothed = set(captured["plot_kwargs"]["smoothed_variables"])
+    assert selected.isdisjoint({"volume", "slhf_heating_rate_approx"})
+    assert {
+        "T_mean",
+        "cloud_cover",
+        "soil_moisture",
+        "sshf_heating_rate_approx",
+    } <= smoothed
+    assert smoothed == selected - {"lwa_a_region", "lwa_c_region"}
     assert captured["plot_kwargs"]["plot_extended_variables"]
 
 

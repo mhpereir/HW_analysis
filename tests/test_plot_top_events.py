@@ -7,6 +7,7 @@ import pytest
 import xarray as xr
 from HW_analysis.scripts import plot_top_events
 from HW_analysis.src import analysis_io
+from HW_analysis.src.artifact_paths import artifact_root
 
 RUN_ARGS = [
     "--region",
@@ -45,8 +46,7 @@ def test_parse_args_builds_default_paths(monkeypatch):
         end_year=2024,
     )
     assert args.output_dir == (
-        plot_top_events.REPO_ROOT
-        / "results"
+        artifact_root()
         / "plots_top_events"
         / "region_pnw_hotz"
         / "boundary_surface_700hPa"
@@ -64,8 +64,7 @@ def test_parse_args_builds_separate_presentation_output_path(monkeypatch):
 
     assert args.layout == "presentation"
     assert args.output_dir == (
-        plot_top_events.REPO_ROOT
-        / "results"
+        artifact_root()
         / "plots_top_events_presentation"
         / "region_pnw_hotz"
         / "boundary_surface_700hPa"
@@ -149,6 +148,7 @@ def test_write_top_event_plots_writes_raw_and_smoothed_figures_per_event(tmp_pat
         ds,
         selected,
         output_dir=tmp_path,
+        event_table=ds,
         window_days=0,
         smoothing_window=1,
     )
@@ -164,7 +164,7 @@ def test_write_top_event_plots_computes_one_reference_composite(monkeypatch, tmp
     ds = _make_plot_dataset()
     ds.attrs["data_representation"] = "climatological_anomaly"
     selected = plot_top_events.select_top_tas_events(ds, n=2)
-    event_table = xr.Dataset()
+    event_table = ds[["event_id", "peak_time"]]
     reference_composite = xr.Dataset()
     smoothed_reference_composite = xr.Dataset()
     captured = {
@@ -322,6 +322,7 @@ def test_write_top_event_plots_uses_extended_variables_when_requested(
         ds,
         selected,
         output_dir=tmp_path,
+        event_table=ds,
         window_days=1,
         plot_extended_variables=True,
     )
@@ -333,6 +334,16 @@ def test_write_top_event_plots_uses_extended_variables_when_requested(
     assert captured["smooth_kwargs"][0]["variables"] == (
         plot_top_events.EXTENDED_SMOOTHED_TOP_EVENT_VARIABLES
     )
+    selected = set(captured["composite_kwargs"]["variables"])
+    smoothed = set(captured["smooth_kwargs"][0]["variables"])
+    assert selected.isdisjoint({"volume", "slhf_heating_rate_approx"})
+    assert {
+        "T_mean",
+        "cloud_cover",
+        "soil_moisture",
+        "sshf_heating_rate_approx",
+    } <= smoothed
+    assert smoothed == selected - {"lwa_a_region", "lwa_c_region"}
     assert captured["plot_extended_variables"] == [True, True]
     assert captured["layouts"] == ["paper", "paper"]
 
@@ -387,6 +398,7 @@ def test_write_top_event_plots_uses_presentation_variables_and_filenames(
         ds,
         selected,
         output_dir=tmp_path,
+        event_table=ds,
         window_days=1,
         smoothing_window=6,
         layout="presentation",

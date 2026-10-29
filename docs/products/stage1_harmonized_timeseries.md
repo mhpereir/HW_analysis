@@ -14,8 +14,11 @@ consumers that require face tendencies or regional climatology must explicitly
 require contract version 2.
 
 ```text
-results/stage1/harmonized_regional_timeseries_*.nc
+$HWA_ARTIFACT_ROOT/stage1/harmonized_regional_timeseries_*.nc
 ```
+
+Storage paths follow the [artifact-location contract](../workflows/artifacts.md); the root
+is shared across source checkouts and may be configured before submission.
 
 ## Producer
 
@@ -36,9 +39,10 @@ stable save/open behavior and validates the product marker on read.
 - optional surface radiation, turbulent flux, soil-moisture, and cloud-cover inputs
 
 Configured regional bounds live in `src/config.py` and must match the geometry
-used by the corresponding threshold and EHB inputs. The Central USA extension
-uses 36-46 N and 105-95 W; see
-[decision 010](../decisions/010_central_usa_region.md).
+of the corresponding threshold and EHB inputs. Central USA uses the identifier
+`central_usa`, 36-46 N and 105-95 W, through the same regional builders and
+consumers as other regions; see
+[decision 011](../decisions/011_central_usa_region.md).
 
 ## Dimensions
 
@@ -46,6 +50,36 @@ uses 36-46 N and 105-95 W; see
 | --- | --- |
 | `time` | Harmonized analysis time axis, currently hourly for the primary product. |
 | `event` | Heatwave event-summary axis. |
+
+## Production hourly coverage
+
+Both production entrypoints, `build_stage1_harmonized_timeseries.py` and
+`build_stage1_pressure_layer.py`, use the same coverage check in
+`src.harmonize.validate_production_hourly_coverage`. For the current
+May-October EHB campaigns, each requested analysis year must contain exactly
+the hourly timestamps from May 1 at 01:00 UTC through October 31 at 22:00 UTC,
+inclusive (4,414 samples per year). These are the centered-hour EHB timestamps;
+the first and last hours of the upstream May-October input period are absent.
+The off-season gap between annual blocks is expected.
+
+This expectation is independent of the lower and upper pressure boundaries.
+Missing years or hours, duplicate or unordered timestamps, shifted hours, and
+extra timestamps fail before assembly. The reference-based builder applies
+the same check to both its annual EHB sources and the selected reference
+years, then requires exact source/reference alignment. Its optional validation
+of additional upstream years uses the same annual coverage contract.
+
+The raw-source entrypoint now rejects incomplete seasonal EHB inputs that
+previously could pass through to assembly. Complete production inputs retain
+their numerical results and schema. Existing product readers and low-level
+harmonization helpers continue to support historical products and short
+synthetic datasets; they do not impose this production calendar implicitly.
+Changing the production season requires updating this shared expectation for
+both entrypoints together, not a pressure-layer-specific exception.
+
+Validation must exercise both entrypoints with complete and incomplete
+coverage, including missing requested years, and retain the independent
+pressure-layer source, reference-identity, and numerical-closure checks.
 
 ## Core Time-indexed Variables
 
@@ -196,3 +230,51 @@ a partial file at the final product path.
 The regional climatology is a separate compact companion product. Stage 1 is
 not expanded with climatology or anomaly variables. See
 [Regional hourly climatology](stage1_regional_hourly_climatology.md).
+
+## Fixed pressure layers using an accepted regional reference
+
+`scripts/build_stage1_pressure_layer.py` assembles a new pressure layer from
+an immutable EHB campaign and an accepted contract-v2 Stage-1 reference for
+the same horizontal region, threshold variable, quantile, and analysis years.
+Run it through `schedulers/schedule_build_stage1_pressure_layer.sh`.
+
+The scheduler loads the shared artifact configuration and requires
+`REFERENCE_PATH` and the fresh `OUTPUT_DIR` beneath `HWA_ARTIFACT_ROOT`.
+`LOG_DIR` defaults to `HWA_LOG_ROOT`; application logs are created exclusively
+before preflight checks. The upstream `HEAT_BUDGET_MANIFEST` retains its EHB
+campaign location outside the prepared-artifact tree. Pass root overrides
+explicitly through PBS as described in the artifact-location contract.
+
+Only the vertical EHB control volume changes. TAS, all three LWA families,
+their thresholds, flags and event IDs, and regional surface diagnostics are
+reused exactly from the reference. The hourly axes must match exactly after
+selecting complete analysis years; interpolation and partial-year selections
+are forbidden. The selected event table is retained for those years and must
+agree with an independently rebuilt event table. The reference file's SHA-256
+must match an explicitly supplied accepted hash.
+
+The builder replaces temperature, volume, all budget rates and every boundary
+face from the new annual EHB inputs using the standard harmonization code.
+Both pressure faces are required. Surface-energy approximations are recomputed
+from the preserved surface fluxes, recorded regional area and constants, and
+the new volume. For an elevated layer these are hypothetical uniform-energy
+equivalents, not measured heating or boundary fluxes into that layer; their
+metadata states this limitation. They must not be substituted for the EHB
+residual `diabatic`.
+
+Before publication, validate the EHB manifest's horizontal region and pressure
+bounds, every requested year's shared production hourly coverage, finite numeric
+fields, positive volume, six-face reconstruction and budget closure. Validate
+the complete upstream annual inventory, including years outside the analysis
+period, in the production run. Validate exact equality of reused fields and
+event summaries, direct normalized source values and closure in the reopened
+output. A one-year smoke precedes full production. Synthetic tests cover
+incompatible references, pressure metadata, missing hours, missing bottom
+faces, closure failure, and the changed volume normalization.
+
+Each attempt requires a new output directory and never overwrites an existing
+directory. NetCDF publication remains atomic. A JSON manifest records source
+and reference hashes, source and analysis years, EHB producer provenance,
+execution commit and PBS identity, validation metrics, and output hashes.
+Existing raw-source builds, surface products and downstream schemas remain
+unchanged. New filenames encode the fixed lower and upper pressure bounds.

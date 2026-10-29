@@ -3,10 +3,11 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "${REPO_ROOT}/config/artifact_paths.sh"
 
 T2M_ROOT="/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/2mT"
 Z500_ROOT="/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/z500"
-OUTPUT_DIR="${REPO_ROOT}/results/spatial_composites/daily"
+OUTPUT_DIR="${HWA_ARTIFACT_ROOT}/spatial_composites/daily"
 START_YEAR=1940
 END_YEAR=2024
 THREADS=1

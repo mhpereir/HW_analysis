@@ -1,9 +1,7 @@
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCHEDULER = (
-    REPO_ROOT / "schedulers/schedule_plot_dyn_net_spatial_composites.sh"
-)
+SCHEDULER = REPO_ROOT / "schedulers/schedule_plot_dyn_net_spatial_composites.sh"
 
 
 def test_plot_scheduler_is_commit_verified_and_plot_only():

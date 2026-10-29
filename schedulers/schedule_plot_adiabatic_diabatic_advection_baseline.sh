@@ -6,19 +6,26 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 BASELINE_INPUT_PATH="${BASELINE_INPUT_PATH:?BASELINE_INPUT_PATH is required}"
 EVENT_INPUT_PATH="${EVENT_INPUT_PATH:?EVENT_INPUT_PATH is required}"
 OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 COLOR_VARIABLE="${COLOR_VARIABLE:-tas_anom_peak}"
 POINT_SIZE="${POINT_SIZE:-24.0}"
 ALPHA="${ALPHA:-0.2}"
 EVENT_POINT_SIZE="${EVENT_POINT_SIZE:-24.0}"
 EVENT_ALPHA="${EVENT_ALPHA:-0.7}"
+
+# Runtime validation and logging.
+hwa_start_log "plot_adiabatic_diabatic_advection_baseline"
+hwa_validate_artifact_paths BASELINE_INPUT_PATH EVENT_INPUT_PATH OUTPUT_PATH
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
@@ -28,8 +35,6 @@ test -s "${EVENT_INPUT_PATH}"
 test ! -e "${OUTPUT_PATH}"
 
 mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_plot_adiabatic_diabatic_advection_baseline.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
@@ -53,6 +58,7 @@ echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v python scripts/event_features/plot_adiabatic_diabatic_advection_baseline.py \
+  "${season_args[@]}" \
   --input-path "${BASELINE_INPUT_PATH}" \
   --event-input-path "${EVENT_INPUT_PATH}" \
   --output-path "${OUTPUT_PATH}" \

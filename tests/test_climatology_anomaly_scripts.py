@@ -36,6 +36,7 @@ def test_all_event_anomalies_are_applied_before_event_stacking(
         [
             "plot_composite_timeseries_all_clim_anom.py",
             *RUN_ARGS,
+            "--all-seasons",
             "--input-path",
             str(tmp_path / "stage1.nc"),
             "--climatology-path",
@@ -113,6 +114,7 @@ def test_split_anomalies_use_absolute_stage1_for_bin_membership(
         [
             "plot_composite_timeseries_split_clim_anom.py",
             *RUN_ARGS,
+            "--all-seasons",
             "--input-path",
             str(tmp_path / "stage1.nc"),
             "--climatology-path",

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import xarray as xr
 from HW_analysis.scripts import plot_top_events_clim_anom as anomaly_plot
+from HW_analysis.src.artifact_paths import artifact_root
 
 RUN_ARGS = [
     "--region",
@@ -40,8 +41,7 @@ def test_parse_args_builds_isolated_anomaly_paths(monkeypatch):
         ).resolve()
     )
     assert args.output_dir == (
-        anomaly_plot.REPO_ROOT
-        / "results"
+        artifact_root()
         / "plots_top_events_clim_anom"
         / "region_pnw_hotz"
         / "boundary_surface_700hPa"
@@ -79,6 +79,7 @@ def test_main_ranks_absolute_events_and_anomalizes_before_plotting(
     monkeypatch.setattr(
         "sys.argv",
         _argv(
+            "--all-seasons",
             "--input-path",
             str(input_path),
             "--climatology-path",

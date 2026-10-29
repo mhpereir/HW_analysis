@@ -88,9 +88,7 @@ DIAGNOSTIC_VARIABLES = (
     "T_anom_mean_ant",
     "days_from_solstice",
 )
-DERIVED_DIAGNOSTIC_VARIABLES = (
-    "log10_tas_excess_integral",
-)
+DERIVED_DIAGNOSTIC_VARIABLES = ("log10_tas_excess_integral",)
 
 
 def parse_args() -> argparse.Namespace:
@@ -232,7 +230,7 @@ def build_event_feature_pca(
         scaler=scaler,
         n_input_events=feature_table.sizes[EVENT_DIM],
         n_valid_events=valid_idx.size,
-        n_components=n_components, # type: ignore
+        n_components=n_components,  # type: ignore
     )
     return out
 
@@ -302,7 +300,9 @@ def feature_values(feature_table: xr.Dataset, feature_name: str) -> np.ndarray:
     return out
 
 
-def heat_budget_fraction_values(feature_table: xr.Dataset, feature_name: str) -> np.ndarray:
+def heat_budget_fraction_values(
+    feature_table: xr.Dataset, feature_name: str
+) -> np.ndarray:
     """Return one heat-budget term as a fraction of summed absolute budget terms."""
     numerator = np.asarray(
         feature_table[HEAT_BUDGET_FRACTION_NUMERATORS[feature_name]].values,
@@ -310,7 +310,9 @@ def heat_budget_fraction_values(feature_table: xr.Dataset, feature_name: str) ->
     )
     denominator = np.zeros_like(numerator, dtype=float)
     for source_name in INTEGRATED_HEAT_BUDGET_VARIABLES:
-        denominator = denominator + np.abs(np.asarray(feature_table[source_name].values, dtype=float))
+        denominator = denominator + np.abs(
+            np.asarray(feature_table[source_name].values, dtype=float)
+        )
     return np.where(denominator != 0.0, numerator / denominator, np.nan)
 
 
@@ -352,7 +354,9 @@ def make_pca_dataset(
 ) -> xr.Dataset:
     """Assemble the PCA output dataset."""
     event_coord = retained_event_coordinate(feature_table, valid_idx)
-    pc_coord = np.asarray([f"PC{i}" for i in range(1, scores.shape[1] + 1)], dtype=object)
+    pc_coord = np.asarray(
+        [f"PC{i}" for i in range(1, scores.shape[1] + 1)], dtype=object
+    )
     feature_coord = np.asarray(feature_names, dtype=object)
     event_original_coord = np.asarray(feature_table[EVENT_DIM].values)
 
@@ -386,7 +390,9 @@ def make_pca_dataset(
     return out
 
 
-def retained_event_coordinate(feature_table: xr.Dataset, valid_idx: np.ndarray) -> np.ndarray:
+def retained_event_coordinate(
+    feature_table: xr.Dataset, valid_idx: np.ndarray
+) -> np.ndarray:
     """Return event coordinate values for retained events, preferring event_id."""
     if "event_id" in feature_table:
         return np.asarray(feature_table["event_id"].isel({EVENT_DIM: valid_idx}).values)

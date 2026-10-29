@@ -93,7 +93,10 @@ def test_advection_panel_draws_one_to_negative_one_line():
 
 def test_shared_x_axis_uses_finite_x_data_extent_only():
     features = _make_feature_table()
-    features["I_diabatic_pre"] = ("event", np.array([10.0, 12.0, 14.0, 16.0, 18.0, 20.0]))
+    features["I_diabatic_pre"] = (
+        "event",
+        np.array([10.0, 12.0, 14.0, 16.0, 18.0, 20.0]),
+    )
     features["I_advection_pre"] = (
         "event",
         np.array([-20.0, -18.0, -16.0, -14.0, -12.0, -10.0]),
@@ -171,7 +174,12 @@ def test_main_writes_one_raw_output(monkeypatch, tmp_path):
     output_path = tmp_path / "adiabatic_advection_vs_adiabatic_scatter.png"
     written = []
 
-    def fake_open(path):
+    def fake_open(path, **season_options):
+        assert season_options == {
+            "season_months": [6, 7, 8],
+            "all_seasons": False,
+            "require_full_event": False,
+        }
         assert path == input_path
         return _make_feature_table()
 

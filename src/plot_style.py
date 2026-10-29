@@ -10,11 +10,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from matplotlib.colors import Normalize
+from matplotlib.lines import Line2D
 from matplotlib.ticker import (
     AutoMinorLocator,
     Formatter,
+    MaxNLocator,
     MultipleLocator,
     NullFormatter,
+    ScalarFormatter,
     StrMethodFormatter,
 )
 
@@ -42,6 +45,22 @@ SINGLE_PANEL_ASPECT = 0.6
 TWO_PANEL_STACK_ASPECT = 0.55
 TWO_PANEL_COLUMN_ASPECT = 1.5
 PRESENTATION_TWO_PANEL_WIDTH_SCALE = 1.25
+PRESENTATION_SCATTER_X_INTERVALS = 4
+PRESENTATION_EVENT_SIZE_PT2 = 40.0
+PRESENTATION_EVENT_ALPHA = 0.9
+BUDGET_REFERENCE_CAPTION = (
+    r"Lower-panel lines: $I_{dyn,net}+I_{diabatic}=I_{dT/dt}$ (K)"
+)
+ANOMALY_BUDGET_REFERENCE_CAPTION = (
+    r"Lower-panel lines: $I'_{dyn,net}+I'_{diabatic}=I'_{dT/dt}$ (K)"
+)
+HEAT_BUDGET_ANOMALY_LABELS = {
+    "I_advection_pre": r"$I'_{advective}$ (K)",
+    "I_adiabatic_pre": r"$I'_{adiabatic}$ (K)",
+    "I_dyn_pre": r"$I'_{dyn,net}$ (K)",
+    "I_dTdt_pre": r"$I'_{dT/dt}$ (K)",
+    "I_diabatic_pre": r"$I'_{diabatic}$ (K)",
+}
 THREE_PANEL_STACK_ASPECT = 0.62
 SQUARE_PANEL_ASPECT = 0.95
 
@@ -104,6 +123,21 @@ FACE_COLORS = {
     "west": "#009E9E",
     "top": "#E69F00",
     "bottom": "#D55E00",
+}
+
+HEATING_RANK_STYLES = {
+    "raw": {
+        "color": COLORS["storage"],
+        "linestyle": "-",
+        "marker": "o",
+        "label": "Raw rank",
+    },
+    "corrected": {
+        "color": COLORS["temperature_tendency"],
+        "linestyle": "--",
+        "marker": "s",
+        "label": "Climatology-corrected rank",
+    },
 }
 
 REGION_NAME_MAPPING = {
@@ -234,13 +268,110 @@ def format_time_axis(ax) -> None:
     ax.xaxis.set_minor_formatter(NullFormatter())
 
 
-def format_integer_axis(axis, *, spacing: int = 1) -> None:
-    """Format a numeric axis with integer labels at a fixed integer spacing."""
+def format_day_lag_axis(axis) -> None:
+    """Use daily minor ticks and prefer whole-day major ticks when possible."""
+    axis.set_major_locator(MaxNLocator(nbins="auto", integer=True))
+    axis.set_major_formatter(ScalarFormatter(useOffset=False))
+    axis.set_minor_locator(MultipleLocator(1))
+    use_default_numeric_formatter(axis)
+
+
+def format_integer_axis(
+    axis, *, spacing: int = 1, minor_spacing: int | None = None
+) -> None:
+    """Format integer labels, optionally fixing minor ticks independently."""
     if isinstance(spacing, bool) or not isinstance(spacing, int) or spacing < 1:
         raise ValueError("spacing must be a positive integer.")
+    if minor_spacing is not None and (
+        isinstance(minor_spacing, bool)
+        or not isinstance(minor_spacing, int)
+        or minor_spacing < 1
+    ):
+        raise ValueError("minor_spacing must be a positive integer.")
     axis.set_major_locator(MultipleLocator(spacing))
     axis.set_major_formatter(StrMethodFormatter("{x:.0f}"))
+    if minor_spacing is not None:
+        axis.set_minor_locator(MultipleLocator(minor_spacing))
     use_default_numeric_formatter(axis)
+
+
+def limit_major_ticks(axis, *, max_intervals: int) -> None:
+    """Limit numeric tick density without changing shared decimal formatting."""
+    if (
+        isinstance(max_intervals, bool)
+        or not isinstance(max_intervals, int)
+        or max_intervals < 1
+    ):
+        raise ValueError("max_intervals must be a positive integer.")
+    axis.set_major_locator(MaxNLocator(nbins=max_intervals))
+
+
+def event_severity_legend_handle(*, point_size: float, alpha: float) -> Line2D:
+    """Return a visible population key independent of the first event's color."""
+    return Line2D(
+        [],
+        [],
+        linestyle="none",
+        marker="o",
+        markersize=np.sqrt(point_size),
+        markerfacecolor=plt.get_cmap(EVENT_SEVERITY_COLOR_MAP)(0.5),
+        markeredgecolor=COLORS["benchmark"],
+        markeredgewidth=0.45,
+        alpha=alpha,
+        label="Events",
+    )
+
+
+def add_sum_reference_lines(ax, *, spacing: float = 5.0, max_lines: int = 17) -> None:
+    """Label visible x+y=c guides in K without changing limits or autoscaling.
+
+    Broad ranges use integer multiples of spacing to bound rendering cost and
+    avoid a dense background. This is a geometric guide, not a fitted model.
+    """
+    if not np.isfinite(spacing) or spacing <= 0:
+        raise ValueError("spacing must be finite and positive.")
+    if isinstance(max_lines, bool) or not isinstance(max_lines, int) or max_lines < 2:
+        raise ValueError("max_lines must be an integer of at least two.")
+    if ax.get_xscale() != "linear" or ax.get_yscale() != "linear":
+        raise ValueError("Sum reference guides require linear axes.")
+
+    xmin, xmax = sorted(ax.get_xlim())
+    ymin, ymax = sorted(ax.get_ylim())
+    lower, upper = xmin + ymin, xmax + ymax
+    step = spacing * max(1, int(np.ceil((upper - lower) / spacing / (max_lines - 1))))
+    first, last = int(np.ceil(lower / step)), int(np.floor(upper / step))
+    for index in range(first, last + 1):
+        level = index * step
+        lo, hi = max(xmin, level - ymax), min(xmax, level - ymin)
+        if max((hi - lo) / (xmax - xmin), (hi - lo) / (ymax - ymin)) < 0.1:
+            continue
+        xx = np.array([lo, hi])
+        ax.plot(
+            xx,
+            np.clip(level - xx, ymin, ymax),
+            scalex=False,
+            scaley=False,
+            color=COLORS["zero"],
+            linewidth=REFERENCE_LINE_WIDTH_PT,
+            linestyle=":",
+            alpha=0.55,
+            zorder=0,
+            label=f"reference {level:g} K",
+        )
+        xpos = lo + 0.82 * (hi - lo)
+        xleft, xright = ax.get_xlim()
+        fraction = (xpos - xleft) / (xright - xleft)
+        ax.text(
+            xpos,
+            level - xpos,
+            f"{level:g} K",
+            fontsize=LEGEND_FONT_SIZE_PT - 1,
+            color="0.35",
+            ha="right" if fraction > 0.9 else "left" if fraction < 0.1 else "center",
+            va="center",
+            clip_on=True,
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.75, "pad": 0.3},
+        )
 
 
 def style_axis(ax, *, grid: bool = True) -> None:

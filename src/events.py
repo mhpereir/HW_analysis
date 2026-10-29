@@ -26,8 +26,9 @@ import xarray as xr
 
 from . import preprocess
 
-#future to do:
+# future to do:
 # add event-summary for "LWA_a" events (similar to current tas-defined events)
+
 
 def mask_to_event_ids(
     mask: xr.DataArray,
@@ -173,7 +174,6 @@ def _label_1d_events(mask_1d: np.ndarray, min_duration: int) -> np.ndarray:
     return event_ids
 
 
-
 def build_event_summary_table(
     ds: xr.Dataset,
     event_id: str | xr.DataArray,
@@ -233,7 +233,9 @@ def build_event_summary_table(
     event_values = event_da.values.astype(np.int64)
     day_values = _as_calendar_days(time_values)
 
-    event_ids = np.array(sorted(int(value) for value in np.unique(event_values) if value > 0))
+    event_ids = np.array(
+        sorted(int(value) for value in np.unique(event_values) if value > 0)
+    )
     n_events = event_ids.size
 
     columns: dict[str, list[object]] = {
@@ -284,12 +286,16 @@ def build_event_summary_table(
         columns["start_time"].append(time_values[idx_full[0]])
         columns["end_time"].append(time_values[idx_full[-1]])
         columns["duration"].append(idx_daily.size)
-        columns["peak_time"].append(time_values[peak_idx] if peak_idx is not None else np.datetime64("NaT"))
+        columns["peak_time"].append(
+            time_values[peak_idx] if peak_idx is not None else np.datetime64("NaT")
+        )
         columns["peak_value"].append(peak_value)
         columns["tas_peak"].append(_nanmax_or_nan(tas_values))
         columns["tas_anom_peak"].append(_nanmax_or_nan(tas_anom_values))
         columns["tas_excess_peak"].append(_nanmax_or_nan(tas_excess_values))
-        columns["tas_excess_integral"].append(_nansum_or_nan(tas_excess_values)) #nansum != nanmax
+        columns["tas_excess_integral"].append(
+            _nansum_or_nan(tas_excess_values)
+        )  # nansum != nanmax
         columns["lwa_a_peak"].append(_nanmax_or_nan(lwa_a_values))
         columns["lwa_c_peak"].append(_nanmax_or_nan(lwa_c_values))
 
@@ -297,15 +303,33 @@ def build_event_summary_table(
     out = xr.Dataset(
         data_vars={
             "event_id": ("event", np.asarray(columns["event_id"], dtype=np.int64)),
-            "start_time": ("event", np.asarray(columns["start_time"], dtype="datetime64[ns]")),
-            "end_time": ("event", np.asarray(columns["end_time"], dtype="datetime64[ns]")),
+            "start_time": (
+                "event",
+                np.asarray(columns["start_time"], dtype="datetime64[ns]"),
+            ),
+            "end_time": (
+                "event",
+                np.asarray(columns["end_time"], dtype="datetime64[ns]"),
+            ),
             "duration": ("event", np.asarray(columns["duration"], dtype=np.int64)),
-            "peak_time": ("event", np.asarray(columns["peak_time"], dtype="datetime64[ns]")),
+            "peak_time": (
+                "event",
+                np.asarray(columns["peak_time"], dtype="datetime64[ns]"),
+            ),
             "peak_value": ("event", np.asarray(columns["peak_value"], dtype=float)),
             "tas_peak": ("event", np.asarray(columns["tas_peak"], dtype=float)),
-            "tas_anom_peak": ("event", np.asarray(columns["tas_anom_peak"], dtype=float)),
-            "tas_excess_peak": ("event", np.asarray(columns["tas_excess_peak"], dtype=float)),
-            "tas_excess_integral": ("event", np.asarray(columns["tas_excess_integral"], dtype=float)),
+            "tas_anom_peak": (
+                "event",
+                np.asarray(columns["tas_anom_peak"], dtype=float),
+            ),
+            "tas_excess_peak": (
+                "event",
+                np.asarray(columns["tas_excess_peak"], dtype=float),
+            ),
+            "tas_excess_integral": (
+                "event",
+                np.asarray(columns["tas_excess_integral"], dtype=float),
+            ),
             "lwa_a_peak": ("event", np.asarray(columns["lwa_a_peak"], dtype=float)),
             "lwa_c_peak": ("event", np.asarray(columns["lwa_c_peak"], dtype=float)),
         },
@@ -351,10 +375,8 @@ def _validate_event_summary_inputs(
 
     if event_da.dims != (time_dim,):
         raise ValueError(
-            "event_id must be 1D with dims "
-            f"({time_dim!r},); got {event_da.dims!r}."
+            f"event_id must be 1D with dims ({time_dim!r},); got {event_da.dims!r}."
         )
-
 
 
 def _validate_event_id_inputs(
@@ -389,7 +411,9 @@ def _lwa_variable_key(variable: str) -> str:
     valid = {"LWA", "LWA_a", "LWA_c"}
     if variable not in valid:
         available = ", ".join(sorted(valid))
-        raise ValueError(f"Unsupported LWA variable {variable!r}. Expected one of: {available}.")
+        raise ValueError(
+            f"Unsupported LWA variable {variable!r}. Expected one of: {available}."
+        )
 
     return variable.lower()
 
@@ -404,7 +428,9 @@ def _as_calendar_days(time_values: np.ndarray) -> np.ndarray:
         ) from exc
 
 
-def _first_index_per_calendar_day(idx_full: np.ndarray, day_values: np.ndarray) -> np.ndarray:
+def _first_index_per_calendar_day(
+    idx_full: np.ndarray, day_values: np.ndarray
+) -> np.ndarray:
     """Return the first input index for each calendar day represented in idx_full."""
     event_days = day_values[idx_full]
     _, first_positions = np.unique(event_days, return_index=True)

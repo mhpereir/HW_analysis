@@ -62,13 +62,10 @@ def test_plot_region_domains_draws_one_wireframe_per_configured_region():
     try:
         ax = fig.axes[0]
         assert len(ax.patches) == len(config.REGIONS)
-        assert ax.get_title() == (
-            "Stage 1 Regional Domains\nRun bf232281_20260819"
-        )
+        assert ax.get_title() == ("Stage 1 Regional Domains\nRun bf232281_20260819")
         assert len(fig.legends) == 1
         assert [text.get_text() for text in fig.legends[0].get_texts()] == [
-            plot_style.REGION_NAME_MAPPING[region]
-            for region in sorted(config.REGIONS)
+            plot_style.REGION_NAME_MAPPING[region] for region in sorted(config.REGIONS)
         ]
         edge_colors = [patch.get_edgecolor() for patch in ax.patches]
         assert len(set(edge_colors)) == len(config.REGIONS)
