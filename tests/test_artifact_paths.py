@@ -234,7 +234,7 @@ def _scheduler_env(scheduler, tmp_path):
     # Supply required prepared paths, but no data. The invalid commit must stop
     # the scheduler before any scientific environment or producer is invoked.
     for name in re.findall(
-        r'^([A-Z_]+)="\$\{\1:\?', scheduler.read_text(), re.MULTILINE
+        r'^([A-Z_][A-Z0-9_]*)="\$\{\1:\?', scheduler.read_text(), re.MULTILINE
     ):
         if name not in env:
             env[name] = str(tmp_path / "artifacts" / name.lower())
@@ -355,7 +355,9 @@ GUARDED_SCHEDULERS = [
     for path in ACTIVE_SCHEDULERS
     if (
         match := re.search(
-            r"^hwa_validate_artifact_paths ([A-Z_]+)", path.read_text(), re.MULTILINE
+            r"^hwa_validate_artifact_paths ([A-Z_][A-Z0-9_]*)",
+            path.read_text(),
+            re.MULTILINE,
         )
     )
 ]
@@ -385,6 +387,25 @@ def test_each_product_scheduler_rejects_relative_prepared_paths(
         in result.stdout + result.stderr
     )
     assert not (tmp_path / "artifacts").exists()
+
+
+@pytest.mark.parametrize("name", ["REFERENCE_PATH", "OUTPUT_DIR"])
+def test_pressure_layer_scheduler_guards_reference_and_output(name, tmp_path):
+    scheduler = REPO_ROOT / "schedulers/schedule_build_stage1_pressure_layer.sh"
+    env = _scheduler_env(scheduler, tmp_path)
+    env[name] = str(tmp_path / "outside-artifact-root" / "product.nc")
+    result = subprocess.run(
+        ["bash", str(scheduler)],
+        env=env,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert f"{name} must be beneath HWA_ARTIFACT_ROOT" in result.stdout + result.stderr
+    assert not (tmp_path / "artifacts").exists()
+    assert not (tmp_path / "outside-artifact-root").exists()
 
 
 @pytest.mark.parametrize("dirty", [False, True])

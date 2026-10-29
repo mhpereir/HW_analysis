@@ -151,7 +151,7 @@ def validate_stage2_season(
     """
     months = resolve_months(season_months, all_seasons=all_seasons)
     stage = ds.attrs.get("pipeline_stage")
-    if stage == "stage_2_event_features":
+    if stage in {"stage_2_event_features", "stage_2_event_component_anomalies"}:
         dim, anchor = "event", "peak_time"
         actual_full = _binary_attr(ds, "require_full_event")
         if require_full_event is not None and actual_full != int(require_full_event):
@@ -162,7 +162,7 @@ def validate_stage2_season(
                 f"Stage-2 event membership differs from the requested rule. Use {option} "
                 "to consume this population, or rebuild Stage 2 with the requested rule."
             )
-    elif stage == "stage_2_baseline_features":
+    elif stage in {"stage_2_baseline_features", "stage_2_baseline_component_anomalies"}:
         dim, anchor, actual_full = "baseline_day", "reference_time", 0
     else:
         raise ValueError(

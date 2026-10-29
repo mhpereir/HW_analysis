@@ -15,7 +15,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-
 from scripts.idyn_matching_exploration import matching_settings
 from src import (
     advection_direction,
@@ -73,6 +72,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output-path", type=Path, default=None)
     parser.add_argument("--window-days", type=int, default=7)
+    parser.add_argument(
+        "--smoothing-window",
+        type=int,
+        default=advection_direction_plotting.DEFAULT_SMOOTHING_WINDOW,
+    )
     args = plot_paths.finalize_stage1_plot_paths(
         season_selection.parse_args(parser),
         parser,
@@ -97,6 +101,8 @@ def validate_args(args: argparse.Namespace) -> None:
     """Reject invalid windows, missing inputs, and output replacement."""
     if args.window_days < 1:
         raise ValueError("--window-days must be >= 1.")
+    if args.smoothing_window < 1:
+        raise ValueError("--smoothing-window must be >= 1.")
     for label, path in (
         ("Stage-1 input", args.input_path),
         ("climatology", args.climatology_path),
@@ -107,8 +113,11 @@ def validate_args(args: argparse.Namespace) -> None:
             raise FileNotFoundError(f"{label} file does not exist: {path}.")
     if args.output_path.suffix.lower() != ".png":
         raise ValueError("--output-path must use the .png suffix.")
-    if args.output_path.exists():
-        raise FileExistsError(f"Matched anomaly plot already exists: {args.output_path}.")
+    smoothed_path = advection_direction_plotting.smoothed_output_path(args.output_path)
+    existing = [path for path in (args.output_path, smoothed_path) if path.exists()]
+    if existing:
+        paths = ", ".join(str(path) for path in existing)
+        raise FileExistsError(f"Matched anomaly plot output already exists: {paths}.")
 
 
 def open_event_features(path: str | Path, **season_options) -> xr.Dataset:
@@ -251,7 +260,7 @@ def sha256_file(path: str | Path) -> str:
 
 
 def main() -> int:
-    """Build and write the separate matched-sign advection figure."""
+    """Build and write raw and smoothed matched-sign advection figures."""
     args = parse_args()
     validate_args(args)
     settings = matching_settings.load_matching_settings(args.matching_settings_path)
@@ -295,15 +304,19 @@ def main() -> int:
             composite.attrs["climatology_path"] = str(args.climatology_path)
             composite.attrs["event_features_path"] = str(args.event_features_path)
             composite.attrs["event_features_sha256"] = event_features_sha256
-        path = (
-            advection_direction_plotting.write_matched_advection_direction_exploration_plot(
-                prepared.negative,
-                prepared.positive,
-                args.output_path,
-            )
+        written = advection_direction_plotting.write_matched_advection_direction_exploration_outputs(
+            prepared.negative,
+            prepared.positive,
+            args.output_path,
+            smoothed_output_path=advection_direction_plotting.smoothed_output_path(
+                args.output_path
+            ),
+            smoothing_window=args.smoothing_window,
         )
 
-    print(f"Wrote matched advection-direction anomaly plot: {path}")
+    print("Wrote matched advection-direction anomaly plots:")
+    for path in written:
+        print(f"  {path}")
     print(f"Matching specification: {prepared.specification.identifier}")
     print(f"Matched pairs: {prepared.match.pair_count}")
     print(f"Stage-2 SHA-256: {event_features_sha256}")

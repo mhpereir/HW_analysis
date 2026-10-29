@@ -56,6 +56,11 @@ It does not silently trim a file or relabel its population. A full-population
 analysis requires both an all-season producer and an explicit all-season
 consumer. Custom seasons must likewise agree.
 
+Selection helpers attach provenance only to their returned products. They and
+the consumer guards must leave the input rows, values and metadata unchanged,
+including when every event passes selection. This preserves accepted reference
+tables and prevents one selection from changing a later consumer's provenance.
+
 Historical JJA tables with `require_full_event=1` remain usable by explicitly
 requesting `--require-full-event`. They are a stricter population than the new
 default; regenerating from Stage 1 is required to recover omitted
@@ -87,7 +92,12 @@ exception to the generic Stage-2 endpoint default, not a requirement to change
 the sensitivity population. The integration history still spans all required
 months.
 
-Top-event face plots, top-event maps and inter-region fractions must adopt the
+The face-advection integration now applies the shared full-JJA defaults to
+its top-event rank and reference population, and validates the matched
+Stage-2 source before restricting it to complete events. Its hourly and
+24-hour display-smoothed variants retain the same selected population.
+
+Top-event maps and inter-region fractions must adopt the
 JJA/full-event default, including ranking and reference populations, with
 explicit full-population modes preserved. Their consumers must guard inherited
 membership. Apply these changes on their own branches after validating this

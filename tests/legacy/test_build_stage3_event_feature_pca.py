@@ -28,23 +28,29 @@ def test_build_event_feature_pca_uses_default_derived_features_and_metadata():
     )
 
     expected_first_row = np.array(
-            [
-                10.0,
-                1.0 / 6.0,
-                -2.0 / 6.0,
-                2.0,
-                1.0,
+        [
+            10.0,
+            1.0 / 6.0,
+            -2.0 / 6.0,
+            2.0,
+            1.0,
             np.cos(-30.0 * 2.0 * np.pi / 365.0),
             2.0,
         ]
     )
     np.testing.assert_allclose(out["feature_matrix"].values[0], expected_first_row)
-    np.testing.assert_allclose(out["feature_matrix_scaled"].values.mean(axis=0), 0.0, atol=1e-12)
-    np.testing.assert_allclose(out["feature_matrix_scaled"].values.std(axis=0), 1.0, atol=1e-12)
+    np.testing.assert_allclose(
+        out["feature_matrix_scaled"].values.mean(axis=0), 0.0, atol=1e-12
+    )
+    np.testing.assert_allclose(
+        out["feature_matrix_scaled"].values.std(axis=0), 1.0, atol=1e-12
+    )
     np.testing.assert_array_equal(out["valid_event_mask_original"].values, [1, 1, 1, 1])
     np.testing.assert_array_equal(out["event_id"].values, [1, 2, 3, 4])
     assert "log10_tas_excess_integral" in out
-    np.testing.assert_allclose(out["log10_tas_excess_integral"].values, [1.0, 2.0, 3.0, 4.0])
+    np.testing.assert_allclose(
+        out["log10_tas_excess_integral"].values, [1.0, 2.0, 3.0, 4.0]
+    )
     assert out["pc_score"].dims == ("event", "pc")
     assert out["pc_loading"].dims == ("pc", "feature")
     assert out.attrs["pipeline_stage"] == "stage_3_event_feature_pca"

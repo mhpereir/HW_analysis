@@ -31,9 +31,7 @@ from src.artifact_paths import artifact_root
 DEFAULT_RUN_ID = "bf232281_20260819"
 DEFAULT_RUN_DIR = artifact_root() / "stage1/runs" / DEFAULT_RUN_ID
 DEFAULT_OUTPUT_PATH = (
-    artifact_root()
-    / "region_vis"
-    / f"stage1_regional_domains_{DEFAULT_RUN_ID}.png"
+    artifact_root() / "region_vis" / f"stage1_regional_domains_{DEFAULT_RUN_ID}.png"
 )
 DEFAULT_EXPECTED_REGION_COUNT = 7
 STAGE1_PRODUCT_GLOB = "harmonized_regional_timeseries_*.nc"
@@ -220,7 +218,9 @@ def read_stage1_region_metadata(
                 path=resolved_path,
             )
     except OSError as exc:
-        raise ValueError(f"Could not open Stage 1 product {resolved_path}: {exc}") from exc
+        raise ValueError(
+            f"Could not open Stage 1 product {resolved_path}: {exc}"
+        ) from exc
 
     bounds = (west, east, south, north)
     if west >= east or south >= north:
@@ -345,9 +345,7 @@ def decorate_northern_hemisphere(ax, data_crs: ccrs.PlateCarree) -> None:
     gridlines.ylocator = FixedLocator(np.arange(15, 91, 15))
 
     angles = np.linspace(0.0, 2.0 * np.pi, 181)
-    circle = mpath.Path(
-        np.column_stack([np.sin(angles), np.cos(angles)]) * 0.5 + 0.5
-    )
+    circle = mpath.Path(np.column_stack([np.sin(angles), np.cos(angles)]) * 0.5 + 0.5)
     ax.set_boundary(circle, transform=ax.transAxes)
 
 
@@ -370,8 +368,7 @@ def _text_attribute(value, *, attribute: str, path: Path) -> str:
         value = value.decode("utf-8")
     if not isinstance(value, str) or not value.strip():
         raise ValueError(
-            f"Stage 1 product has invalid {attribute!r} metadata in {path}: "
-            f"{value!r}."
+            f"Stage 1 product has invalid {attribute!r} metadata in {path}: {value!r}."
         )
     return value.strip()
 
@@ -386,13 +383,11 @@ def _bounds_attribute(
         bounds = np.asarray(value, dtype=float)
     except (TypeError, ValueError) as exc:
         raise ValueError(
-            f"Stage 1 product has invalid {attribute!r} metadata in {path}: "
-            f"{value!r}."
+            f"Stage 1 product has invalid {attribute!r} metadata in {path}: {value!r}."
         ) from exc
     if bounds.shape != (2,) or not np.isfinite(bounds).all():
         raise ValueError(
-            f"Stage 1 product has invalid {attribute!r} metadata in {path}: "
-            f"{value!r}."
+            f"Stage 1 product has invalid {attribute!r} metadata in {path}: {value!r}."
         )
     return float(bounds[0]), float(bounds[1])
 

@@ -49,9 +49,7 @@ def test_prepare_matched_events_uses_selector_and_records_pair_audit(monkeypatch
         selected.events["matched_pair_distance"][:4],
         selected.events["matched_pair_distance"][4:],
     )
-    assert selected.events.attrs["matching_specification"] == (
-        "peak_anomaly_0p20"
-    )
+    assert selected.events.attrs["matching_specification"] == ("peak_anomaly_0p20")
     assert selected.events.attrs["matching_group_variable"] == "I_dyn_pre"
     assert selected.events.attrs["matching_source_negative_count"] == 4
     assert selected.events.attrs["matching_source_positive_count"] == 5
@@ -86,9 +84,7 @@ def test_build_matched_spatial_composites_writes_separate_contract(tmp_path):
     )
 
     assert selected.match.pair_count == 4
-    assert output.attrs["pipeline_stage"] == (
-        "daily_matched_idyn_spatial_composites"
-    )
+    assert output.attrs["pipeline_stage"] == ("daily_matched_idyn_spatial_composites")
     matched_builder.season_selection.validate_inherited_event_season(output)
     assert output.attrs["season_months"] == "6,7,8"
     assert output.attrs["matching_specification"] == "peak_anomaly_0p20"
@@ -186,10 +182,7 @@ def _write_spatial_file(
     shape = (time.size, latitude.size, longitude.size)
     t2m = np.broadcast_to(base_t2m + t2m_offset, shape).copy()
     z = np.broadcast_to(
-        (
-            base_height
-            + z_height_offset
-        )
+        (base_height + z_height_offset)
         * matched_builder.spatial_builder.GEOPOTENTIAL_TO_HEIGHT_M_S2,
         shape,
     ).copy()

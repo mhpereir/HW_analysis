@@ -336,10 +336,7 @@ def _nonempty_string(value: object, *, context: str) -> str:
 def _unique_strings(value: object, *, context: str) -> tuple[str, ...]:
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
         raise TypeError(f"{context} must be a nonempty array of strings.")
-    out = tuple(
-        _nonempty_string(item, context=f"{context} item")
-        for item in value
-    )
+    out = tuple(_nonempty_string(item, context=f"{context} item") for item in value)
     if not out:
         raise ValueError(f"{context} must be a nonempty array of strings.")
     if len(set(out)) != len(out):
@@ -365,10 +362,7 @@ def _positive_float(value: object, *, context: str) -> float:
 def _positive_floats(value: object, *, context: str) -> tuple[float, ...]:
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
         raise TypeError(f"{context} must be a nonempty array of numbers.")
-    out = tuple(
-        _positive_float(item, context=f"{context} item")
-        for item in value
-    )
+    out = tuple(_positive_float(item, context=f"{context} item") for item in value)
     if not out:
         raise ValueError(f"{context} must be a nonempty array of numbers.")
     if len(set(out)) != len(out):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from numbers import Integral
 from pathlib import Path
 
 from src.artifact_paths import artifact_root
@@ -15,15 +16,11 @@ DEFAULT_INPUT_PATH = (
 )
 
 DEFAULT_OUTPUT_PATH = (
-    artifact_root()
-    / "stage2_event_features"
-    / "hw_event_features_fixed_windows.nc"
+    artifact_root() / "stage2_event_features" / "hw_event_features_fixed_windows.nc"
 )
 
 DEFAULT_CSV_OUTPUT_PATH = (
-    artifact_root()
-    / "stage2_event_features"
-    / "hw_event_features_fixed_windows.csv"
+    artifact_root() / "stage2_event_features" / "hw_event_features_fixed_windows.csv"
 )
 
 TIME_DIM = "time"
@@ -40,6 +37,24 @@ WINDOWS = {
     "near_peak": (-24, 24),
     "decay": (0, 72),
 }
+
+
+def integration_windows(
+    integration_hours: int | None = None,
+) -> dict[str, tuple[int, int]]:
+    """Resolve one run's windows without mutating the scientific defaults."""
+    windows = dict(WINDOWS)
+    if integration_hours is not None:
+        if (
+            isinstance(integration_hours, bool)
+            or not isinstance(integration_hours, Integral)
+            or integration_hours <= 0
+        ):
+            raise ValueError("integration_hours must be a positive integer.")
+        for name in ("heat_budget_pre", "lwa_pre_peak"):
+            windows[name] = (-int(integration_hours), 0)
+    return windows
+
 
 DEFAULT_INTEGRAL_FEATURES = {
     "dTdt": "heat_budget_pre",

@@ -122,6 +122,8 @@ a figure.
 | Stage 1 regional hourly climatology | [Regional hourly climatology contract](products/stage1_regional_hourly_climatology.md) |
 | Stage 2 event features | [Event-feature contract](products/stage2_event_features.md) |
 | Stage 2 baseline features | [Baseline-day contract](products/stage2_baseline_features.md) |
+| Component-anomaly budgets | [Derived Stage-2 contract](products/stage2_component_anomalies.md) |
+| Integration-window exploration | [Heating-rank contract](products/integration_window_ranks.md), [workflow and further plans](../scripts/integration_window_analysis/README.md) |
 | Temporal composites | [Composite workflow](workflows/composites.md) |
 | Spatial ERA5 preparation and composites | [Spatial composite workflow](workflows/spatial_composites.md) |
 | Figure conventions and shared style | [Plotting workflow](workflows/plotting.md) |
@@ -137,6 +139,8 @@ a figure.
 | Plot Stage 1 | `scripts/plot_*.py` |
 | Plot Stage 1 region inventory | `scripts/region_vis/plot_stage1_regions.py` |
 | Plot matched Stage-1 composites | `scripts/plot_advection_direction_exploration_matched_clim_anom.py` |
+| Plot top-event face-advection values | `scripts/plot_advection_direction_exploration_top_events.py` |
+| Plot top-event face-advection anomalies | `scripts/plot_advection_direction_exploration_top_events_clim_anom.py` |
 | Plot Stage 2 | active plotting scripts in `scripts/event_features/` |
 | Prepare spatial ERA5 | `scripts/spatial_composites/build_era5_daily_spatial_data.sh`, `scripts/spatial_composites/build_era5_daily_doy_climatology.sh` |
 | Build and plot spatial composites | `scripts/spatial_composites/build_dyn_net_spatial_composites.py`, `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |

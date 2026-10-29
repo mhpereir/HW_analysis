@@ -55,6 +55,93 @@ FULL_DIAGNOSTIC_SOURCE_VARIABLES: dict[str, str] = {
 SURFACE_ENERGY_VARIABLES: tuple[str, ...] = ("nslr", "nssr", "slhf", "sshf")
 
 
+def validate_production_hourly_coverage(
+    ds: xr.Dataset, *, years: Sequence[int], context: str = "Stage-1 EHB coverage"
+) -> None:
+    """Require complete May-October centered-hour blocks for any pressure layer.
+
+    Production entrypoints call this explicitly; generic assembly helpers and
+    readers remain usable with short synthetic or historical datasets.
+    """
+    years = tuple(years)
+    if not years or years != tuple(sorted(set(years))):
+        raise ValueError("Production years must be nonempty, unique and increasing.")
+    if "time" not in ds.coords or ds.time.dims != ("time",):
+        raise ValueError(f"{context} requires a one-dimensional time coordinate.")
+    if not np.issubdtype(ds.time.dtype, np.datetime64):
+        raise ValueError(f"{context} requires datetime timestamps.")
+    expected = pd.DatetimeIndex(
+        np.concatenate(
+            [
+                pd.date_range(
+                    f"{year}-05-01T01:00", f"{year}-10-31T22:00", freq="h"
+                ).values
+                for year in years
+            ]
+        )
+    )
+    actual = pd.DatetimeIndex(ds.time.values)
+    if not actual.equals(expected):
+        raise ValueError(
+            f"{context} must contain exactly May 1 01:00 through October 31 22:00 "
+            f"UTC hourly, in order, for each requested year {list(years)}; "
+            f"expected {len(expected)} samples, got {len(actual)} "
+            f"({len(expected.difference(actual))} missing, "
+            f"{len(actual.difference(expected))} unexpected). "
+            "Duplicate, unordered or shifted timestamps are not allowed."
+        )
+
+
+def replace_heat_budget(reference: xr.Dataset, heat_budget: xr.Dataset) -> xr.Dataset:
+    """Replace a validated reference's budget and volume-dependent diagnostics.
+
+    Callers validate region, coverage, pressure bounds and reference provenance.
+    Surface fields and event definitions are independent of the EHB layer.
+    """
+    if not reference.indexes["time"].equals(heat_budget.indexes["time"]):
+        raise ValueError("Reference and heat budget must have exactly matching times.")
+    replaced = set(HEAT_BUDGET_VARIABLE_MAP.values())
+    replaced.update(
+        f"advection_{face}" for face in (*advection_direction.REQUIRED_FACES, "bottom")
+    )
+    replaced.update(f"{name}_heating_rate_approx" for name in SURFACE_ENERGY_VARIABLES)
+    replaced.add("surface_energy_heating_rate_approx")
+    out = reference.drop_vars(sorted(replaced.intersection(reference.data_vars)))
+    out = out.assign(_prepare_heat_budget_variables(heat_budget, time_dim="time"))
+    out = advection_direction.add_face_advection_tendencies(out, heat_budget)
+    for name in SURFACE_ENERGY_VARIABLES:
+        rate_name = f"{name}_heating_rate_approx"
+        old_attrs = reference[rate_name].attrs
+        out[rate_name] = diagnostics.approximate_surface_energy_heating_rate(
+            out[name],
+            out["volume"],
+            region_area_m2=float(old_attrs["region_area_m2"]),
+            g_m_s2=float(old_attrs["g_m_s2"]),
+            cp_j_kg_k=float(old_attrs["cp_j_kg_k"]),
+            name=rate_name,
+        )
+        out[rate_name].attrs.update(
+            {
+                "native_time_resolution": "hourly",
+                "analysis_time_resolution": "hourly",
+                "source_dataset": name,
+                "physical_interpretation": (
+                    "Hypothetical uniform surface-energy equivalent for this pressure "
+                    "layer; not a measured heating or boundary flux into the layer."
+                ),
+            }
+        )
+    total_name = "surface_energy_heating_rate_approx"
+    out[total_name] = sum(
+        out[f"{name}_heating_rate_approx"] for name in SURFACE_ENERGY_VARIABLES
+    )
+    out[total_name].attrs = dict(reference[total_name].attrs)
+    out[total_name].attrs["physical_interpretation"] = out[rate_name].attrs[
+        "physical_interpretation"
+    ]
+    return out
+
+
 def build_regional_analysis_dataset(
     *,
     heat_budget: xr.Dataset,
@@ -72,7 +159,9 @@ def build_regional_analysis_dataset(
     resolution.
     """
     if time_dim not in heat_budget.coords:
-        raise ValueError(f"heat_budget is missing required time coordinate {time_dim!r}.")
+        raise ValueError(
+            f"heat_budget is missing required time coordinate {time_dim!r}."
+        )
 
     hourly_time = heat_budget[time_dim]
     data_vars: dict[str, xr.DataArray] = {}
@@ -204,7 +293,9 @@ def _validate_daily_projection_inputs(
 ) -> None:
     """Validate inputs for date-based daily-to-hourly projection."""
     if not isinstance(daily, xr.DataArray):
-        raise TypeError("project_daily_to_hourly expects daily to be an xarray.DataArray.")
+        raise TypeError(
+            "project_daily_to_hourly expects daily to be an xarray.DataArray."
+        )
 
     if daily_time_dim not in daily.coords:
         raise ValueError(
@@ -227,9 +318,13 @@ def _prepare_heat_budget_variables(
     time_dim: str,
 ) -> dict[str, xr.DataArray]:
     """Rename and normalize hourly heat-budget variables into analysis names."""
-    missing = sorted(source for source in HEAT_BUDGET_VARIABLE_MAP if source not in heat_budget)
+    missing = sorted(
+        source for source in HEAT_BUDGET_VARIABLE_MAP if source not in heat_budget
+    )
     if missing:
-        raise ValueError(f"heat_budget is missing required variables: {', '.join(missing)}")
+        raise ValueError(
+            f"heat_budget is missing required variables: {', '.join(missing)}"
+        )
 
     volume = heat_budget["domain_volume"]
     out: dict[str, xr.DataArray] = {}
@@ -282,7 +377,9 @@ def _prepare_full_diagnostic_variables(
 ) -> dict[str, xr.DataArray]:
     """Reduce and align optional full diagnostic source datasets."""
     missing = sorted(
-        name for name in FULL_DIAGNOSTIC_SOURCE_VARIABLES if name not in full_diagnostics
+        name
+        for name in FULL_DIAGNOSTIC_SOURCE_VARIABLES
+        if name not in full_diagnostics
     )
     if missing:
         raise ValueError(f"full_diagnostics are missing datasets: {', '.join(missing)}")
@@ -460,7 +557,9 @@ def _align_hourly_series(
 
     missing = target_time.difference(source_time)
     if len(missing) > 0:
-        preview = ", ".join(timestamp.strftime("%Y-%m-%dT%H:%M") for timestamp in missing[:5])
+        preview = ", ".join(
+            timestamp.strftime("%Y-%m-%dT%H:%M") for timestamp in missing[:5]
+        )
         suffix = "" if len(missing) <= 5 else f", ... ({len(missing)} total)"
         raise ValueError(f"{name!r} is missing target timestamps: {preview}{suffix}.")
 
@@ -495,7 +594,9 @@ def _project_daily_product_variables(
     """Project selected daily product variables to the hourly analysis axis."""
     missing = sorted(source for source in specs if source not in products)
     if missing:
-        raise ValueError(f"daily event products are missing variables: {', '.join(missing)}")
+        raise ValueError(
+            f"daily event products are missing variables: {', '.join(missing)}"
+        )
 
     return {
         output_name: _project_daily_analysis_variable(

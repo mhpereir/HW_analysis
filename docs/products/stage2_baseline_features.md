@@ -87,6 +87,14 @@ Season selection applies to `reference_time` only. Fixed windows use the
 complete Stage-1 time axis and may cross selected-season boundaries; see
 [decision 004](../decisions/004_baseline_season_windows.md).
 
+The explicit `--integration-hours H` / `integration_hours=H` override follows
+the event-product contract; PBS jobs accept `INTEGRATION_HOURS`. The default
+remains 96 hours. Boundary selection and `event_adjacent` must use the resolved
+windows, with both adjacent and clean days retained and their counts recorded.
+A longer window may change clean-baseline membership even when reference days
+remain unchanged. See [decision 001](../decisions/001_event_feature_windows.md)
+for the 7/14/21-day sensitivity campaign and validation requirements.
+
 JJA reference times are the default. `--all-seasons` explicitly restores the
 full saved population. Consumers validate both metadata and actual reference
 dates, as described in [decision 010](../decisions/010_season_selection_defaults.md).

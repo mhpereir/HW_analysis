@@ -119,9 +119,7 @@ def validate_args(args: argparse.Namespace) -> None:
         )
 
     existing = [
-        path
-        for path in artifact_paths(args.output_dir).values()
-        if path.exists()
+        path for path in artifact_paths(args.output_dir).values() if path.exists()
     ]
     if existing and not args.overwrite:
         listed = ", ".join(str(path) for path in existing)
@@ -175,8 +173,7 @@ def prepare_exploration(
     missing = sorted(required.difference(features.data_vars))
     if missing:
         raise ValueError(
-            "Event-feature table is missing required variables: "
-            + ", ".join(missing)
+            "Event-feature table is missing required variables: " + ", ".join(missing)
         )
     if "event" not in features.dims:
         raise ValueError("Event-feature table is missing the 'event' dimension.")
@@ -633,12 +630,8 @@ def plot_balance_and_sensitivity(
 
     variables = list(exploration.settings.balance_variables)
     positions = np.arange(len(variables))
-    before = np.array(
-        [exploration.balance[name]["smd_before"] for name in variables]
-    )
-    after = np.array(
-        [exploration.balance[name]["smd_after"] for name in variables]
-    )
+    before = np.array([exploration.balance[name]["smd_before"] for name in variables])
+    after = np.array([exploration.balance[name]["smd_after"] for name in variables])
     balance_ax.axvspan(-0.1, 0.1, color=plot_style.COLORS["grid"], alpha=0.7)
     balance_ax.axvline(
         0,
@@ -672,9 +665,7 @@ def plot_balance_and_sensitivity(
         zorder=3,
     )
     balance_ax.set_yticks(positions)
-    balance_ax.set_yticklabels(
-        [VARIABLE_LABELS.get(name, name) for name in variables]
-    )
+    balance_ax.set_yticklabels([VARIABLE_LABELS.get(name, name) for name in variables])
     plot_style.use_default_numeric_formatter(balance_ax.yaxis)
     balance_ax.invert_yaxis()
     balance_ax.set_xlabel("Standardized mean difference\n(positive minus negative)")
@@ -713,8 +704,7 @@ def plot_balance_and_sensitivity(
     sensitivity_ax.invert_yaxis()
     sensitivity_ax.set_xlabel("Matched pairs")
     sensitivity_calipers = {
-        specification.caliper_sd
-        for specification in sensitivity_specifications
+        specification.caliper_sd for specification in sensitivity_specifications
     }
     if len(sensitivity_calipers) == 1:
         sensitivity_subtitle = (
@@ -793,9 +783,7 @@ def plot_matching_specification_tradeoff(
             smds = np.full(len(variables), np.nan)
         else:
             balance = balance_for_match(exploration, match)
-            smds = np.array(
-                [balance[name]["smd_after"] for name in variables]
-            )
+            smds = np.array([balance[name]["smd_after"] for name in variables])
         balance_ax.scatter(
             smds,
             positions,
@@ -806,9 +794,7 @@ def plot_matching_specification_tradeoff(
             zorder=3,
         )
     balance_ax.set_yticks(positions)
-    balance_ax.set_yticklabels(
-        [VARIABLE_LABELS.get(name, name) for name in variables]
-    )
+    balance_ax.set_yticklabels([VARIABLE_LABELS.get(name, name) for name in variables])
     plot_style.use_default_numeric_formatter(balance_ax.yaxis)
     balance_ax.invert_yaxis()
     balance_ax.set_xlabel("Standardized mean difference\n(positive minus negative)")
@@ -860,9 +846,7 @@ def plot_matching_specification_tradeoff(
                 None,
             )
             if existing_index is None:
-                annotation_groups.append(
-                    (pair_count, worst_smd, [comparison_caliper])
-                )
+                annotation_groups.append((pair_count, worst_smd, [comparison_caliper]))
             else:
                 annotation_groups[existing_index][2].append(comparison_caliper)
         for pair_count, worst_smd, group_calipers in annotation_groups:
@@ -898,8 +882,7 @@ def plot_matching_specification_tradeoff(
         f"Worst absolute SMD across {len(variables)} audit variables"
     )
     frontier_ax.set_title(
-        "Retention versus worst-case balance\n"
-        "(labels are calipers in pooled SD)"
+        "Retention versus worst-case balance\n(labels are calipers in pooled SD)"
     )
     frontier_ax.set_xlim(0, exploration.negative_indices.size * 1.05)
     frontier_ax.set_ylim(0, 1.18)

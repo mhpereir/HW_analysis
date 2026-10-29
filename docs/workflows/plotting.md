@@ -45,6 +45,8 @@ $HWA_ARTIFACT_ROOT/plots_<plot_name>/
 | Stage 1 | all-event and split temporal composites | `scripts/plot_composite_timeseries_all.py`, `scripts/plot_composite_timeseries_split.py` |
 | Stage 1 plus regional hourly climatology | all-event and split climatological-anomaly composites | `scripts/plot_composite_timeseries_all_clim_anom.py`, `scripts/plot_composite_timeseries_split_clim_anom.py` |
 | Stage 1 plus regional hourly climatology | face-resolved advection climatological anomalies | `scripts/plot_advection_direction_exploration_clim_anom.py` |
+| Stage 1 | top-event face-resolved advection values against an all-event reference | `scripts/plot_advection_direction_exploration_top_events.py` |
+| Stage 1 plus regional hourly climatology | top-event face-resolved advection climatological anomalies against an all-event reference | `scripts/plot_advection_direction_exploration_top_events_clim_anom.py` |
 | Stage 1 plus regional hourly climatology, Stage 2 event features, and matching settings | matched face-resolved advection climatological anomalies | `scripts/plot_advection_direction_exploration_matched_clim_anom.py` |
 | Stage 1 | top-event traces | `scripts/plot_top_events.py` |
 | Stage 1 plus regional hourly climatology | top-event climatological-anomaly traces | `scripts/plot_top_events_clim_anom.py` |
@@ -54,6 +56,7 @@ $HWA_ARTIFACT_ROOT/plots_<plot_name>/
 | Stage 2 event features | adiabatic, advection, and diabatic event diagnostics | `plot_adiabatic_advection_comparison.py`, `plot_adiabatic_diabatic_advection.py` under `scripts/event_features/` |
 | Stage 2 event and baseline features | event-versus-baseline comparisons | `plot_adiabatic_advection_comparison_baseline.py`, `plot_adiabatic_diabatic_advection_baseline.py` under `scripts/event_features/` |
 | Stage 2 event features plus tracked settings | matched positive/negative `I_dyn` diagnostics | `scripts/idyn_matching_exploration/explore_idyn_matching.py` |
+| Saved integration-window heating-rank tables | target-event raw and climatology-corrected rank curves | `scripts/integration_window_analysis/plot_heating_comparison.py` |
 | Spatial composite product | sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_dyn_net_spatial_composites.py` |
 | Matched spatial composite product | matched positive/negative `I_dyn_pre` sign-by-lag T2m/Z500 maps | `scripts/spatial_composites/plot_matched_dyn_pre_spatial_composites.py` |
 
@@ -64,6 +67,22 @@ For GMT hour grouping, pressure-layer inputs, sample counts and numerical
 companions, follow the [diurnal-cycle workflow](diurnal_cycle.md).
 
 ## Required behavior
+
+The event-versus-clean-baseline comparison also consumes the saved
+[component-anomaly products](../products/stage2_component_anomalies.md).
+Both inputs must use the same representation, region, pressure layer, window
+and climatological reference. Anomaly figures label all heating integrals with
+primes and identify the reference period; lower-panel diagonals represent the
+anomalous total. Peak-TAS coloring and accepted population membership are
+unchanged. Absolute inputs retain their existing rendering.
+
+The integration-window rank figure follows the
+[heating-rank product contract](../products/integration_window_ranks.md).
+It reads saved comparisons, uses `HEATING_RANK_STYLES`, displays one regional
+panel per input, and puts rank 1 at the top of an integer axis. Both curves
+use the same fixed cohort across all integration windows. Identify the
+climatological atmospheric-temperature endpoint correction, reference years
+and population size. PNG and PDF outputs must not overwrite earlier figures.
 
 - Use the non-interactive Matplotlib `Agg` backend for batch rendering.
 - The regional-domain overview discovers unique regions from the Stage 1
@@ -89,6 +108,26 @@ companions, follow the [diurnal-cycle workflow](diurnal_cycle.md).
   and validates matching Stage-1 and Stage-2 peak timestamps before building
   composites. Component identity remains color encoded. Positive `I_dyn_pre`
   uses solid lines and negative `I_dyn_pre` uses dashed lines.
+- The absolute, climatological-anomaly, and matched-population face-advection
+  entrypoints each preserve the existing unsmoothed two-panel figure and write
+  a second `_smoothed.png` figure. The second figure uses the shared centered
+  display-only running mean, defaults to 24 hourly samples, requires complete
+  windows at the lag boundaries, and identifies the smoothing window in its
+  title. Smooth signed face tendencies before deriving grouped curves. For the
+  matched figure, smooth each sign population independently. Do not alter event
+  membership, climatology subtraction, matching, or source composites.
+- The raw and climatological-anomaly top-event face-advection entrypoints rank
+  the filtered absolute Stage-1 event table by descending `tas_peak`, with a
+  default of 10 events. For every selected event they overlay the corresponding
+  all-event mean as solid lines and the individual top-event trace as dashed
+  lines in the existing two-panel face/grouped layout. The raw entrypoint plots
+  Stage-1 tendencies directly in `K hr-1`; the anomaly entrypoint subtracts the
+  timestamp-matched hourly climatology and uses anomaly labels. Component color
+  remains the identity channel. Hourly and centered 24-hour-smoothed figures
+  use separate filenames; smooth the reference and event face tendencies
+  independently before deriving grouped curves. Titles and a line-style legend
+  must distinguish the reference from the ranked event. The existing three
+  face-advection figure families remain unchanged.
 - The matched spatial figure must consume a separate matched spatial-composite
   product built from the canonical Stage-2 table and tracked settings. It must
   not infer matched membership from an already averaged all-event spatial
@@ -347,6 +386,13 @@ python -m pytest -q \
 For a production figure change, also render a representative product through
 PBS on Venus and inspect the saved artifact, labels, units, panel ordering,
 legibility, and output path.
+
+Synthetic tests for both top-event face-advection variants must verify ranking,
+season-filter propagation, peak-relative event extraction, solid-reference and
+dashed-event line semantics, independent display smoothing,
+grouped-component identities, stable filenames, source-data immutability,
+no-overwrite behavior, and complete scheduler publication. The anomaly variant
+must additionally verify timestamp-level climatology subtraction.
 
 For the presentation feature comparisons, first run the commit-pinned
 `schedulers/schedule_presentation_feature_smoke.sh` on Venus. It exercises the

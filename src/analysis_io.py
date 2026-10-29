@@ -81,18 +81,29 @@ REQUIRED_STAGE1_V2_VARIABLES: frozenset[str] = frozenset(
 
 
 def open_stage2_features(
-    path: str | Path, *, expected_stage: str | None = None, **season_options: Any
+    path: str | Path,
+    *,
+    expected_stage: str | tuple[str, ...] | None = None,
+    **season_options: Any,
 ) -> xr.Dataset:
     """Open a Stage-2 table and guard its seasonal population before use."""
     ds = xr.open_dataset(
         Path(path).expanduser().resolve(), engine="h5netcdf", decode_timedelta=True
     )
     try:
-        if (
-            expected_stage is not None
-            and ds.attrs.get("pipeline_stage") != expected_stage
-        ):
+        allowed_stages = (
+            (expected_stage,) if isinstance(expected_stage, str) else expected_stage
+        )
+        stage = ds.attrs.get("pipeline_stage")
+        if allowed_stages is not None and stage not in allowed_stages:
             raise ValueError(f"Expected pipeline_stage={expected_stage!r}.")
+        if stage in {
+            "stage_2_event_component_anomalies",
+            "stage_2_baseline_component_anomalies",
+        }:
+            from .stage2_component_anomalies import validate_component_anomalies
+
+            validate_component_anomalies(ds)
         season_selection.validate_stage2_season(ds, **season_options)
     except Exception:
         ds.close()
@@ -294,6 +305,32 @@ def save_diurnal_composite(ds: xr.Dataset, path: str | Path) -> Path:
     return output_path
 
 
+def save_integration_window_ranks(ds: xr.Dataset, output_path: str | Path) -> Path:
+    """Publish one validated rank comparison without replacing existing data."""
+    from src.integration_window_analysis import validate_heating_comparison
+
+    validate_heating_comparison(ds)
+    path = Path(output_path)
+    if path.exists():
+        raise FileExistsError(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_netcdf_atomically(_prepare_for_netcdf(ds), path)
+    return path
+
+
+def open_integration_window_ranks(path: str | Path) -> xr.Dataset:
+    """Open and validate a prepared heating-rank comparison."""
+    from src.integration_window_analysis import validate_heating_comparison
+
+    ds = xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True)
+    try:
+        validate_heating_comparison(ds)
+    except Exception:
+        ds.close()
+        raise
+    return ds
+
+
 def _write_netcdf_atomically(
     ds: xr.Dataset, output_path: Path, *, overwrite: bool = True
 ) -> None:
@@ -367,3 +404,29 @@ def _filename_token(value: object) -> str:
     for old, new in (("/", "-"), ("\\", "-"), (" ", "-")):
         token = token.replace(old, new)
     return token
+
+
+def save_component_anomalies(ds: xr.Dataset, output_path: str | Path) -> Path:
+    """Atomically save a new validated component-anomaly feature table."""
+    from src.stage2_component_anomalies import validate_component_anomalies
+
+    validate_component_anomalies(ds)
+    path = Path(output_path).expanduser().resolve()
+    if path.exists():
+        raise FileExistsError(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_netcdf_atomically(_prepare_for_netcdf(ds), path)
+    return path
+
+
+def open_component_anomalies(path: str | Path) -> xr.Dataset:
+    """Open and validate one component-anomaly table."""
+    from src.stage2_component_anomalies import validate_component_anomalies
+
+    ds = xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True)
+    try:
+        validate_component_anomalies(ds)
+    except Exception:
+        ds.close()
+        raise
+    return ds
