@@ -1,4 +1,4 @@
-"""Independent checks for core JJA Stage-2 window-sensitivity products."""
+"""Independent checks for core JJA Stage-2 products and sensitivity cohorts."""
 
 from __future__ import annotations
 
@@ -25,13 +25,18 @@ def validate_core_pair(
     events: xr.Dataset,
     baseline: xr.Dataset,
     integration_hours: int,
+    *,
+    require_full_event: bool = True,
 ) -> dict:
     """Check populations, coverage, metadata and every direct source reduction.
 
     This validator deliberately does not use the builders or WindowReducer.
-    It covers the core, JJA full-event campaign, not extended-variable products.
+    The population policy is explicit; complete JJA events remain the default
+    for existing sensitivity callers. Extended-variable products are excluded.
     """
     hours = integration_hours
+    if not isinstance(require_full_event, bool):
+        raise TypeError("require_full_event must be an explicit boolean.")
     if (
         isinstance(hours, bool)
         or not isinstance(hours, (int, np.integer))
@@ -52,7 +57,7 @@ def validate_core_pair(
     ends = source.end_time.values.astype("datetime64[D]")
     if np.isnat(peaks).any() or np.isnat(starts).any() or np.isnat(ends).any():
         raise ValueError("Stage-1 event times contain missing values.")
-    seasonal = np.asarray(
+    full_event_seasonal = np.asarray(
         [
             end >= start
             and np.isin(
@@ -60,6 +65,16 @@ def validate_core_pair(
             ).all()
             for start, end in zip(starts, ends, strict=True)
         ]
+    )
+    seasonal = (
+        full_event_seasonal
+        if require_full_event
+        else np.isin(_months(peaks), [6, 7, 8])
+    )
+    _check_equal(
+        events.attrs["require_full_event"],
+        int(require_full_event),
+        "event population policy",
     )
     covered = (peaks + np.timedelta64(earliest_lag, "h") >= times[0]) & (
         peaks <= times[-1]
@@ -140,6 +155,14 @@ def validate_core_pair(
             table.attrs["pipeline_stage"], f"stage_2_{kind}_features", "product marker"
         )
         _check_equal(table.attrs["season_months"], "6,7,8", "season metadata")
+        _check_equal(table.attrs["all_seasons"], 0, "JJA population metadata")
+        expected_rule = (
+            "full_event" if kind == "event" and require_full_event else "anchor_month"
+        )
+        if "season_selection_rule" in table.attrs:
+            _check_equal(
+                table.attrs["season_selection_rule"], expected_rule, "season rule"
+            )
         _check_equal(table.attrs["extended_variables_used"], 0, "core features")
         anchors = table[anchor_name].values.astype("datetime64[ns]")
         if anchors.size == 0:
@@ -228,6 +251,7 @@ def validate_core_pair(
     report["baseline"]["clean_rows"] = int((~adjacent).sum())
     report["baseline"]["adjacent_rows"] = int(adjacent.sum())
     report["integration_hours"] = int(hours)
+    report["require_full_event"] = require_full_event
     report["expected_hourly_samples"] = int(hours + 1)
     # Identify the June 2021 event by its date, not a region-specific numeric ID.
     peaks = events.peak_time.values.astype("datetime64[D]")

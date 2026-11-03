@@ -8,6 +8,7 @@ import xarray as xr
 
 from scripts.event_features import event_feature_config as config
 from scripts.event_features import run_window_sensitivity as runner
+from scripts.event_features import validate_stage2_campaign as campaign_validator
 from scripts.event_features.build_stage2_baseline_features import (
     build_baseline_features,
 )
@@ -199,3 +200,102 @@ def test_validator_detects_product_corruption(source, corruption):
         events.event_id.values[0] = 999
     with pytest.raises(AssertionError):
         validate_core_pair(source, events, baseline, 504)
+
+
+@pytest.mark.parametrize("require_full_event", [False, True])
+@pytest.mark.parametrize("event_id_source", ["hw_event_id", "lwa_event_id"])
+def test_validator_distinguishes_peak_and_full_event_cohorts(
+    source, require_full_event, event_id_source
+):
+    source["start_time"] = source.start_time.copy(deep=True)
+    source.start_time.values[0] = np.datetime64("2021-05-30", "ns")
+    source.hw_event_id.loc[{"time": slice("2021-05-30", "2021-05-31")}] = 1
+    if event_id_source != "hw_event_id":
+        source = source.rename({"hw_event_id": event_id_source})
+        source.attrs["event_id_source"] = event_id_source
+    events = build_event_features(
+        source, integration_hours=48, require_full_event=require_full_event
+    )
+    baseline = build_baseline_features(source, integration_hours=48)
+    report = validate_core_pair(
+        source, events, baseline, 48, require_full_event=require_full_event
+    )
+    assert report["event"]["rows"] == (2 if require_full_event else 3)
+    assert report["require_full_event"] is require_full_event
+    with pytest.raises(AssertionError, match="event population policy"):
+        validate_core_pair(
+            source, events, baseline, 48, require_full_event=not require_full_event
+        )
+
+
+def test_validator_rejects_mislabelled_season_policy(source):
+    events = build_event_features(source, integration_hours=96)
+    baseline = build_baseline_features(source, integration_hours=96)
+    events.attrs["season_selection_rule"] = "full_event"
+    with pytest.raises(AssertionError, match="season rule"):
+        validate_core_pair(source, events, baseline, 96, require_full_event=False)
+
+
+@pytest.mark.parametrize("corrupt", [False, True])
+def test_campaign_audits_saved_products_and_preserves_evidence(
+    source, tmp_path, monkeypatch, corrupt
+):
+    source_path = tmp_path / "source.nc"
+    source.to_netcdf(source_path, engine="h5netcdf")
+    events = build_event_features(source, input_path=source_path, integration_hours=48)
+    baseline = build_baseline_features(
+        source, input_path=source_path, integration_hours=48
+    )
+    if corrupt:
+        baseline.I_lwa_a_pre_reference.values[0] += 1
+    event_path, baseline_path = tmp_path / "events.nc", tmp_path / "baseline.nc"
+    events.to_netcdf(event_path, engine="h5netcdf")
+    baseline.to_netcdf(baseline_path, engine="h5netcdf")
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "pairs": [
+                    {
+                        "id": "synthetic-48h",
+                        "input": str(source_path),
+                        "events": str(event_path),
+                        "baseline": str(baseline_path),
+                        "integration_hours": 48,
+                        "require_full_event": False,
+                    }
+                ]
+            }
+        )
+    )
+    destination = tmp_path / "validation"
+    monkeypatch.setenv("HWA_ARTIFACT_ROOT", str(tmp_path))
+    monkeypatch.setenv("EXPECTED_COMMIT", "synthetic-test")
+    monkeypatch.setenv("PBS_JOBID", "synthetic-test")
+    monkeypatch.setattr(
+        analysis_io,
+        "open_harmonized_timeseries",
+        lambda path: xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True),
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "validate_stage2_campaign",
+            "--manifest",
+            str(manifest_path),
+            "--output-dir",
+            str(destination),
+        ],
+    )
+    if corrupt:
+        with pytest.raises(AssertionError, match="direct reductions"):
+            campaign_validator.main()
+        assert not (destination / "validation.json").exists()
+    else:
+        assert campaign_validator.main() == 0
+        report = json.loads((destination / "validation.json").read_text())
+        assert report["numerical_validation"] == "passed"
+        assert report["pairs"][0]["validation"]["event"]["rows"] == 3
+        assert report["input_sha256"][str(source_path)] == runner.sha256(source_path)
+        with pytest.raises(FileExistsError):
+            campaign_validator.main()
