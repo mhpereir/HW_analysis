@@ -42,9 +42,10 @@ cd "${PROJECT_ROOT}"
 if [[ "${RUN_TESTS}" = "1" ]]; then
     python -m pytest -q -W error tests/test_stage2_component_anomalies.py tests/test_plot_adiabatic_advection_comparison_baseline.py
 fi
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 /usr/bin/time -v python scripts/integration_window_analysis/build_component_anomalies.py \
     --input-path "${INPUT_PATH}" --climatology-path "${CLIMATOLOGY_PATH}" \
     --reference-dir "${REFERENCE_DIR}" --integration-hours "${INTEGRATION_HOURS}" \
-    --output-dir "${OUTPUT_DIR}"
+    --output-dir "${OUTPUT_DIR}" "${season_args[@]}"
 test -s "${OUTPUT_DIR}/manifest.json"
 echo "[info] finished=$(date -Is)"

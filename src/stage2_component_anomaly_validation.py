@@ -34,12 +34,56 @@ def validate_anomalies_against_sources(
     climate_positions = climate_keys.get_indexer(source_keys)
     source_values = {name: source[name].values for name in TENDENCIES}
     climate_values = {name: climate[name].values for name in TENDENCIES}
-    report = {}
+    if np.any(climate_positions < 0):
+        raise ValueError("Independent validation found missing climatology keys.")
+    order = np.argsort(climate_positions, kind="stable")
+    boundaries = np.searchsorted(
+        climate_positions[order], np.arange(len(climate_keys) + 1)
+    )
+    groups = np.split(order, boundaries[1:-1])
+    climate_errors = {}
+    for name in TENDENCIES:
+        samples = [source_values[name][group] for group in groups]
+        samples = [values[np.isfinite(values)] for values in samples]
+        count = np.array([len(values) for values in samples])
+        np.testing.assert_array_equal(count, climate[f"{name}_count"].values)
+        if np.any(count == 0):
+            raise ValueError("Independent validation found empty climatology keys.")
+        mean = np.array([np.mean(values) for values in samples])
+        np.testing.assert_allclose(
+            climate_values[name],
+            mean,
+            rtol=1e-12,
+            atol=1e-12,
+            err_msg=f"{name} independent calendar-hour climatology mean",
+        )
+        climate_errors[name] = float(np.max(np.abs(climate_values[name] - mean)))
+    report = {
+        "climatology": {
+            "calendar_hours": len(climate_keys),
+            "source_counts": "identical",
+            "maximum_direct_mean_difference_K_per_hour": climate_errors,
+        },
+        "require_full_event": bool(reference_events.attrs["require_full_event"]),
+    }
     for kind, table, reference, anchor_name, dim in (
         ("event", events, reference_events, "peak_time", "event"),
         ("baseline", baseline, reference_baseline, "reference_time", "baseline_day"),
     ):
         validate_component_anomalies(table)
+        for name in (
+            "season_months",
+            "all_seasons",
+            "require_full_event",
+            "season_selection_rule",
+            "season_anchor",
+            "event_id_source",
+        ):
+            if (
+                name in reference.attrs
+                and table.attrs.get(name) != reference.attrs[name]
+            ):
+                raise ValueError(f"Saved {kind} changed reference {name} metadata.")
         xr.testing.assert_identical(table[dim], reference[dim])
         for name in reference.data_vars:
             if name not in RAW_TO_ANOMALY:

@@ -96,9 +96,11 @@ def source():
     return ds
 
 
-def inputs(source, hours=96):
+def inputs(source, hours=96, *, require_full_event=True):
     common = {"season_months": [6, 7, 8], "integration_hours": hours}
-    events = build_event_features(source, require_full_event=True, **common)
+    events = build_event_features(
+        source, require_full_event=require_full_event, **common
+    )
     baseline = build_baseline_features(source, **common)
     climate = climatology.build_regional_hourly_climatology(
         source, variables=TENDENCIES
@@ -111,7 +113,7 @@ def inputs(source, hours=96):
     )
 
 
-@pytest.mark.parametrize("hours", [96, 168, 336, 504])
+@pytest.mark.parametrize("hours", [48, 96, 168, 336, 504])
 def test_known_anomalies_all_windows_preserve_both_populations(source, hours, tmp_path):
     climate, events, baseline = inputs(source, hours)
     originals = [d.copy(deep=True) for d in (source, climate, events, baseline)]
@@ -204,6 +206,8 @@ def test_reference_and_anomaly_season_guards_reject_false_cohorts(
         )
     if problem == "endpoint_events":
         events.attrs["require_full_event"] = 0
+        if derived:
+            match = "Contradictory Stage-2"
     elif problem == "all_seasons":
         baseline.attrs["all_seasons"] = 1
     elif problem == "crossing_event":
@@ -261,7 +265,7 @@ def test_incompatible_climatology_is_rejected(source, field, value):
 
 
 @pytest.mark.parametrize(
-    "problem", ["window", "identity", "peak", "count", "already_anomaly"]
+    "problem", ["window", "identity", "peak", "count", "already_anomaly", "selector"]
 )
 def test_incompatible_reference_tables_are_rejected(source, problem):
     climate, events, baseline = inputs(source)
@@ -273,6 +277,8 @@ def test_incompatible_reference_tables_are_rejected(source, problem):
         events.peak_time.values[-1] += np.timedelta64(1, "h")
     elif problem == "count":
         baseline.n_samples_heat_budget_pre.values[0] -= 1
+    elif problem == "selector":
+        baseline.attrs["event_id_source"] = "lwa_a_event_id"
     else:
         events.attrs["heat_budget_representation"] = "climatological_anomaly"
     with pytest.raises(ValueError):
@@ -287,6 +293,68 @@ def test_independent_validation_catches_shift_even_when_closure_holds(source):
     validate_component_anomalies(ae)
     with pytest.raises(AssertionError, match="direct anomaly"):
         validate_anomalies_against_sources(source, climate, ae, ab, events, baseline)
+
+
+def test_independent_validation_rejects_wrong_climatology_with_closing_budget(source):
+    climate, events, baseline = inputs(source)
+    climate.advection.values[:] += 0.01
+    climate.dTdt.values[:] += 0.01
+    ae, ab = build_component_anomaly_pair(source, climate, events, baseline)
+    with pytest.raises(AssertionError, match="independent calendar-hour climatology"):
+        validate_anomalies_against_sources(source, climate, ae, ab, events, baseline)
+
+
+def crossing_source(source, event_id_source):
+    """Give each selected event a May start and a June integration endpoint."""
+    source = source.copy(deep=True)
+    peaks = np.array(
+        [f"{year}-06-01" for year in (2019, 2020, 2021)], dtype="datetime64[ns]"
+    )
+    source["peak_time"] = ("event", peaks)
+    source["start_time"] = ("event", peaks - np.timedelta64(1, "D"))
+    source["end_time"] = ("event", peaks + np.timedelta64(1, "D"))
+    flags = np.zeros(source.sizes["time"], dtype=int)
+    for identifier, peak in zip(source.event_id.values, peaks, strict=True):
+        flags[
+            (source.time >= peak - np.timedelta64(1, "D"))
+            & (source.time < peak + np.timedelta64(2, "D"))
+        ] = identifier
+    source.hw_event_id.values[:] = 0
+    source[event_id_source] = ("time", flags)
+    source.attrs["event_id_source"] = event_id_source
+    return source
+
+
+@pytest.mark.parametrize("hours", [48, 96])
+@pytest.mark.parametrize("event_id_source", ["hw_event_id", "lwa_a_event_id"])
+def test_endpoint_reference_preserves_boundary_events_and_selected_baselines(
+    source, hours, event_id_source, tmp_path
+):
+    source = crossing_source(source, event_id_source)
+    climate, events, baseline = inputs(source, hours, require_full_event=False)
+    with pytest.raises(ValueError, match="membership differs"):
+        build_component_anomaly_pair(source, climate, events, baseline)
+    ae, ab = build_component_anomaly_pair(
+        source, climate, events, baseline, require_full_event=False
+    )
+    report = validate_anomalies_against_sources(
+        source, climate, ae, ab, events, baseline
+    )
+    assert report["require_full_event"] is False
+    assert report["expected_hourly_samples"] == hours + 1
+    assert report["climatology"]["source_counts"] == "identical"
+    np.testing.assert_array_equal(ae.event_id, [101, 102, 103])
+    np.testing.assert_allclose(
+        ae.I_dTdt_anom_pre, np.array([-1, 0, 1]) * 0.025 * (hours + 1), atol=1e-12
+    )
+    assert ab.attrs["event_id_source"] == event_id_source
+    for kind, table in (("event", ae), ("baseline", ab)):
+        path = analysis_io.save_component_anomalies(table, tmp_path / f"{kind}.nc")
+        with analysis_io.open_stage2_features(path, require_full_event=False) as saved:
+            xr.testing.assert_identical(table, saved)
+    with pytest.raises(ValueError, match="membership differs"):
+        validate_component_anomalies(ae, require_full_event=True)
+    assert comparison_plot_views(ab, ae)[2] is True
 
 
 @pytest.mark.parametrize("layout", ["full", "presentation"])
@@ -414,11 +482,23 @@ def test_runner_checks_reference_hashes_and_refuses_overwrite(tmp_path):
         )
 
 
+@pytest.mark.parametrize(
+    "hours,require_full_event,event_id_source",
+    [
+        (96, True, "hw_event_id"),
+        (48, False, "lwa_a_event_id"),
+        (96, False, "hw_event_id"),
+    ],
+)
 def test_runner_saves_validated_products_and_both_figure_layouts(
-    source, tmp_path, monkeypatch
+    source, tmp_path, monkeypatch, hours, require_full_event, event_id_source
 ):
     """Exercise the file handoff using accepted decoded reference tables."""
-    climate, events, baseline = inputs(source)
+    if not require_full_event:
+        source = crossing_source(source, event_id_source)
+    climate, events, baseline = inputs(
+        source, hours, require_full_event=require_full_event
+    )
     stage1 = tmp_path / "source.nc"
     source.to_netcdf(stage1, engine="h5netcdf")
     climate.attrs["source_stage1_sha256"] = runner.sha256(stage1)
@@ -460,14 +540,16 @@ def test_runner_saves_validated_products_and_both_figure_layouts(
                 "--reference-dir",
                 str(references),
                 "--integration-hours",
-                "96",
+                str(hours),
                 "--output-dir",
                 str(output),
+                *([] if require_full_event else ["--no-require-full-event"]),
             ]
         )
         == 0
     )
     manifest = json.loads((output / "manifest.json").read_text())
+    assert manifest["require_full_event"] is require_full_event
     assert manifest["validation"]["raw_integrals_recalculated"] is False
     assert len(manifest["output_sha256"]) == 10
     for name, expected in manifest["output_sha256"].items():

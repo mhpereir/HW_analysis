@@ -28,6 +28,18 @@ Keep the complete antecedent hourly record, including May for early-June
 anchors. The climatology remains the fixed all-observation climatology;
 matching the reference population does not redefine it as an event mean.
 
+Ordinary regional campaigns may instead use accepted JJA-peak Stage-2
+references, including TAS- and LWA-selected populations at 48 and 96 hours.
+The builder must explicitly request that policy with
+`--no-require-full-event`; its default remains complete JJA events for
+compatibility with the window-sensitivity campaign. Never trim or reselect
+reference rows to make a policy match. Saved anomaly products retain the
+reference selection metadata, and readers validate the declared rule and
+actual timestamps. Plotting consumers still require the requested policy to
+match that declaration. Each selector uses a climatology with the exact
+corresponding Stage-1 checksum, even when its physical tendencies agree with
+another selector's source.
+
 ## Calculation
 
 For each tendency X (dTdt, advection, adiabatic, diabatic), use the existing
@@ -42,6 +54,7 @@ $$
 
 The anchor is the stored event peak or baseline reference time. The inclusive
 windows contain 97, 169, 337 or 505 hourly samples. All integrals have units K.
+The 48-hour regional products contain 49 samples under the same operator.
 Missing hours, missing climatology keys, nonfinite samples, incomplete
 climatological source-year counts and mismatched regions or pressure layers
 are errors, not reasons to silently change the reference population.
@@ -98,6 +111,9 @@ validates seasonal membership for either representation. Pass
 `--require-full-event` when plotting this campaign's saved tables. The raw
 window-sensitivity runner passes that option explicitly. Other Stage-2
 consumers retain their endpoint-based default and reject incompatible input.
+The component-anomaly scheduler forwards `HWA_SEASON_OPTIONS` to its builder;
+set it to `--no-require-full-event` for ordinary regional campaigns. The
+builder writes both layouts in PNG and PDF from the saved anomaly tables.
 
 Reusable calculation and validation belong in `src/`; product I/O belongs in
 `src/analysis_io.py`. The thin CLI under `scripts/integration_window_analysis/`
@@ -113,6 +129,12 @@ years, both populations, all four windows, input immutability and rejection of
 incompatible or incomplete inputs. Verify selection fields against the accepted
 tables and independently integrate source-minus-climatology samples for every
 row. Check dynamical and total anomaly closure, saved metadata and round trips.
+Independently verify all four climatological tendency means and counts against
+the Stage-1 calendar-hour groups before validating the anomaly integrals.
+Exercise 48/96-hour JJA-peak references for both selected event-ID sources,
+including events crossing May/June, while retaining full-event rejection and
+historical-product compatibility tests. Preserve every non-budget feature,
+including event severity and baseline adjacency, exactly.
 Also exercise saved anomaly products through the comparison CLI, including
 historical season metadata, rejection of mismatched season requests or falsely
 labeled JJA rows, and complete May history for a 21-day June anchor. Retain the

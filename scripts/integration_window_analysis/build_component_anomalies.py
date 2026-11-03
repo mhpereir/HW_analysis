@@ -46,6 +46,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--climatology-path", type=Path, required=True)
     parser.add_argument("--reference-dir", type=Path, required=True)
     parser.add_argument("--integration-hours", type=int, required=True)
+    parser.add_argument(
+        "--require-full-event",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Require complete JJA events (default); --no-require-full-event accepts JJA-peak references.",
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.integration_hours <= 0:
@@ -100,7 +106,11 @@ def main(argv: list[str] | None = None) -> int:
                     "Requested window does not match the accepted reference."
                 )
         events, baseline = build_component_anomaly_pair(
-            source, climate, refs["event"], refs["baseline"]
+            source,
+            climate,
+            refs["event"],
+            refs["baseline"],
+            require_full_event=args.require_full_event,
         )
         args.output_dir.mkdir(parents=True, exist_ok=False)
         for name, table in (("event", events), ("baseline", baseline)):
@@ -161,6 +171,7 @@ def main(argv: list[str] | None = None) -> int:
             "input_sha256": hashes,
             "region": events.attrs["region"],
             "integration_hours": args.integration_hours,
+            "require_full_event": args.require_full_event,
             "output_sha256": {
                 path.name: sha256(path)
                 for path in sorted(args.output_dir.iterdir())

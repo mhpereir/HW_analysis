@@ -39,7 +39,9 @@ def _window_hours(table: xr.Dataset) -> int:
     return -start
 
 
-def _validate_reference(table: xr.Dataset, kind: str, hours: int) -> None:
+def _validate_reference(
+    table: xr.Dataset, kind: str, hours: int, *, require_full_event: bool
+) -> None:
     required = {
         "pipeline_stage": f"stage_2_{kind}_features",
         "heat_budget_pre_window_hours": f"{-hours},0",
@@ -52,7 +54,9 @@ def _validate_reference(table: xr.Dataset, kind: str, hours: int) -> None:
             raise ValueError(f"Reference {kind} requires {key}={expected!r}.")
     if table.attrs.get("heat_budget_representation", "absolute") != "absolute":
         raise ValueError("The reference must be an accepted absolute Stage-2 table.")
-    season_selection.validate_stage2_season(table, require_full_event=True)
+    season_selection.validate_stage2_season(
+        table, require_full_event=require_full_event
+    )
     dim, anchor = (
         ("event", "peak_time")
         if kind == "event"
@@ -142,13 +146,22 @@ def _complete_windows(anomalies: xr.Dataset, anchors: np.ndarray, hours: int) ->
 
 
 def build_component_anomaly_pair(
-    source: xr.Dataset, climate: xr.Dataset, events: xr.Dataset, baseline: xr.Dataset
+    source: xr.Dataset,
+    climate: xr.Dataset,
+    events: xr.Dataset,
+    baseline: xr.Dataset,
+    *,
+    require_full_event: bool = True,
 ) -> tuple[xr.Dataset, xr.Dataset]:
     """Integrate tendency anomalies without recalculating raw totals or selections."""
     hours = _window_hours(events)
     _validate_climate(source, climate)
     for kind, reference in (("event", events), ("baseline", baseline)):
-        _validate_reference(reference, kind, hours)
+        _validate_reference(
+            reference, kind, hours, require_full_event=require_full_event
+        )
+    if baseline.attrs.get("event_id_source") != source.attrs.get("event_id_source"):
+        raise ValueError("Reference baseline event selection does not match Stage 1.")
     if not pd.Index(events.event_id.values).is_unique:
         raise ValueError("Reference event IDs must be unique.")
     for name in ("event_id", "peak_time", "start_time", "end_time"):
@@ -216,13 +229,15 @@ def build_component_anomaly_pair(
                 "climatology_matching",
             ):
                 out[name].attrs[key] = climate.attrs[key]
-        validate_component_anomalies(out)
+        validate_component_anomalies(out, require_full_event=require_full_event)
         outputs.append(out)
     return tuple(outputs)
 
 
-def validate_component_anomalies(table: xr.Dataset) -> None:
-    """Validate the saved anomaly-only budget contract and its closure."""
+def validate_component_anomalies(
+    table: xr.Dataset, *, require_full_event: bool | None = None
+) -> None:
+    """Validate the saved anomaly budget and its declared seasonal population."""
     marker = table.attrs.get("pipeline_stage")
     if marker not in {
         "stage_2_event_component_anomalies",
@@ -236,7 +251,9 @@ def validate_component_anomalies(table: xr.Dataset) -> None:
         raise ValueError(
             "Missing component-anomaly representation or contract version."
         )
-    season_selection.validate_stage2_season(table, require_full_event=True)
+    season_selection.validate_stage2_season(
+        table, require_full_event=require_full_event
+    )
     if any(name in table for name in RAW_TO_ANOMALY):
         raise ValueError("Anomaly products must not contain raw budget features.")
     if any(key not in table.attrs for key in PAIR_METADATA):
