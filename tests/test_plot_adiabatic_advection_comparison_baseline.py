@@ -95,20 +95,21 @@ def test_event_legend_key_is_visible_and_independent_of_first_event(
 
 
 @pytest.mark.parametrize("scale", [1.0, 1e-5, 1e5])
-def test_presentation_ticks_do_not_overlap_after_export(tmp_path, scale):
+@pytest.mark.parametrize("layout", ["presentation", "full"])
+def test_ticks_do_not_overlap_after_export(tmp_path, scale, layout):
     baseline = _make_baseline_table()
     events = _make_event_table()
-    baseline["I_adiabatic_pre"][:] = np.linspace(-45.0, 28.0, 6) * scale
+    baseline["I_adiabatic_pre"][:] = np.linspace(-33.0, 26.0, 6) * scale
     baseline["I_dyn_pre"][:] = np.linspace(-26.0, 10.0, 6) * scale
-    events["I_adiabatic_pre"][:] = np.array([-14.0, 4.0, 27.0]) * scale
+    events["I_adiabatic_pre"][:] = np.array([-14.0, 4.0, 25.0]) * scale
     events["I_dyn_pre"][:] = np.array([-9.5, 0.0, 9.0]) * scale
-    fig = plot_diag.plot_tendency_scatter(baseline, events, layout="presentation")
+    fig = plot_diag.plot_tendency_scatter(baseline, events, layout=layout)
     try:
         plot_diag.plot_style.save_figure(fig, tmp_path / "ticks.png")
         fig.set_dpi(plot_diag.plot_style.DPI)
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
-        for ax in fig.axes[:2]:
+        for ax in fig.axes[:-1]:
             labels = [
                 label
                 for label in ax.get_xticklabels()

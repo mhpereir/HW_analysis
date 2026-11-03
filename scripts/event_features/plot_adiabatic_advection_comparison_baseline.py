@@ -433,6 +433,8 @@ def plot_tendency_scatter(
 
     set_shared_x_data_limits(axes[:2], panel_x_values(axes[:2]))
     set_shared_x_data_limits(axes[2:], panel_x_values(axes[2:]))
+    for ax in axes:
+        plot_style.limit_major_ticks(ax.xaxis, max_intervals=4)
 
     colorbar = fig.colorbar(event_mappable, ax=axes, shrink=0.92)
     colorbar.set_label(variable_label(color_variable))

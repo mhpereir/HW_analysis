@@ -178,6 +178,9 @@ and population size. PNG and PDF outputs must not overwrite earlier figures.
   so extreme event markers are not cut in half. The presentation layout uses
   the shared major-tick limiter with at most four intervals on each x-axis;
   retain the shared two-decimal formatting and existing font and canvas sizes.
+  The event-versus-clean-baseline full layout also limits each shared x-axis
+  to four intervals, keeping negative two-decimal labels separated in its
+  narrower panels. Verify label bounding boxes after export in both layouts.
 - The adiabatic/advection baseline comparison uses a stable, visible Events
   legend proxy sampled from the midpoint of the shared severity colormap,
   with a contrasting outline. The proxy identifies the event population,
