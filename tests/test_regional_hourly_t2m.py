@@ -15,6 +15,19 @@ regional = producer.regional_temperature
 analysis_io = producer.analysis_io
 
 
+@pytest.mark.parametrize("unit", ["s", "ms", "us", "ns"])
+def test_hour_coverage_accepts_equivalent_datetime_encodings(unit):
+    values = regional.expected_hours(2000, 2000).values.astype(f"datetime64[{unit}]")
+    regional.validate_hours(xr.DataArray(values, dims="time"), 2000, 2000)
+
+
+def test_hour_coverage_rejects_a_nanosecond_offset():
+    values = regional.expected_hours(2000, 2000).values.astype("datetime64[ns]")
+    values[0] += np.timedelta64(1, "ns")
+    with pytest.raises(ValueError, match="Every UTC hour"):
+        regional.validate_hours(xr.DataArray(values, dims="time"), 2000, 2000)
+
+
 @pytest.fixture
 def sources(monkeypatch):
     monkeypatch.setitem(

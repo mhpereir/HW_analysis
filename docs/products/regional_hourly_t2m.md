@@ -12,6 +12,10 @@ The default source directory is
 `2mT_hour_ERA5_<year>.nc`. The source root, region, inclusive year range and
 time block size are configurable. Each source must contain every UTC hour of
 its calendar year, including leap days, exactly once and in order.
+Coverage compares the exact timestamp values at nanosecond precision, so
+equivalent second, millisecond, microsecond and nanosecond encodings are
+accepted consistently across supported pandas versions. This normalization
+does not round timestamps to hours or fill missing samples.
 
 Use the native 0.25-degree grid and the inclusive grid-center selection and
 cosine-latitude weighting in `src.preprocess`, with region bounds from

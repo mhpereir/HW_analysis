@@ -32,8 +32,11 @@ def expected_hours(start_year: int, end_year: int) -> pd.DatetimeIndex:
 def validate_hours(time: xr.DataArray, start_year: int, end_year: int) -> None:
     if time.dims != ("time",) or not np.issubdtype(time.dtype, np.datetime64):
         raise ValueError("A one-dimensional Gregorian UTC time coordinate is required.")
-    actual = pd.DatetimeIndex(time.values)
-    if not actual.equals(expected_hours(start_year, end_year)):
+    # pandas 2.x Index.equals also compares datetime storage resolution.
+    # Validate timestamp values rather than rejecting equivalent encodings.
+    actual = time.values.astype("datetime64[ns]")
+    expected = expected_hours(start_year, end_year).values.astype("datetime64[ns]")
+    if not np.array_equal(actual, expected):
         raise ValueError(
             "Every UTC hour of each requested calendar year must occur exactly once, in order."
         )

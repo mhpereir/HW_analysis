@@ -80,7 +80,7 @@ with xr.open_dataset(path, engine="h5netcdf") as cached:
     assert cached.tas_region.attrs["units"] == "K"
     assert cached.tas_region.attrs["native_time_resolution"] == "hourly"
     full_time = pd.date_range(f"{year}-01-01", f"{year + 1}-01-01", freq="h", inclusive="left")
-    assert pd.DatetimeIndex(cached.time.values).equals(full_time)
+    np.testing.assert_array_equal(cached.time.values.astype("datetime64[ns]"), full_time.values.astype("datetime64[ns]"))
     assert np.isfinite(cached.tas_region.values).all()
     actual = cached.tas_region.sel(time=times).values
     np.testing.assert_allclose(actual, expected, rtol=0, atol=1e-10)
