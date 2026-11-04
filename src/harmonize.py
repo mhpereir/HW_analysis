@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from . import advection_direction, diagnostics, preprocess
+from . import advection_direction, diagnostics, preprocess, regional_temperature
 
 HEAT_BUDGET_VARIABLE_MAP: dict[str, str] = {
     "T_domain_avg": "T_mean",
@@ -90,6 +90,31 @@ def validate_production_hourly_coverage(
             f"{len(actual.difference(expected))} unexpected). "
             "Duplicate, unordered or shifted timestamps are not allowed."
         )
+
+
+def add_regional_hourly_t2m(stage1: xr.Dataset, regional: xr.Dataset) -> xr.Dataset:
+    """Add an optional prepared field by exact lookup, preserving daily TAS."""
+    region = str(stage1.attrs.get("region"))
+    regional_temperature.validate_product(regional, region=region)
+    if "tas_region_hourly" in stage1:
+        raise ValueError(
+            "Stage 1 already contains tas_region_hourly; refusing replacement."
+        )
+    try:
+        matched = regional.tas_region.sel(time=stage1.time)
+    except KeyError as exc:
+        raise ValueError(
+            "Prepared hourly T2m is missing required Stage-1 hours."
+        ) from exc
+    regional_temperature.validate_hourly_variable(matched, region=region)
+    for key in ("lat_bounds", "lon_bounds"):
+        if key in stage1.tas_region.attrs and not np.array_equal(
+            stage1.tas_region.attrs[key], matched.attrs[key]
+        ):
+            raise ValueError(f"Stage-1 daily and hourly T2m disagree on {key}.")
+    # Assign only the variable so cache coordinate attrs cannot change the
+    # existing Stage-1 time coordinate or the metadata of daily event fields.
+    return stage1.assign(tas_region_hourly=matched.copy(deep=True).variable)
 
 
 def replace_heat_budget(reference: xr.Dataset, heat_budget: xr.Dataset) -> xr.Dataset:

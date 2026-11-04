@@ -130,6 +130,11 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--hourly-t2m-path",
+        type=Path,
+        help="Optional prepared regional hourly T2m cache; adds tas_region_hourly without reading raw grids.",
+    )
+    parser.add_argument(
         "--cloud-cover-source-layout",
         choices=data_io.CLOUD_COVER_LAYOUTS,
         default=data_io.CLOUD_COVER_LAYOUT_GLOBAL,
@@ -372,6 +377,17 @@ def full_diagnostic_datasets(datasets: dict[str, object]) -> dict[str, xr.Datase
 def main() -> int:
     """Load the configured ERA5 products and print a summary."""
     args = parse_args()
+    regional_t2m = None
+    hourly_t2m_path = getattr(args, "hourly_t2m_path", None)
+    if hourly_t2m_path is not None:
+        from src.regional_temperature import sha256
+
+        hourly_t2m_path = hourly_t2m_path.expanduser().resolve()
+        with analysis_io.open_regional_hourly_t2m(
+            hourly_t2m_path, region=args.region
+        ) as regional:
+            regional_t2m = regional.load()
+        hourly_t2m_hash = sha256(hourly_t2m_path)
     datasets = load_era5_inputs(args)
     heat_budget_dataset = require_dataset(datasets["heat_budget"])
     harmonize.validate_production_hourly_coverage(
@@ -479,6 +495,12 @@ def main() -> int:
             ),
         },
     )
+    if regional_t2m is not None:
+        analysis_ds = harmonize.add_regional_hourly_t2m(analysis_ds, regional_t2m)
+        analysis_ds.attrs.update(
+            hourly_t2m_source_path=str(hourly_t2m_path),
+            hourly_t2m_source_sha256=hourly_t2m_hash,
+        )
     describe_analysis_dataset(analysis_ds)
 
     analysis_ds = append_event_summary_table(

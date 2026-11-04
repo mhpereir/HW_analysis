@@ -18,6 +18,7 @@ TIME_END="${TIME_END:-2024}"
 QUANTILE="${QUANTILE:-90}"
 THRESHOLD_VARIABLE="${THRESHOLD_VARIABLE:-tas}"
 HEAT_BUDGET_ROOT="${HEAT_BUDGET_ROOT:-}"
+HOURLY_T2M_PATH="${HOURLY_T2M_PATH:-}"
 CLOUD_COVER_ROOT="${CLOUD_COVER_ROOT:-/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/cloud_cover}"
 LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 VENUS_MAMBA_ENV="${VENUS_MAMBA_ENV:-dev_env}"
@@ -42,6 +43,15 @@ fi
 # Runtime validation and logging.
 hwa_start_log "stage1_${REGION}_global_cloud"
 hwa_validate_artifact_paths OUTPUT_PATH
+HOURLY_T2M_ARGS=()
+if [[ -n "${HOURLY_T2M_PATH}" ]]; then
+    hwa_validate_artifact_paths HOURLY_T2M_PATH
+    [[ -f "${HOURLY_T2M_PATH}" ]] || {
+        echo "[error] HOURLY_T2M_PATH must be an existing prepared cache file" >&2
+        exit 2
+    }
+    HOURLY_T2M_ARGS=(--hourly-t2m-path "${HOURLY_T2M_PATH}")
+fi
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 if [[ "${actual_commit}" != "${EXPECTED_COMMIT}" ]]; then
@@ -76,6 +86,7 @@ echo "[info] python=${PYTHON_EXECUTABLE}"
 echo "[info] region=${REGION}"
 echo "[info] threshold_variable=${THRESHOLD_VARIABLE}"
 echo "[info] heat_budget_root=${HEAT_BUDGET_ROOT:-configured-saved-results-default}"
+echo "[info] hourly_t2m_path=${HOURLY_T2M_PATH:-not-requested}"
 echo "[info] cloud_cover_source_layout=global-hourly-grid"
 echo "[info] cloud_cover_root=${CLOUD_COVER_ROOT}"
 echo "[info] stage1_contract_version=2"
@@ -93,6 +104,7 @@ echo "[info] output_path=${OUTPUT_PATH}"
     --start-year-ehb 1940 \
     --end-year-ehb 2025 \
     "${HEAT_BUDGET_ARGS[@]}" \
+    "${HOURLY_T2M_ARGS[@]}" \
     --threshold-variable "${THRESHOLD_VARIABLE}" \
     --add-full-diagnostics \
     --cloud-cover-source-layout "global-hourly-grid" \

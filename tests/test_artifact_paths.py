@@ -408,6 +408,46 @@ def test_pressure_layer_scheduler_guards_reference_and_output(name, tmp_path):
     assert not (tmp_path / "outside-artifact-root").exists()
 
 
+@pytest.mark.parametrize("case", ["inside", "relative", "outside", "escaping_symlink"])
+def test_stage1_hourly_cache_uses_shared_artifact_root(case, tmp_path):
+    scheduler = REPO_ROOT / "schedulers/schedule_build_stage1_harmonized_timeseries.sh"
+    root = tmp_path / "artifacts"
+    root.mkdir()
+    external = tmp_path / "outside-cache.nc"
+    external.write_bytes(b"synthetic fixture; preflight must not read data")
+    if case == "inside":
+        cache = root / "regional_hourly_t2m" / "pnw_hotz" / "attempt" / "cache.nc"
+        cache.parent.mkdir(parents=True)
+        cache.write_bytes(external.read_bytes())
+        expected = "checkout commit"
+    elif case == "relative":
+        cache = Path("relative/cache.nc")
+        expected = "HOURLY_T2M_PATH must be an absolute prepared-product path"
+    elif case == "outside":
+        cache = external
+        expected = "HOURLY_T2M_PATH must be beneath HWA_ARTIFACT_ROOT"
+    else:
+        cache = root / "escaping.nc"
+        cache.symlink_to(external)
+        expected = "HOURLY_T2M_PATH must be beneath HWA_ARTIFACT_ROOT"
+    env = _scheduler_env(scheduler, tmp_path)
+    env["HOURLY_T2M_PATH"] = str(cache)
+    result = subprocess.run(
+        ["bash", str(scheduler)],
+        env=env,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    # A valid cache path proceeds to the deliberately invalid commit guard;
+    # invalid paths fail first. Neither case starts Mamba or scientific work.
+    assert result.returncode != 0
+    assert expected in result.stdout + result.stderr
+    assert "mamba" not in result.stderr
+    assert external.read_bytes() == b"synthetic fixture; preflight must not read data"
+
+
 @pytest.mark.parametrize("dirty", [False, True])
 def test_array_submitter_passes_exported_paths_only_from_clean_checkout(
     dirty, tmp_path

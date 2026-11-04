@@ -27,7 +27,7 @@ from uuid import uuid4
 import numpy as np
 import xarray as xr
 
-from . import season_selection
+from . import regional_temperature, season_selection
 from .artifact_paths import artifact_root
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -179,6 +179,46 @@ def save_harmonized_timeseries(
     return output_path
 
 
+def open_regional_hourly_t2m(
+    path: str | Path, *, region: str | None = None
+) -> xr.Dataset:
+    """Open a complete prepared hourly regional ERA5 product."""
+    ds = xr.open_dataset(
+        Path(path).expanduser(), engine="h5netcdf", decode_timedelta=True
+    )
+    try:
+        regional_temperature.validate_product(ds, region=region)
+    except Exception:
+        ds.close()
+        raise
+    return ds
+
+
+def save_regional_hourly_t2m(ds: xr.Dataset, path: str | Path) -> Path:
+    """Validate a round trip before exclusive, atomic publication."""
+    regional_temperature.validate_product(ds)
+    output = Path(path).expanduser().absolute()
+    if output.exists() or output.is_symlink():
+        raise FileExistsError(f"Output already exists: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_name(f".{output.name}.{uuid4().hex}.partial")
+    try:
+        _prepare_for_netcdf(ds).to_netcdf(
+            temporary,
+            engine="h5netcdf",
+            encoding={"tas_region": {"dtype": "float64", "zlib": True, "complevel": 4}},
+        )
+        with open_regional_hourly_t2m(temporary, region=ds.attrs["region"]) as reopened:
+            np.testing.assert_array_equal(
+                reopened.tas_region.values, ds.tas_region.values
+            )
+            np.testing.assert_array_equal(reopened.time.values, ds.time.values)
+        os.link(temporary, output)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return output
+
+
 def open_harmonized_timeseries(
     path: str | Path = DEFAULT_HARMONIZED_TIMESERIES_PATH,
     *,
@@ -191,7 +231,11 @@ def open_harmonized_timeseries(
         kwargs["chunks"] = dict(chunks)
 
     ds = xr.open_dataset(input_path, **kwargs)
-    _validate_harmonized_timeseries(ds)
+    try:
+        _validate_harmonized_timeseries(ds)
+    except Exception:
+        ds.close()
+        raise
     return ds
 
 
@@ -242,6 +286,11 @@ def _validate_harmonized_timeseries(ds: xr.Dataset) -> None:
     if missing:
         raise ValueError(
             f"Harmonized dataset is missing required variables: {', '.join(missing)}."
+        )
+
+    if "tas_region_hourly" in ds:
+        regional_temperature.validate_hourly_variable(
+            ds.tas_region_hourly, region=str(ds.attrs.get("region"))
         )
 
     contract_version = int(ds.attrs.get("stage1_contract_version", 1))

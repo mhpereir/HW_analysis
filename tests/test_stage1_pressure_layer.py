@@ -136,10 +136,19 @@ def test_reused_regional_fields_match_full_raw_source_build(layer_inputs):
     assert report["events"] == 2
 
 
+def test_pressure_layer_preserves_optional_hourly_temperature(layer_inputs):
+    raw, reference, _ = layer_inputs
+    reference = reference.assign(tas_region_hourly=reference.T_mean.copy(deep=True))
+    reference.tas_region_hourly.attrs.update(units="K", native_time_resolution="hourly")
+    result = harmonize.replace_heat_budget(reference, raw)
+    xr.testing.assert_identical(result.tas_region_hourly, reference.tas_region_hourly)
+
+
 @pytest.mark.parametrize("bottom,top", [("surface", "700"), ("700", "500")])
 @pytest.mark.parametrize("threshold_variable", ["tas", "lwa_a"])
+@pytest.mark.parametrize("include_hourly", [False, True])
 def test_raw_builder_preserves_complete_season_results(
-    layer_inputs, monkeypatch, tmp_path, bottom, top, threshold_variable
+    layer_inputs, monkeypatch, tmp_path, bottom, top, threshold_variable, include_hourly
 ):
     raw, reference, _ = layer_inputs
     if bottom == "surface":
@@ -179,6 +188,35 @@ def test_raw_builder_preserves_complete_season_results(
         ),
     }
     output = tmp_path / "raw-source-stage1.nc"
+    hourly_args = []
+    if include_hourly:
+        time = np.arange(
+            np.datetime64("2001-01-01T00"),
+            np.datetime64("2002-01-01T00"),
+            np.timedelta64(1, "h"),
+        )
+        cached = xr.Dataset(
+            {"tas_region": ("time", 280 + np.arange(len(time)) / len(time))},
+            coords={"time": time},
+            attrs={
+                "pipeline_stage": "era5_regional_hourly_t2m",
+                "regional_hourly_t2m_contract_version": 1,
+                "region": "pnw_bartusek",
+                "start_year": 2001,
+                "end_year": 2001,
+            },
+        )
+        cached.tas_region.attrs.update(
+            units="K",
+            native_time_resolution="hourly",
+            region="pnw_bartusek",
+            lat_bounds=(40, 60),
+            lon_bounds=(-130, -110),
+            source_grid_spacing_degrees=0.25,
+        )
+        cache_path = tmp_path / "prepared-tas-region.nc"
+        analysis_io.save_regional_hourly_t2m(cached, cache_path)
+        hourly_args = ["--hourly-t2m-path", str(cache_path)]
     monkeypatch.setattr(
         sys,
         "argv",
@@ -196,6 +234,7 @@ def test_raw_builder_preserves_complete_season_results(
             threshold_variable,
             "--output-path",
             str(output),
+            *hourly_args,
         ],
     )
     # Replace only unavailable source I/O; exercise the production coverage gate,
@@ -203,6 +242,16 @@ def test_raw_builder_preserves_complete_season_results(
     monkeypatch.setattr(raw_builder, "load_era5_inputs", lambda args: inputs)
     assert raw_builder.main() == 0
     with analysis_io.open_harmonized_timeseries(output) as product:
+        if include_hourly:
+            np.testing.assert_array_equal(
+                product.tas_region_hourly, cached.tas_region.sel(time=product.time)
+            )
+            assert product.attrs["hourly_t2m_source_path"] == str(cache_path)
+            assert product.attrs["hourly_t2m_source_sha256"] == pressure_layer.sha256(
+                cache_path
+            )
+        else:
+            assert "tas_region_hourly" not in product
         np.testing.assert_array_equal(product.time, reference.time)
         for name in ("hw_event_id", "lwa_a_event_id", "event_id", "peak_time"):
             np.testing.assert_array_equal(product[name], reference[name])

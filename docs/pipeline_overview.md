@@ -71,6 +71,7 @@ Product Stage 2: event-feature table + tracked matching settings
 
 | Product stage | Durable artifact | Producer | Main consumers |
 | --- | --- | --- | --- |
+| Upstream regional ERA5 | [Native hourly regional T2m](products/regional_hourly_t2m.md) under `$HWA_ARTIFACT_ROOT/regional_hourly_t2m/` | `scripts/prepare_regional_hourly_t2m.py` | optional Stage-1 `tas_region_hourly`, temperature diagnostic |
 | Stage 1 | `$HWA_ARTIFACT_ROOT/stage1/harmonized_regional_timeseries_*.nc` | `scripts/build_stage1_harmonized_timeseries.py` | event features, baseline features, composites, top-event plots |
 | Stage 1 companion | `$HWA_ARTIFACT_ROOT/stage1_climatology/regional_hourly_climatology_*.nc` | `scripts/build_stage1_hourly_climatology.py` | climatological-anomaly composites, top-event traces, and face-advection diagnostics |
 | Stage 2 | event-feature table | `scripts/event_features/build_stage2_event_features.py` | feature plots, event comparisons, exploratory diagnostics |
@@ -112,6 +113,7 @@ products or plotting dependencies.
 | `src/config.py` | Paths, region definitions, seasons, source constants, and default settings. |
 | `src/data_io.py` | Open raw/source datasets and handle source-specific file conventions. |
 | `src/preprocess.py` | Low-level time, coordinate, unit, averaging, anomaly, and resampling utilities. |
+| `src/regional_temperature.py` | Bounded native-grid hourly T2m preparation and regional cache validation. |
 | `src/harmonize.py` | Align sources into the Stage-1 regional time-series product. |
 | `src/analysis_io.py` | Save/open internal products, especially the Stage-1 handoff, and validate metadata. |
 | `src/selectors.py` | Filter event tables, build reusable event/time masks, and perform deterministic standardized event matching. |

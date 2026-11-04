@@ -63,6 +63,28 @@ SURFACE_DIAGNOSTIC_FILE_STEMS: dict[str, str] = {
 }
 
 
+def open_era5_hourly_t2m_year(
+    year: int, *, root: str | Path | None = None
+) -> xr.Dataset:
+    """Open one native annual grid lazily for bounded regional preparation."""
+    path = (
+        Path(root or config.ERA5_HOURLY_T2M_ROOT).expanduser()
+        / f"2mT_hour_ERA5_{year}.nc"
+    )
+    source = xr.open_dataset(
+        path, engine="h5netcdf", cache=False, decode_timedelta=True
+    )
+    try:
+        out = _standardize_common_structure(source)
+        if "t2m" not in out:
+            raise ValueError(f"Native hourly ERA5 source is missing t2m: {path}")
+        out.set_close(source.close)
+        return out
+    except Exception:
+        source.close()
+        raise
+
+
 def open_era5_tas(
     *,
     years: Sequence[int] | None = None,

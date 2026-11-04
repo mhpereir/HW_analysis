@@ -135,6 +135,19 @@ slhf_heating_rate_approx(time)
 surface_energy_heating_rate_approx(time)
 ```
 
+Independently of full diagnostics, `--hourly-t2m-path` optionally adds
+`tas_region_hourly(time)` from a separately prepared
+[regional hourly ERA5 T2m product](regional_hourly_t2m.md). This is a native
+hourly, 0.25-degree regional mean, stored as `tas_region` in that standalone
+product and mapped to `tas_region_hourly` when added to Stage 1;
+`tas_region` remains the existing daily
+event-selection temperature repeated on hourly timestamps. Exact matching
+selects the cached series onto the EHB axis without interpolation or spatial
+work. Missing required hours or incompatible region/bounds/units fail. Record
+the cache path and SHA-256. Version 2 does not require this optional field;
+existing products and event membership remain unchanged. Pressure-layer
+reference builds preserve the field when present.
+
 Cloud cover is loaded from the global hourly ERA5 grid and reduced to the
 configured region with the same cosine-latitude weighted regional-mean
 procedure used by other gridded surface diagnostics. PBL diagnostics are not

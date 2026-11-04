@@ -38,6 +38,14 @@ Raw ERA5, upstream EHB, thresholds, LWA, environments and tracked configuration
 files retain their existing locations. They are not migrated by this policy.
 Stage 3 and Stage 4 remain inactive and their legacy entrypoints are excluded.
 
+The [regional hourly T2m preparation](../products/regional_hourly_t2m.md)
+stores its prepared products under
+`$HWA_ARTIFACT_ROOT/regional_hourly_t2m/<region>/<attempt>/`. It uses the same
+root as Stage 1 and Stage 2, with logs under `HWA_LOG_ROOT`. Stage-1 jobs
+optionally read the cache through `HOURLY_T2M_PATH`, subject to the same
+prepared-input path guards. Raw global hourly ERA5 stays at its existing
+download location.
+
 Use fresh, explicitly named run/attempt output paths for production. Stable
 storage does not authorize overwriting an accepted product. Stage-2 and
 matching schedulers now refuse replacement of existing final products, including

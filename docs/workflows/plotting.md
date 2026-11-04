@@ -51,6 +51,7 @@ $HWA_ARTIFACT_ROOT/plots_<plot_name>/
 | Stage 1 | top-event traces | `scripts/plot_top_events.py` |
 | Stage 1 plus regional hourly climatology | top-event climatological-anomaly traces | `scripts/plot_top_events_clim_anom.py` |
 | Stage 1 | diurnal, threshold, and event-summary diagnostics | `scripts/plot_diurnal_cycle.py`, `scripts/plot_threshold_timeseries.py`, `scripts/plot_event_summary.py` |
+| Stage 1 plus prepared regional hourly T2m (or explicit daily-only mode) | temperature scatter plots and variability statistics | `scripts/plot_temperature_variability.py` |
 | Stage 1 run inventory | Northern Hemisphere regional-domain overview | `scripts/region_vis/plot_stage1_regions.py` |
 | Stage 2 event features | feature grids, splits, and combined comparisons | `event_feature_grid_plot.py`, `plot_event_feature.py`, `plot_event_feature_split.py`, `plot_event_feature_split_combined.py` under `scripts/event_features/` |
 | Stage 2 event features | adiabatic, advection, and diabatic event diagnostics | `plot_adiabatic_advection_comparison.py`, `plot_adiabatic_diabatic_advection.py` under `scripts/event_features/` |
@@ -65,6 +66,79 @@ figure entrypoints.
 
 For GMT hour grouping, pressure-layer inputs, sample counts and numerical
 companions, follow the [diurnal-cycle workflow](diurnal_cycle.md).
+
+## Surface and atmospheric temperature variability
+
+`scripts/plot_temperature_variability.py` is a single-file diagnostic of the
+relationship between regional T2m and the saved EHB `T_mean`. It consumes a
+Stage-1 product and, for the hourly comparison, a separately prepared regional
+hourly T2m NetCDF. It does not load spatial ERA5, reconstruct EHB temperature,
+detect events, or change existing products. The small statistical reductions
+are kept in this script for this explicitly self-contained diagnostic.
+
+Stage-1 `tas_region` is **daily-native**, projected onto hourly timestamps. It
+is the authoritative daily event-selection temperature, not hourly T2m. The
+hourly companion must contain `tas_region(time)` by default, temperature
+units (`K` or Celsius), `native_time_resolution="hourly"`
+on that variable, and a dataset `region` matching Stage 1. Its preparation must
+use the same regional definition and cosine-latitude weighting as event T2m.
+The [hourly preparation script](../products/regional_hourly_t2m.md) supplies
+this product on the native 0.25-degree grid; daily event T2m uses the existing
+2-degree grid, so daily source differences are reported rather than assumed
+to vanish. Alternatively, `--stage1-hourly-t2m` uses the optional Stage-1
+`tas_region_hourly` field after the prepared cache has been ingested. The
+script checks matching stored bounds when present and records companion
+metadata; a region label alone cannot certify the upstream spatial reduction.
+Daily-projected inputs, duplicate, unordered or non-hour-aligned timestamps,
+and incompatible metadata are errors. Missing hours are never interpolated.
+Use `--daily-only` explicitly if the hourly companion is not yet available.
+
+The default population is every complete UTC day in JJA over all available
+years, including heatwave and non-heatwave days. `--all-seasons` uses every
+available month, not necessarily a complete calendar year; `--season-months`,
+`--start-year` and `--end-year` provide explicit selections. Both comparisons
+use the same days with all 24 finite hourly samples in each required field.
+Daily atmospheric temperature is the arithmetic mean of those 24 hours.
+The daily scatter uses Stage-1 `tas_region`, checked for constancy within a
+UTC day. With an hourly companion, an additional daily-from-hourly statistical
+comparison and differences from daily event T2m expose source disagreement.
+
+The figure shows hourly and daily scatter plots and yearly standard-deviation
+ratios. Statistics use every retained pair, independently of plotting:
+Pearson r, Spearman rho, OLS of `T_mean` on T2m (slope, intercept and R-squared),
+means, sample standard deviations and variances (`ddof=1`), interquartile
+ranges, and atmospheric-to-surface SD and variance ratios, pooled and per year.
+Exported columns and statistical keys use `tas_region`, consistent with
+Stage 1 and the prepared hourly product; time scale is recorded separately.
+The daily-pair table also includes `tas_region_hourly`, the daily mean of
+the native hourly companion, when available. The raw ERA5 source field is
+named `t2m`; it is normalized to `tas_region` during regional preparation.
+A ratio greater than one means greater atmospheric temperature variability
+on the stated sample. Undefined statistics (including constant series) are
+null, not zero. No independent-sample p-values or causal interpretations are
+reported. These are raw-temperature statistics; shared seasonal cycles and
+trends remain, so they do not establish an anomaly relationship.
+
+For example, inside an authorized Venus PBS allocation:
+
+```bash
+python scripts/plot_temperature_variability.py \
+  --input-path /absolute/path/to/stage1.nc \
+  --hourly-t2m-path /absolute/path/to/prepared_regional_hourly_t2m.nc \
+  --output-dir /absolute/path/to/new_temperature_variability_attempt
+```
+
+The output directory must be new. It contains PNG/PDF figures,
+`statistics.csv`, `daily_pairs.csv`, and `statistics.json` with coverage,
+selection, definitions, input paths/hashes/metadata, execution Git/script
+provenance, numerical results and output hashes. Daily-only output explicitly
+marks the hourly panels unavailable. Local validation uses synthetic known
+correlations and variance ratios, unit conversion, missing-day/season/year
+boundaries, source disagreement, invalid inputs, immutability and exclusive
+output creation, followed by the full `dev_env` suite. Production acceptance
+requires an authorized clean-commit Venus PBS run, independent numerical
+checks and original-resolution figure review. The separate hourly preparation
+has its own producer and scheduler; neither workflow submits jobs itself.
 
 ## Required behavior
 

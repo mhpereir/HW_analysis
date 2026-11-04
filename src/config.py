@@ -66,6 +66,11 @@ variables
 tas (valid_time, lat, lon) - daily 2m air temperature on the standard grid
 """
 
+# Native 0.25-degree annual hourly grids, used only by regional preparation.
+ERA5_HOURLY_T2M_ROOT: str = (
+    "/home/mhpereir/downloads-mhpereir/REANALYSIS/ERA5/hourly/2mT"
+)
+
 # spatially aggregated on standard grid, daily
 LWA_THRESH_ROOT: str = "/home/mhpereir/data-mhpereir/LWA_thresholds/outputs"
 # /{region}/{dataset: ERA5 or CanESM5}/q{quantile}/{dataset}_LWAthresh_{method}_1970_2014_q{quantile}_{region}.500.nc

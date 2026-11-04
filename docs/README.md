@@ -119,6 +119,7 @@ a figure.
 | Prepared inputs, outputs, and scheduler logs | [Artifact locations](workflows/artifacts.md) |
 | Active architecture and ownership | [Pipeline overview](pipeline_overview.md) |
 | Stage 1 regional dataset | [Stage 1 product contract](products/stage1_harmonized_timeseries.md) |
+| Prepared regional hourly T2m | [Regional hourly T2m contract](products/regional_hourly_t2m.md) |
 | Stage 1 regional hourly climatology | [Regional hourly climatology contract](products/stage1_regional_hourly_climatology.md) |
 | Stage 2 event features | [Event-feature contract](products/stage2_event_features.md) |
 | Stage 2 baseline features | [Baseline-day contract](products/stage2_baseline_features.md) |
