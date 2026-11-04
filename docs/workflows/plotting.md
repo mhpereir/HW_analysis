@@ -140,6 +140,19 @@ requires an authorized clean-commit Venus PBS run, independent numerical
 checks and original-resolution figure review. The separate hourly preparation
 has its own producer and scheduler; neither workflow submits jobs itself.
 
+Use `schedulers/schedule_temperature_variability.sh` for an existing hourly
+cache. Supply `INPUT_PATH`, `HOURLY_T2M_PATH`, `CACHE_MANIFEST_PATH`, a fresh
+`OUTPUT_DIR`, and the usual commit and storage settings. `START_YEAR` and
+`END_YEAR` default to 1940 and 2024; `SEASON_MONTHS` defaults to `6 7 8`.
+This job does not rebuild or modify the cache. It writes the diagnostic and
+`independent_validation.json`. The validator checks the entire cache's hourly
+coverage and hash, source-file identities, direct native-grid means at four
+hours in the first/middle/last source years, and independently recomputes all
+saved daily pairs and pooled/yearly statistics. Raw-grid checks are sampled,
+not a second full spatial reduction. Input hashes are checked again at the
+end. Scheduler completion still requires log, provenance, and visual review
+before scientific acceptance.
+
 ## Required behavior
 
 The event-versus-clean-baseline comparison also consumes the saved

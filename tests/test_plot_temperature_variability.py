@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 from HW_analysis.scripts import plot_temperature_variability as plotter
+from HW_analysis.scripts import validate_temperature_variability as validator
 from HW_analysis.src import analysis_io
 
 
@@ -244,6 +245,36 @@ def test_yearly_stats_and_scatter_use_all_pairs():
         plt.close(fig)
 
 
+@pytest.mark.parametrize(
+    "corruption", [None, "statistic", "daily_pair", "coverage", "missing_row"]
+)
+def test_independent_validation_detects_saved_product_corruption(corruption):
+    stage1, hourly = make_inputs((2000, 2001))
+    pairs, daily, coverage = plotter.prepare_pairs(stage1, hourly)
+    report = {
+        "selection": {"months_utc": [6, 7, 8], "start_year": 2000, "end_year": 2001},
+        "coverage": coverage,
+        "statistics": plotter.statistics_table(pairs),
+        "daily_source_agreement": plotter.source_agreement(daily),
+    }
+    if corruption == "statistic":
+        report["statistics"][0]["pearson_r"] -= 0.05
+    elif corruption == "daily_pair":
+        daily.loc[daily.index[0], "T_mean"] += 1
+    elif corruption == "coverage":
+        report["coverage"]["retained_hours"] -= 24
+    elif corruption == "missing_row":
+        report["statistics"].pop()
+    if corruption is not None:
+        with pytest.raises((AssertionError, KeyError)):
+            validator.validate_statistics(stage1, hourly, report, daily)
+    else:
+        assert validator.validate_statistics(stage1, hourly, report, daily) == {
+            "statistical_rows_checked": 9,
+            "daily_pairs_checked": 8,
+        }
+
+
 @pytest.mark.parametrize("daily_only", [False, True])
 def test_cli_exports_reproducible_outputs_and_refuses_overwrite(tmp_path, daily_only):
     stage1, hourly = make_inputs((2000, 2001))
@@ -279,6 +310,15 @@ def test_cli_exports_reproducible_outputs_and_refuses_overwrite(tmp_path, daily_
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):
         plotter.main(args)
     assert before == (plotter.sha256(stage1_path), plotter.sha256(hourly_path))
+
+
+@pytest.mark.parametrize("count", [1, 8])
+def test_independent_constant_statistics_are_not_spurious(count):
+    result = validator.direct_statistics(np.full((count, 2), 273.123))
+    assert result["pearson_r"] is None
+    assert result["spearman_rho"] is None
+    assert result["sd_ratio_T_mean_over_tas_region"] is None
+    assert result["T_mean_sd_K"] == (0 if count > 1 else None)
 
 
 def test_cli_requires_explicit_mode_and_season_options():

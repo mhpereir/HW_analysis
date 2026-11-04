@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 from HW_analysis.scripts import prepare_regional_hourly_t2m as producer
+from HW_analysis.scripts import validate_temperature_variability as validator
 
 from src import harmonize
 
@@ -114,6 +115,40 @@ def test_grid_conventions_and_block_size_preserve_reduction(sources):
     )
     np.testing.assert_allclose(first.tas_region, reverse.tas_region, rtol=0, atol=1e-12)
     assert reverse.sizes["time"] == 8760
+
+
+@pytest.mark.parametrize("corrupt", [False, True])
+def test_independent_cache_validation_checks_raw_values(sources, tmp_path, corrupt):
+    source = sources()
+    cached, checks = regional.prepare_annual_region(
+        source, region="test_region", year=2000
+    )
+    raw = source.rename({"time": "valid_time", "lat": "latitude", "lon": "longitude"})
+    raw_path = tmp_path / "raw.nc"
+    raw.to_netcdf(raw_path, engine="h5netcdf")
+    stat = raw_path.stat()
+    manifest = {
+        "start_year": 2000,
+        "end_year": 2000,
+        "region": "test_region",
+        "sources": [
+            {
+                "path": str(raw_path),
+                "size_bytes": stat.st_size,
+                "mtime_ns": stat.st_mtime_ns,
+                **checks,
+            }
+        ],
+    }
+    if corrupt:
+        cached.tas_region.values[0] += 0.5
+        with pytest.raises(AssertionError):
+            validator.validate_cache(cached, manifest)
+    else:
+        result = validator.validate_cache(cached, manifest)
+        assert result["hours"] == 8784
+        assert result["source_years"] == 1
+        assert result["raw_samples"][0]["maximum_absolute_error_K"] < 1e-10
 
 
 @pytest.mark.parametrize(
