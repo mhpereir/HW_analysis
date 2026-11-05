@@ -51,6 +51,7 @@ $HWA_ARTIFACT_ROOT/plots_<plot_name>/
 | Stage 1 | top-event traces | `scripts/plot_top_events.py` |
 | Stage 1 plus regional hourly climatology | top-event climatological-anomaly traces | `scripts/plot_top_events_clim_anom.py` |
 | Stage 1 | diurnal, threshold, and event-summary diagnostics | `scripts/plot_diurnal_cycle.py`, `scripts/plot_threshold_timeseries.py`, `scripts/plot_event_summary.py` |
+| Stage 1 | exploratory daily anticyclonic LWA changes versus heat-budget tendencies | `scripts/plot_hw_lwa_analysis.py` |
 | Stage 1 run inventory | Northern Hemisphere regional-domain overview | `scripts/region_vis/plot_stage1_regions.py` |
 | Stage 2 event features | feature grids, splits, and combined comparisons | `event_feature_grid_plot.py`, `plot_event_feature.py`, `plot_event_feature_split.py`, `plot_event_feature_split_combined.py` under `scripts/event_features/` |
 | Stage 2 event features | adiabatic, advection, and diabatic event diagnostics | `plot_adiabatic_advection_comparison.py`, `plot_adiabatic_diabatic_advection.py` under `scripts/event_features/` |
@@ -369,6 +370,110 @@ This is a display transform only. It must not mutate Stage 1, the climatology
 companion, or any assembled composite or top-event dataset. Synthetic plotting
 tests must verify the `Δ` labels, the reversed absolute and anomaly traces and
 bounds, top-event and reference signs, and source-data immutability.
+
+## Exploratory daily LWA and heat-budget relationships
+
+`scripts/plot_hw_lwa_analysis.py` is an intentionally self-contained exploration:
+all new reduction, pairing, plotting, and CLI code lives in this single file.
+It reuses the Stage-1 reader, seasonal event selector, and shared figure style.
+It does not change any product schema, rebuild events, or join the production
+pipeline. Existing products and figure entrypoints remain compatible.
+
+Use a TAS-selected Stage-1 product (`event_id_source = hw_event_id`). The
+analysis uses `lwa_a_region` within the saved heatwaves, with complete JJA
+events by default and the standard seasonal CLI overrides. An LWA-selected
+event table is rejected, since its event IDs describe a different population.
+Stage-2 window summaries cannot recover the required daily sequence.
+
+Include a separate non-heatwave baseline population. Both dates in a baseline
+pair must fall in the requested season (JJA by default), and every hourly
+`hw_event_id` on both dates must be zero. Use the original saved IDs, not the
+complement of the seasonally selected event table: excluded heatwaves are
+never reclassified as baseline. This population includes all non-heatwave
+days satisfying these conditions, without an additional event-adjacency
+buffer or a requirement that TAS fall below its threshold. It is not the
+Stage-2 fixed-window "clean baseline" selection.
+
+LWA is daily-native data projected onto the hourly axis by calendar-day lookup.
+Validate that metadata and the constant within-day LWA values. Never interpret
+hourly repeats or midnight steps as an hourly derivative. Calculate daily
+means of `advection`, `adiabatic`, and `diabatic` from exactly 24 finite hourly
+samples on each native UTC calendar date. Keep the stored positive-warming
+signs and `K hr-1` rate units; averaging a rate does not integrate it.
+
+Keep only complete days belonging entirely to a selected heatwave or to the
+baseline. Pair days only when their dates differ by exactly one day, their
+calendar years match, and their saved heatwave IDs match (zero for baseline
+pairs). Establish these conditions before taking differences. Missing
+hours/days, summer-to-summer gaps, year boundaries, separate events and
+heatwave/baseline transitions must never be bridged. Within each population,
+use one common finite sample for all three tendencies, without filling gaps
+or interpolating.
+
+For daily LWA values $A_d$ and daily-mean tendencies $\overline{Q}_{j,d}$,
+the paired quantities are
+
+$$
+\Delta A_d = A_{d+1}-A_d, \qquad
+\dot A_d = \frac{\Delta A_d}{1\ \mathrm{day}}, \qquad
+Q_{j,d+1/2}=\frac{\overline{Q}_{j,d}+\overline{Q}_{j,d+1}}{2}.
+$$
+
+This is a finite difference of daily values paired with the midpoint average
+of two daily means, not an instantaneous derivative or a new hourly estimate.
+The default horizontal axis is the rate per day; `--x-axis change` displays
+the raw difference. Their numeric values coincide for the required one-day
+spacing, but their labels and units differ. LWA units come from the input.
+The third column explicitly labels `diabatic` as the budget closure residual.
+
+Historical Stage-1 files may lack LWA units. In that case require explicit
+`--lwa-units` and `--lwa-units-evidence` options, after inspecting the upstream
+calculation; record both without modifying the source dataset. Refuse an
+override that contradicts declared units. The inspected ERA5 height-based
+calculation integrates height departures (m) over meridional distance (m),
+giving square metres, not pressure-weighted units. This is a source-based
+interpretation when the upstream NetCDF also omits units.
+
+Write a two-row, three-column scatter figure: heatwaves in the top row,
+non-heatwave baseline in the bottom row, and one heating term per column. Use
+matching limits across both populations and keep their points and correlation
+statistics separate. An empty population retains its row with an explicit
+empty-sample annotation and null correlations; fail only if neither population
+has eligible pairs. Save a CSV with a `population` column (`heatwave` or
+`baseline`), both source dates, daily values, daily tendencies, event IDs and
+plotted pairs. The JSON records input/output hashes, script/checkout
+provenance, settings, counts and descriptive Pearson/Spearman correlations
+separately by population. Daily pairs receive equal weight; long events
+contribute more pairs. Adjacent pairs share days, and correlations are not
+significance tests or evidence of causation. No p-values are reported.
+Use an explicitly supplied fresh `--output-dir`, outside the source checkout
+for production, and never overwrite an existing directory.
+
+Run through `schedulers/schedule_hw_lwa_analysis.sh`, requesting one CPU,
+4 GB and ten minutes. `RUN_MODE=smoke` runs the synthetic diagnostic and
+artifact-path tests; validate this job before submitting `RUN_MODE=plot`.
+The plotting job requires `INPUT_PATH`, `EXPECTED_INPUT_SHA256`, and a fresh
+`OUTPUT_DIR`, alongside the standard source commit and storage-root pins.
+Optional `LWA_UNITS` and `LWA_UNITS_EVIDENCE` are passed explicitly for missing
+historical metadata. `HWA_SEASON_OPTIONS` and `X_AXIS` control the documented
+selection and axis switches. Both modes preserve exclusive application logs.
+
+Before recording successful numerical validation, reopen the saved CSV and
+independently reconstruct its expected rows from direct hourly NumPy slices
+and the original event table. Check exact timestamps, year/season/event and
+baseline membership, complete hourly coverage, source LWA differences, signs,
+daily means, midpoint rates and per-population counts. This check uses direct
+hourly slices and sums, not the production groupby/pairing function. Store its
+errors and counts in the summary. Visual acceptance remains a separate check.
+
+Local validation uses synthetic linear/constant daily signals, within-day
+variation, missing hours/days, summer gaps, adjacent years, separate events,
+heatwave/baseline transitions, excluded-event contamination, season membership,
+single-population inputs, signs/units, source immutability, and figure/CSV/JSON
+export with separate population counts and correlations.
+Run the full `dev_env` suite before handoff. Production acceptance separately
+requires authorized commit/publication and a tracked Venus PBS render with
+independent numerical checks and original-resolution visual review.
 
 ## Validation
 
