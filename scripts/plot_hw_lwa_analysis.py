@@ -1,4 +1,4 @@
-r"""Explore daily anticyclonic LWA changes versus heat-budget tendencies.
+r"""Explore the daily second derivative of LWA_a versus heat-budget tendencies.
 
 Example (on Venus, through a tracked PBS allocation)::
 
@@ -7,16 +7,16 @@ Example (on Venus, through a tracked PBS allocation)::
         --output-dir /path/to/artifacts/plots_hw_lwa_analysis/new_run
 
 LWA is daily-native, repeated on the hourly Stage-1 axis. Recover one value
-per day and average each heating rate over all 24 hours. Pair consecutive days
-within the same selected heatwave or with both days outside heatwaves, always
-within one calendar year, then calculate
-``(LWA_a[next] - LWA_a[current]) / 1 day``. The plotted heating rate is the
-midpoint average of the two daily means, retaining K hr-1 units. This is a
-daily finite-difference diagnostic, not an instantaneous hourly derivative.
+per day and average each heating rate over all 24 hours. Use three consecutive
+days within the same selected heatwave or all outside heatwaves, always within
+one calendar year, then calculate
+``(LWA_a[next] - 2*LWA_a[center] + LWA_a[previous]) / (1 day)**2``.
+The plotted heating rate is the center day's daily mean, retaining K hr-1
+units. This is daily curvature, not an instantaneous hourly derivative.
 
 Default selection: complete JJA TAS events and JJA non-heatwave days. Plot the
 two populations in separate rows with matching axes. Each row uses the same
-finite pairs for all three terms. Correlations describe equally weighted pairs,
+finite triplets for all three terms. Correlations describe equally weighted triplets,
 not independent events; no significance or causal interpretation is implied.
 All new analysis code is contained here; existing readers, season selection
 and style are reused.
@@ -33,7 +33,6 @@ import socket
 import subprocess
 import sys
 from datetime import datetime, timezone
-from itertools import pairwise
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -50,10 +49,7 @@ from src import analysis_io, plot_style, season_selection, selectors
 TERMS = ("advection", "adiabatic", "diabatic")
 POPULATIONS = {"heatwave": "Heatwaves", "baseline": "Non-heatwave baseline"}
 LWA = "lwa_a_region"
-PAIR_COLUMNS = {
-    "rate": "d_lwa_a_dt",
-    "change": "delta_lwa_a",
-}
+X_COLUMN = "d2_lwa_a_dt2"
 
 
 def parse_args() -> argparse.Namespace:
@@ -70,13 +66,7 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         required=True,
-        help="Fresh directory for PNG, paired-sample CSV and summary JSON.",
-    )
-    parser.add_argument(
-        "--x-axis",
-        choices=tuple(PAIR_COLUMNS),
-        default="rate",
-        help="LWA_a difference per day (default) or raw daily change.",
+        help="Fresh directory for PNG, daily-triplet CSV and summary JSON.",
     )
     parser.add_argument(
         "--lwa-units", help="Explicit units for historical inputs lacking LWA metadata."
@@ -163,7 +153,7 @@ def _validate_input(
     return time, units
 
 
-def prepare_pairs(
+def prepare_triplets(
     ds: xr.Dataset,
     *,
     season_months: list[int] | None = None,
@@ -172,7 +162,7 @@ def prepare_pairs(
     lwa_units: str | None = None,
     lwa_units_evidence: str | None = None,
 ) -> tuple[pd.DataFrame, dict]:
-    """Build complete adjacent daily pairs without mutating or trimming Stage 1."""
+    """Build centered three-day stencils without mutating or trimming Stage 1."""
     time, units = _validate_input(
         ds, lwa_units=lwa_units, lwa_units_evidence=lwa_units_evidence
     )
@@ -220,33 +210,39 @@ def prepare_pairs(
     consecutive = (dates[1:] - dates[:-1]) == pd.Timedelta(days=1)
     same_year = dates[1:].year == dates[:-1].year
     same_event = valid.hw_event_id.to_numpy()[1:] == valid.hw_event_id.to_numpy()[:-1]
-    left_indices = np.flatnonzero(consecutive & same_year & same_event)
+    # Each stencil needs BOTH valid links. Filtering first must not close gaps.
+    valid_link = consecutive & same_year & same_event
+    left_indices = np.flatnonzero(valid_link[:-1] & valid_link[1:])
     if left_indices.size == 0:
         raise ValueError(
-            "No complete consecutive daily pairs in either the heatwave or baseline population."
+            "No complete consecutive daily triplets in either the heatwave or baseline population."
         )
-    left, right = valid.iloc[left_indices], valid.iloc[left_indices + 1]
-    elapsed = (right.index - left.index) / pd.Timedelta(days=1)
-    delta = right[LWA].to_numpy() - left[LWA].to_numpy()
-    pairs = pd.DataFrame(
+    left = valid.iloc[left_indices]
+    center = valid.iloc[left_indices + 1]
+    right = valid.iloc[left_indices + 2]
+    step = (center.index - left.index) / pd.Timedelta(days=1)
+    # Differencing the two local slopes avoids subtracting large sums of LWA.
+    second_difference = (right[LWA].to_numpy() - center[LWA].to_numpy()) - (
+        center[LWA].to_numpy() - left[LWA].to_numpy()
+    )
+    triplets = pd.DataFrame(
         {
             "day_start": left.index,
+            "day_center": center.index,
             "day_end": right.index,
             "event_id": left.hw_event_id.to_numpy(dtype=np.int64),
             "population": np.where(left.hw_event_id.eq(0), "baseline", "heatwave"),
-            "elapsed_days": np.asarray(elapsed, dtype=float),
+            "step_days": np.asarray(step, dtype=float),
             "lwa_a_start": left[LWA].to_numpy(),
+            "lwa_a_center": center[LWA].to_numpy(),
             "lwa_a_end": right[LWA].to_numpy(),
-            "delta_lwa_a": delta,
-            "d_lwa_a_dt": delta / elapsed,
+            X_COLUMN: second_difference / step**2,
         }
     )
     for term in TERMS:
-        pairs[f"{term}_daily_start"] = left[term].to_numpy()
-        pairs[f"{term}_daily_end"] = right[term].to_numpy()
-        pairs[f"{term}_pair_mean"] = (
-            pairs[f"{term}_daily_start"] + pairs[f"{term}_daily_end"]
-        ) / 2
+        triplets[f"{term}_daily_start"] = left[term].to_numpy()
+        triplets[f"{term}_daily_center"] = center[term].to_numpy()
+        triplets[f"{term}_daily_end"] = right[term].to_numpy()
 
     details = {
         "lwa_units": units,
@@ -260,7 +256,7 @@ def prepare_pairs(
         "selected_event_ids": selected_ids.tolist(),
         "n_selected_events": int(selected_ids.size),
         "n_represented_events": int(
-            pairs.loc[pairs.event_id > 0, "event_id"].nunique()
+            triplets.loc[triplets.event_id > 0, "event_id"].nunique()
         ),
         "n_source_hours": len(time),
         "n_source_days": len(daily),
@@ -268,40 +264,45 @@ def prepare_pairs(
         "n_days_excluded_incomplete_hours": int((selected_day & ~complete).sum()),
         "n_days_excluded_nonfinite": int((selected_day & complete & ~finite).sum()),
         "n_valid_days": len(valid),
-        "n_pairs": len(pairs),
+        "n_triplets": len(triplets),
         "populations": {
             population: {
                 "n_selected_days": int(mask.sum()),
                 "n_days_excluded_incomplete_hours": int((mask & ~complete).sum()),
                 "n_days_excluded_nonfinite": int((mask & complete & ~finite).sum()),
                 "n_valid_days": int((mask & complete & finite).sum()),
-                "n_pairs": int(pairs.population.eq(population).sum()),
+                "n_triplets": int(triplets.population.eq(population).sum()),
             }
             for population, mask in day_masks.items()
         },
-        "n_candidate_pairs_excluded_gap": int((~consecutive).sum()),
-        "n_candidate_pairs_excluded_year": int((consecutive & ~same_year).sum()),
-        "n_candidate_pairs_excluded_event": int(
+        "n_adjacent_links_excluded_gap": int((~consecutive).sum()),
+        "n_adjacent_links_excluded_year": int((consecutive & ~same_year).sum()),
+        "n_adjacent_links_excluded_event": int(
             (consecutive & same_year & ~same_event).sum()
         ),
         "daily_reduction": "24 finite native UTC hourly samples per day, no gap filling",
-        "difference": "LWA_a[end] - LWA_a[start]; exactly one day, same year and saved event ID (zero for baseline)",
+        "derivative_order": 2,
+        "difference": "(LWA_a[end] - 2*LWA_a[center] + LWA_a[start]) / (1 day)**2; both steps exactly one day, all three dates in the same year and saved event ID (zero for baseline)",
         "baseline_definition": (
-            "Both dates in the selected season and hw_event_id=0 at all 24 hours "
+            "All three dates in the selected season and hw_event_id=0 at all 24 hours "
             "of each day. No additional event-adjacency buffer. Excluded heatwaves "
             "are not baseline days."
         ),
-        "tendency_alignment": "(daily_mean[start] + daily_mean[end]) / 2, for every term",
+        "tendency_alignment": "daily_mean[center], for every term; no heating derivative or smoothing",
         "interpretation": (
-            "Descriptive equal-weight daily pairs; adjacent pairs share days and longer "
-            "events contribute more pairs. No p-values or causal inference. Diabatic is "
+            "Descriptive equal-weight daily triplets; adjacent triplets share days and longer "
+            "events contribute more triplets. Events shorter than three complete days "
+            "have no stencil. Second differences can amplify daily noise. "
+            "No p-values or causal inference. Diabatic is "
             "the EHB closure residual, not separately diagnosed physical heating."
         ),
     }
-    return pairs, details
+    return triplets, details
 
 
-def validate_saved_pairs(ds: xr.Dataset, pairs: pd.DataFrame, details: dict) -> dict:
+def validate_saved_triplets(
+    ds: xr.Dataset, triplets: pd.DataFrame, details: dict
+) -> dict:
     """Independently reconstruct CSV rows using direct hourly slices and sums."""
     months = details["season_months"]
     eligible_ids = set()
@@ -354,41 +355,47 @@ def validate_saved_pairs(ds: xr.Dataset, pairs: pd.DataFrame, details: dict) -> 
         valid_days.append((day, int(ids[0]), population, float(values[0, 0]), rates))
 
     rows = []
-    for left, right in pairwise(valid_days):
+    for i in range(1, len(valid_days) - 1):
+        left, center, right = valid_days[i - 1 : i + 2]
         day0, eid, population, a0, q0 = left
-        day1, eid1, population1, a1, q1 = right
+        day1, eid1, population1, a1, q1 = center
+        day2, eid2, population2, a2, q2 = right
         if (
             day1 - day0 != np.timedelta64(1, "D")
-            or eid != eid1
-            or population != population1
-            or pd.Timestamp(day0).year != pd.Timestamp(day1).year
+            or day2 - day1 != np.timedelta64(1, "D")
+            or not eid == eid1 == eid2
+            or not population == population1 == population2
+            or len({pd.Timestamp(day).year for day in (day0, day1, day2)}) != 1
         ):
             continue
         row = {
             "day_start": pd.Timestamp(day0),
-            "day_end": pd.Timestamp(day1),
+            "day_center": pd.Timestamp(day1),
+            "day_end": pd.Timestamp(day2),
             "event_id": eid,
             "population": population,
-            "elapsed_days": 1.0,
+            "step_days": 1.0,
             "lwa_a_start": a0,
-            "lwa_a_end": a1,
-            "delta_lwa_a": a1 - a0,
-            "d_lwa_a_dt": a1 - a0,
+            "lwa_a_center": a1,
+            "lwa_a_end": a2,
+            X_COLUMN: math.fsum([a0, -2 * a1, a2]),
         }
         for k, term in enumerate(TERMS):
             row[f"{term}_daily_start"] = q0[k]
-            row[f"{term}_daily_end"] = q1[k]
-            row[f"{term}_pair_mean"] = (q0[k] + q1[k]) / 2
+            row[f"{term}_daily_center"] = q1[k]
+            row[f"{term}_daily_end"] = q2[k]
         rows.append(row)
     reference = pd.DataFrame(rows)
     if (
-        len(reference) != len(pairs)
-        or len(pairs) != details["n_pairs"]
-        or not len(pairs)
+        len(reference) != len(triplets)
+        or len(triplets) != details["n_triplets"]
+        or not len(triplets)
     ):
-        raise ValueError("Independent validation: daily pair coverage/count differs.")
-    for column in ("day_start", "day_end", "event_id", "population"):
-        actual = pairs[column]
+        raise ValueError(
+            "Independent validation: daily triplet coverage/count differs."
+        )
+    for column in ("day_start", "day_center", "day_end", "event_id", "population"):
+        actual = triplets[column]
         if column.startswith("day_"):
             actual = pd.to_datetime(actual)
         np.testing.assert_array_equal(
@@ -396,7 +403,7 @@ def validate_saved_pairs(ds: xr.Dataset, pairs: pd.DataFrame, details: dict) -> 
         )
     errors = {}
     for column in reference.select_dtypes(include="number").columns:
-        actual, expected = pairs[column].to_numpy(), reference[column].to_numpy()
+        actual, expected = triplets[column].to_numpy(), reference[column].to_numpy()
         np.testing.assert_allclose(
             actual,
             expected,
@@ -410,14 +417,14 @@ def validate_saved_pairs(ds: xr.Dataset, pairs: pd.DataFrame, details: dict) -> 
         expected_count = population_counts.get(population, 0)
         expected_days = sum(day[2] == population for day in valid_days)
         if (
-            details["populations"][population]["n_pairs"] != expected_count
+            details["populations"][population]["n_triplets"] != expected_count
             or details["populations"][population]["n_valid_days"] != expected_days
         ):
             raise ValueError(f"Independent validation: {population} counts differ.")
     return {
         "state": "passed",
-        "method": "Direct hourly slices and math.fsum, independent event selection",
-        "n_checked_pairs": len(reference),
+        "method": "Direct hourly slices, math.fsum daily means and signed [1, -2, 1] weighted sums, independent event selection",
+        "n_checked_triplets": len(reference),
         "population_counts": population_counts,
         "max_absolute_errors": errors,
         "rtol": 1e-12,
@@ -427,15 +434,15 @@ def validate_saved_pairs(ds: xr.Dataset, pairs: pd.DataFrame, details: dict) -> 
     }
 
 
-def correlations(pairs: pd.DataFrame, x_axis: str = "rate") -> dict:
+def correlations(triplets: pd.DataFrame) -> dict:
     """Correlate each population separately; empty/constant samples are undefined."""
     output = {}
     for population in POPULATIONS:
-        group = pairs.loc[pairs.population.eq(population)]
-        x = group[PAIR_COLUMNS[x_axis]].to_numpy()
+        group = triplets.loc[triplets.population.eq(population)]
+        x = group[X_COLUMN].to_numpy()
         output[population] = {}
         for term in TERMS:
-            y = group[f"{term}_pair_mean"].to_numpy()
+            y = group[f"{term}_daily_center"].to_numpy()
             if len(x) < 2 or np.ptp(x) == 0 or np.ptp(y) == 0:
                 pearson = spearman = None
             else:
@@ -444,19 +451,17 @@ def correlations(pairs: pd.DataFrame, x_axis: str = "rate") -> dict:
                     np.corrcoef(pd.Series(x).rank(), pd.Series(y).rank())[0, 1]
                 )
             output[population][term] = {
-                "n_pairs": len(x),
+                "n_triplets": len(x),
                 "pearson_r": pearson,
                 "spearman_rho": spearman,
             }
     return output
 
 
-def plot_pairs(
-    pairs: pd.DataFrame, details: dict, *, x_axis: str = "rate", context: str = ""
-):
+def plot_triplets(triplets: pd.DataFrame, details: dict, *, context: str = ""):
     """Render heatwaves and baseline separately with identical limits in all panels."""
-    if pairs.empty:
-        raise ValueError("No daily pairs to plot.")
+    if triplets.empty:
+        raise ValueError("No daily triplets to plot.")
     plot_style.apply_theme()
     fig, axes = plt.subplots(
         2,
@@ -465,21 +470,19 @@ def plot_pairs(
         sharey=True,
         figsize=plot_style.publication_figsize(width="full", aspect=0.82),
     )
-    x = pairs[PAIR_COLUMNS[x_axis]].to_numpy()
+    x = triplets[X_COLUMN].to_numpy()
     units_label = details["lwa_units"]
     if units_label in {"m2", "m^2", "m**2", "m²"}:
         units_label = r"m$^2$"
-    x_label = rf"$\Delta\mathrm{{LWA}}_a$ ({units_label})"
-    if x_axis == "rate":
-        x_label = rf"$\Delta\mathrm{{LWA}}_a/\Delta t$ ({units_label} day$^{{-1}}$)"
-    stats = correlations(pairs, x_axis)
-    y_all = pairs[[f"{term}_pair_mean" for term in TERMS]].to_numpy().ravel()
+    x_label = rf"$d^2\mathrm{{LWA}}_a/dt^2$ ({units_label} day$^{{-2}}$)"
+    stats = correlations(triplets)
+    y_all = triplets[[f"{term}_daily_center" for term in TERMS]].to_numpy().ravel()
     for row, (population, label) in enumerate(POPULATIONS.items()):
-        group = pairs.loc[pairs.population.eq(population)]
+        group = triplets.loc[triplets.population.eq(population)]
         for column, (ax, term) in enumerate(zip(axes[row], TERMS, strict=True)):
             ax.scatter(
-                group[PAIR_COLUMNS[x_axis]],
-                group[f"{term}_pair_mean"],
+                group[X_COLUMN],
+                group[f"{term}_daily_center"],
                 color=plot_style.VARIABLE_COLORS[term],
                 s=plot_style.SCATTER_SIZE_PT2,
                 alpha=plot_style.SCATTER_ALPHA,
@@ -508,7 +511,7 @@ def plot_pairs(
                 "r, rho: undefined" if r is None else f"r = {r:.2f}\nrho = {rho:.2f}"
             )
             if group.empty:
-                annotation = "No eligible daily pairs"
+                annotation = "No eligible daily triplets"
             ax.text(
                 0.04,
                 0.96,
@@ -519,7 +522,7 @@ def plot_pairs(
                 bbox={"facecolor": "white", "alpha": 0.8, "edgecolor": "none"},
             )
         axes[row, 0].set_ylabel(
-            f"{label} ({len(group):,} pairs)\n" + r"Mean tendency (K hr$^{-1}$)"
+            f"{label} ({len(group):,} triplets)\n" + r"Mean tendency (K hr$^{-1}$)"
         )
     months = details["season_months"]
     population = (
@@ -533,15 +536,15 @@ def plot_pairs(
         )
     prefix = f"{context}\n" if context else ""
     fig.suptitle(
-        f"{prefix}Anticyclonic LWA changes and heat-budget tendencies\n"
+        f"{prefix}Anticyclonic LWA second derivative and heat-budget tendencies\n"
         f"{details['n_represented_events']:,} heatwaves | {population}; baseline dates in season",
         y=0.98,
     )
     fig.text(
         0.5,
         0.035,
-        "Heating: midpoint average of two complete daily means; positive values warm.\n"
-        "Daily pairs share days; correlations are descriptive, without significance tests.",
+        "Centered three-day LWA difference; heating is the center day's mean (positive warms).\n"
+        "Daily triplets share days; correlations are descriptive, without significance tests.",
         ha="center",
         fontsize=plot_style.LEGEND_FONT_SIZE_PT,
     )
@@ -575,7 +578,7 @@ def main() -> int:
             f"Output directory already exists; choose a fresh path: {output_dir}"
         )
     with analysis_io.open_harmonized_timeseries(input_path) as ds:
-        pairs, details = prepare_pairs(
+        triplets, details = prepare_triplets(
             ds,
             **season_selection.season_kwargs(args),
             lwa_units=args.lwa_units,
@@ -593,7 +596,7 @@ def main() -> int:
             for value in (bottom, top)
         ]
         context += f" | {' to '.join(bounds)}"
-    context += f" | {pairs.day_start.dt.year.min()}-{pairs.day_end.dt.year.max()}"
+    context += f" | {triplets.day_start.dt.year.min()}-{triplets.day_end.dt.year.max()}"
     if "quantile" in source_attrs:
         context += f" | TAS q{source_attrs['quantile']}"
     summary = {
@@ -612,35 +615,35 @@ def main() -> int:
         "interpreter": sys.executable,
         "host": socket.gethostname(),
         "pbs_job_id": os.environ.get("PBS_JOBID"),
-        "x_axis": args.x_axis,
-        "x_column": PAIR_COLUMNS[args.x_axis],
+        "derivative_order": 2,
+        "x_column": X_COLUMN,
         "column_units": {
-            "elapsed_days": "day",
+            "step_days": "day",
             "lwa_a_start": details["lwa_units"],
+            "lwa_a_center": details["lwa_units"],
             "lwa_a_end": details["lwa_units"],
-            "delta_lwa_a": details["lwa_units"],
-            "d_lwa_a_dt": f"{details['lwa_units']} day-1",
+            X_COLUMN: f"{details['lwa_units']} day-2",
             **{
                 f"{term}_{suffix}": "K hr-1"
                 for term in TERMS
-                for suffix in ("daily_start", "daily_end", "pair_mean")
+                for suffix in ("daily_start", "daily_center", "daily_end")
             },
         },
         "analysis": details,
-        "correlations": correlations(pairs, args.x_axis),
+        "correlations": correlations(triplets),
     }
     # Reserve a new namespace atomically. Failed attempts remain visible for diagnosis.
     output_dir.mkdir(parents=True, exist_ok=False)
     figure_path = output_dir / "hw_lwa_analysis.png"
-    csv_path = output_dir / "daily_pairs.csv"
-    fig = plot_pairs(pairs, details, x_axis=args.x_axis, context=context)
+    csv_path = output_dir / "daily_triplets.csv"
+    fig = plot_triplets(triplets, details, context=context)
     try:
         plot_style.save_figure(fig, figure_path)
     finally:
         plt.close(fig)
-    pairs.to_csv(csv_path, index=False, mode="x", float_format="%.17g")
+    triplets.to_csv(csv_path, index=False, mode="x", float_format="%.17g")
     with analysis_io.open_harmonized_timeseries(input_path) as ds:
-        summary["numerical_validation"] = validate_saved_pairs(
+        summary["numerical_validation"] = validate_saved_triplets(
             ds, pd.read_csv(csv_path, float_precision="round_trip"), details
         )
     summary["outputs"] = {
@@ -652,8 +655,8 @@ def main() -> int:
         json.dump(summary, stream, indent=2, default=str, allow_nan=False)
         stream.write("\n")
     print(
-        f"Wrote {details['populations']['heatwave']['n_pairs']} heatwave pairs and "
-        f"{details['populations']['baseline']['n_pairs']} baseline pairs to {output_dir}"
+        f"Wrote {details['populations']['heatwave']['n_triplets']} heatwave triplets and "
+        f"{details['populations']['baseline']['n_triplets']} baseline triplets to {output_dir}"
     )
     return 0
 

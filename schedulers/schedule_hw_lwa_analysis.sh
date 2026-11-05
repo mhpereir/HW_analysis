@@ -52,7 +52,7 @@ if [[ "${RUN_MODE}" == smoke ]]; then
     /usr/bin/time -v "${python_executable}" -m pytest -q -W error \
         tests/test_plot_hw_lwa_analysis.py tests/test_artifact_paths.py
 else
-    args=(--input-path "${INPUT_PATH}" --output-dir "${OUTPUT_DIR}" --x-axis "${X_AXIS:-rate}")
+    args=(--input-path "${INPUT_PATH}" --output-dir "${OUTPUT_DIR}")
     if [[ -n "${LWA_UNITS:-}" ]]; then
         args+=(--lwa-units "${LWA_UNITS}" --lwa-units-evidence "${LWA_UNITS_EVIDENCE:?LWA_UNITS_EVIDENCE is required with LWA_UNITS}")
     fi
@@ -61,5 +61,5 @@ else
         read -r -a season_args <<< "${HWA_SEASON_OPTIONS}"
     fi
     /usr/bin/time -v "${python_executable}" scripts/plot_hw_lwa_analysis.py "${args[@]}" "${season_args[@]}"
-    sha256sum "${OUTPUT_DIR}/hw_lwa_analysis.png" "${OUTPUT_DIR}/daily_pairs.csv" "${OUTPUT_DIR}/summary.json"
+    sha256sum "${OUTPUT_DIR}/hw_lwa_analysis.png" "${OUTPUT_DIR}/daily_triplets.csv" "${OUTPUT_DIR}/summary.json"
 fi
