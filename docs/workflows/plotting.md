@@ -371,10 +371,10 @@ companion, or any assembled composite or top-event dataset. Synthetic plotting
 tests must verify the `Δ` labels, the reversed absolute and anomaly traces and
 bounds, top-event and reference signs, and source-data immutability.
 
-## Exploratory daily LWA second derivative and heat-budget relationships
+## Exploratory daily square-root LWA and heat-budget relationships
 
 `scripts/plot_hw_lwa_analysis.py` is an intentionally self-contained exploration:
-all new reduction, stencil, plotting, and CLI code lives in this single file.
+all new reduction, pairing, plotting, and CLI code lives in this single file.
 It reuses the Stage-1 reader, seasonal event selector, and shared figure style.
 It does not change any product schema, rebuild events, or join the production
 pipeline. Existing products and figure entrypoints remain compatible.
@@ -385,10 +385,10 @@ events by default and the standard seasonal CLI overrides. An LWA-selected
 event table is rejected, since its event IDs describe a different population.
 Stage-2 window summaries cannot recover the required daily sequence.
 
-Include a separate non-heatwave baseline population. All three dates in a
-baseline triplet must fall in the requested season (JJA by default), and every
-hourly `hw_event_id` on those dates must be zero. Use the original saved IDs,
-not the complement of the seasonally selected event table: excluded heatwaves are
+Include a separate non-heatwave baseline population. Both dates in a baseline
+pair must fall in the requested season (JJA by default), and every hourly
+`hw_event_id` on both dates must be zero. Use the original saved IDs, not the
+complement of the seasonally selected event table: excluded heatwaves are
 never reclassified as baseline. This population includes all non-heatwave
 days satisfying these conditions, without an additional event-adjacency
 buffer or a requirement that TAS fall below its threshold. It is not the
@@ -402,47 +402,44 @@ samples on each native UTC calendar date. Keep the stored positive-warming
 signs and `K hr-1` rate units; averaging a rate does not integrate it.
 
 Keep only complete days belonging entirely to a selected heatwave or to the
-baseline. Form centred three-day stencils only when both date increments are
-exactly one day, all three calendar years match, and all three saved heatwave
-IDs match (zero for baseline triplets). Establish these conditions before
-taking differences. Missing hours/days, summer-to-summer gaps, year boundaries,
-separate events and heatwave/baseline transitions must never be bridged. Within each population,
+baseline. Pair days only when their dates differ by exactly one day, their
+calendar years match, and their saved heatwave IDs match (zero for baseline
+pairs). Establish these conditions before taking differences. Missing
+hours/days, summer-to-summer gaps, year boundaries, separate events and
+heatwave/baseline transitions must never be bridged. Within each population,
 use one common finite sample for all three tendencies, without filling gaps
 or interpolating.
 
-For daily LWA values $A_d$ and daily-mean tendencies $\overline{Q}_{j,d}$,
-plot the centred daily second derivative against the centre day's heating:
+For nonnegative daily regional LWA values $A_d$, define $B_d=\sqrt{A_d}$.
+With daily-mean tendencies $\overline{Q}_{j,d}$, the paired quantities are
 
 $$
-\ddot A_d \approx \frac{A_{d+1}-2A_d+A_{d-1}}{(1\ \mathrm{day})^2},
-\qquad y_{j,d}=\overline{Q}_{j,d}.
+\Delta B_d = \sqrt{A_{d+1}}-\sqrt{A_d}, \qquad
+\dot B_d = \frac{\Delta B_d}{1\ \mathrm{day}}, \qquad
+Q_{j,d+1/2}=\frac{\overline{Q}_{j,d}+\overline{Q}_{j,d+1}}{2}.
 $$
 
-The heating variables, positive-warming signs and `K hr-1` units are unchanged.
-Their daily means now align with the central derivative date, replacing the
-old midpoint average of two days. No differentiation or smoothing of heating
-is applied. LWA units come from the input and the second derivative has those
-units per day squared. The third column labels `diabatic` as the budget closure
-residual. This finite difference measures daily curvature, not an instantaneous
-derivative, and can amplify day-to-day noise. Events shorter than three complete
-days contribute no samples; first and last days are not assigned one-sided
-estimates. Longer events contribute more samples.
-
-This intentionally replaces the exploratory first-order calculation. Remove
-the old `--x-axis`/`X_AXIS` rate/change switch; new CSVs are `daily_triplets.csv`
-with `day_start`, `day_center`, `day_end`, all three LWA values, `step_days`,
-`d2_lwa_a_dt2`, and each term's daily means on all three dates. The plotted
-heating column is `<term>_daily_center`. Summaries identify derivative order 2
-and count triplets rather than pairs. Existing Stage-1/2 contracts and other
-plotting consumers are unaffected. Preserve previous first-order figures,
-tables, summaries and pinned code; use fresh output namespaces for this version.
+This is a finite difference of square-root daily LWA paired with the midpoint average
+of two daily means, not an instantaneous derivative or a new hourly estimate.
+The default horizontal axis is the rate per day; `--x-axis change` displays
+the unnormalised difference of square roots. Their numeric values coincide
+for the required one-day spacing, but their labels and units differ. The
+transform is applied to each daily LWA value before differencing, never to
+the signed LWA increment. Do not approximate it using a chain-rule division
+by $2\sqrt{A}$, which is singular at zero. Zero LWA is valid; reject finite
+negative LWA values explicitly without clipping, taking absolute values,
+adding offsets or silently dropping those values. Missing/nonfinite days
+retain the existing exclusion policy. LWA units come from the input; square
+rooting changes m2 to m and the derivative to m day-1. Other declared units
+are displayed as sqrt(original units), without assuming they are square metres.
+The third column explicitly labels `diabatic` as the budget closure residual.
 
 Historical Stage-1 files may lack LWA units. In that case require explicit
 `--lwa-units` and `--lwa-units-evidence` options, after inspecting the upstream
 calculation; record both without modifying the source dataset. Refuse an
 override that contradicts declared units. The inspected ERA5 height-based
 calculation integrates height departures (m) over meridional distance (m),
-giving square metres, not pressure-weighted units. This is a source-based
+giving square metres before the square-root transform. This is a source-based
 interpretation when the upstream NetCDF also omits units.
 
 Write a two-row, three-column scatter figure: heatwaves in the top row,
@@ -450,12 +447,15 @@ non-heatwave baseline in the bottom row, and one heating term per column. Use
 matching limits across both populations and keep their points and correlation
 statistics separate. An empty population retains its row with an explicit
 empty-sample annotation and null correlations; fail only if neither population
-has eligible triplets. Save a CSV with a `population` column (`heatwave` or
-`baseline`), all three source dates, daily values, daily tendencies, event IDs and
-plotted second derivatives. The JSON records input/output hashes, script/checkout
+has eligible pairs. Save a CSV with a `population` column (`heatwave` or
+`baseline`), both source dates, daily values, daily tendencies, event IDs and
+plotted pairs. Keep raw `lwa_a_start`/`lwa_a_end`, store
+`sqrt_lwa_a_start`/`sqrt_lwa_a_end`, and use `delta_sqrt_lwa_a` and
+`d_sqrt_lwa_a_dt` for the horizontal quantities. The JSON records transform
+`sqrt`, derivative order 1, raw/transformed units, input/output hashes, script/checkout
 provenance, settings, counts and descriptive Pearson/Spearman correlations
-separately by population. Daily triplets receive equal weight; long events
-contribute more samples. Adjacent triplets share days, and correlations are not
+separately by population. Daily pairs receive equal weight; long events
+contribute more pairs. Adjacent pairs share days, and correlations are not
 significance tests or evidence of causation. No p-values are reported.
 Use an explicitly supplied fresh `--output-dir`, outside the source checkout
 for production, and never overwrite an existing directory.
@@ -466,20 +466,27 @@ artifact-path tests; validate this job before submitting `RUN_MODE=plot`.
 The plotting job requires `INPUT_PATH`, `EXPECTED_INPUT_SHA256`, and a fresh
 `OUTPUT_DIR`, alongside the standard source commit and storage-root pins.
 Optional `LWA_UNITS` and `LWA_UNITS_EVIDENCE` are passed explicitly for missing
-historical metadata. `HWA_SEASON_OPTIONS` controls the documented seasonal
-selection. Both modes preserve exclusive application logs.
+historical metadata. `HWA_SEASON_OPTIONS` and `X_AXIS` control the documented
+selection and axis switches. Both modes preserve exclusive application logs.
 
 Before recording successful numerical validation, reopen the saved CSV and
 independently reconstruct its expected rows from direct hourly NumPy slices
 and the original event table. Check exact timestamps, year/season/event and
-baseline membership for all three dates, complete hourly coverage, source LWA
-second differences, signs, daily means, central-day alignment and per-population
-counts. This check uses direct hourly slices and signed weighted sums, not the
-production groupby/stencil function. Store its errors and counts in the summary.
-Visual acceptance remains a separate check.
+baseline membership, complete hourly coverage, source square roots and their differences, signs,
+daily means, midpoint rates and per-population counts. This check uses direct
+hourly slices and sums, not the production groupby/pairing function. Store its
+errors and counts in the summary. Visual acceptance remains a separate check.
 
-Local validation uses synthetic constant/linear/quadratic/cubic daily signals,
-large LWA offsets, both curvature signs, central-day heating alignment, within-day
+Restore the original two-day first-order workflow, midpoint heating, pair
+counts, `daily_pairs.csv`, and `--x-axis`/`X_AXIS` rate/change options. This
+replaces the second-order experiment without rewriting its published history
+or overwriting prior outputs. Stage-1/2 products, event selection and other
+plotting consumers are unaffected. Prior raw-LWA pair tables retain their
+original column meanings; new tables and summaries explicitly name the square
+root and use a fresh output namespace.
+
+Local validation uses constant square-root signals, known signed root
+increments, zeros, negative inputs, transformed units, within-day
 variation, missing hours/days, summer gaps, adjacent years, separate events,
 heatwave/baseline transitions, excluded-event contamination, season membership,
 single-population inputs, signs/units, source immutability, and figure/CSV/JSON
