@@ -10,6 +10,7 @@ import xarray as xr
 from HW_analysis.scripts import plot_temperature_variability as plotter
 from HW_analysis.scripts import validate_temperature_variability as validator
 from HW_analysis.src import analysis_io, plot_style
+from matplotlib.colors import LogNorm
 from PIL import Image
 
 
@@ -246,16 +247,30 @@ def test_yearly_stats_and_scatter_use_all_pairs():
         plt.close(fig)
 
 
-def test_paper_scatter_uses_daily_population_and_shared_single_column_style():
+@pytest.mark.parametrize("kind", ["scatter", "hexbin"])
+def test_paper_scatter_uses_daily_population_and_shared_single_column_style(
+    kind, tmp_path
+):
     stage1, hourly = make_inputs((2000, 2001))
     pairs, _, _ = plotter.prepare_pairs(stage1, hourly)
     fig = plotter.plot_comparison(
-        pairs, plotter.statistics_table(pairs), "Not a paper title", layout="paper"
+        pairs,
+        plotter.statistics_table(pairs),
+        "Not a paper title",
+        layout="paper",
+        kind=kind,
     )
     try:
-        assert len(fig.axes) == 1
+        assert len(fig.axes) == (2 if kind == "hexbin" else 1)
         ax = fig.axes[0]
-        np.testing.assert_allclose(ax.collections[0].get_offsets(), pairs["daily"])
+        if kind == "hexbin":
+            counts = ax.collections[0]
+            np.testing.assert_array_equal(counts.get_array(), [2, 2, 2, 2])
+            assert isinstance(counts.norm, LogNorm)
+            assert counts.norm.vmin == 1
+            assert fig.axes[1].get_ylabel() == "Days per hexagon (log)"
+        else:
+            np.testing.assert_allclose(ax.collections[0].get_offsets(), pairs["daily"])
         assert len(ax.lines) == 1
         np.testing.assert_allclose(
             ax.lines[0].get_ydata(), 2 * ax.lines[0].get_xdata() - 300
@@ -270,10 +285,14 @@ def test_paper_scatter_uses_daily_population_and_shared_single_column_style():
         np.testing.assert_allclose(fig.get_size_inches(), (6, 3.6))
         assert ax.xaxis.label.get_fontsize() == plot_style.PAPER_FONT_SIZE_PT
         assert ax.texts[0].get_fontsize() == plot_style.LEGEND_FONT_SIZE_PT
-        plot_style.format_numeric_axes(fig)
+        plot_style.save_figure(fig, tmp_path / f"{kind}.png", crop=False)
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
         for axis in (ax.xaxis, ax.yaxis):
+            np.testing.assert_array_equal(
+                axis.get_ticklocs(), np.round(axis.get_ticklocs())
+            )
+            assert all("." not in label.get_text() for label in axis.get_ticklabels())
             assert all(
                 label.get_fontsize() == plot_style.PAPER_FONT_SIZE_PT
                 for label in axis.get_ticklabels()
@@ -281,6 +300,28 @@ def test_paper_scatter_uses_daily_population_and_shared_single_column_style():
             bounds = axis.label.get_window_extent(renderer)
             assert fig.bbox.contains(bounds.x0, bounds.y0)
             assert fig.bbox.contains(bounds.x1, bounds.y1)
+        if kind == "hexbin":
+            bounds = fig.axes[1].yaxis.label.get_window_extent(renderer)
+            assert fig.bbox.contains(bounds.x0, bounds.y0)
+            assert fig.bbox.contains(bounds.x1, bounds.y1)
+    finally:
+        plt.close(fig)
+
+
+def test_hexbin_keeps_both_timescale_populations_and_yearly_ratios():
+    stage1, hourly = make_inputs((2000, 2001))
+    pairs, _, _ = plotter.prepare_pairs(stage1, hourly)
+    fig = plotter.plot_comparison(
+        pairs, plotter.statistics_table(pairs), "Synthetic", kind="hexbin", gridsize=12
+    )
+    try:
+        for index, scale in enumerate(("hourly", "daily")):
+            counts = fig.axes[index].collections[0].get_array()
+            assert counts.sum() == len(pairs[scale])
+            assert np.all(counts >= 1)
+        np.testing.assert_allclose(fig.axes[3].lines[0].get_ydata(), [2, 2])
+        assert fig.axes[4].get_ylabel() == "Hours per hexagon (log)"
+        assert fig.axes[5].get_ylabel() == "Days per hexagon (log)"
     finally:
         plt.close(fig)
 
@@ -317,8 +358,9 @@ def test_independent_validation_detects_saved_product_corruption(corruption):
 
 @pytest.mark.parametrize("daily_only", [False, True])
 @pytest.mark.parametrize("layout", ["diagnostic", "paper"])
+@pytest.mark.parametrize("kind", ["scatter", "hexbin"])
 def test_cli_exports_reproducible_outputs_and_refuses_overwrite(
-    tmp_path, daily_only, layout
+    tmp_path, daily_only, layout, kind
 ):
     stage1, hourly = make_inputs((2000, 2001))
     stage1.attrs["pipeline_stage"] = analysis_io.EXPECTED_PIPELINE_STAGE
@@ -332,6 +374,7 @@ def test_cli_exports_reproducible_outputs_and_refuses_overwrite(
     args = ["--input-path", str(stage1_path), "--output-dir", str(output_dir)]
     args += ["--daily-only"] if daily_only else ["--hourly-t2m-path", str(hourly_path)]
     args += ["--figure-layout", layout]
+    args += ["--plot-kind", kind, "--hexbin-gridsize", "12"]
     assert plotter.main(args) == output_dir
     report = json.loads((output_dir / "statistics.json").read_text())
     assert report["coverage"]["retained_days"] == 8
@@ -339,12 +382,21 @@ def test_cli_exports_reproducible_outputs_and_refuses_overwrite(
     assert report["inputs"]["stage1"]["sha256"] == before[0]
     assert report["execution"]["script_sha256"]
     basename = (
-        "temperature_daily_scatter" if layout == "paper" else "temperature_variability"
+        f"temperature_daily_{kind}" if layout == "paper" else "temperature_variability"
     )
+    if layout == "diagnostic" and kind == "hexbin":
+        basename += "_hexbin"
     assert (output_dir / f"{basename}.png").read_bytes().startswith(b"\x89PNG")
     assert (output_dir / f"{basename}.pdf").read_bytes().startswith(b"%PDF")
     assert len(list(output_dir.glob("*.png"))) == 1
     assert report["figure"]["layout"] == layout
+    assert report["figure"]["plot_kind"] == kind
+    assert report["figure"]["temperature_tick_decimals"] == (
+        0 if layout == "paper" else 2
+    )
+    if kind == "hexbin":
+        assert report["figure"]["hexbin"]["gridsize"] == 12
+        assert report["figure"]["hexbin"]["normalization"] == "logarithmic"
     assert report["figure"]["crop"] is (layout != "paper")
     assert report["figure"]["style_sha256"]
     if layout == "paper":
@@ -381,6 +433,9 @@ def test_cli_requires_explicit_mode_and_season_options():
         plotter.parse_args(base)
     assert plotter.parse_args([*base, "--daily-only"]).season_months == [6, 7, 8]
     assert plotter.parse_args([*base, "--daily-only"]).figure_layout == "diagnostic"
+    assert plotter.parse_args([*base, "--daily-only"]).plot_kind == "scatter"
+    with pytest.raises(SystemExit):
+        plotter.parse_args([*base, "--daily-only", "--hexbin-gridsize", "1"])
     assert (
         plotter.parse_args(
             [*base, "--hourly-t2m-path", "hourly.nc"]

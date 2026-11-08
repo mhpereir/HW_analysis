@@ -36,6 +36,9 @@ layouts for clipping and overlap when changing these settings.
 `save_figure()` normally crops unused margins. Use `crop=False` with a layout
 that fits all artists inside the canvas when an exact publication aspect is
 required; PNG and PDF then preserve the requested canvas dimensions.
+`format_integer_axis()` preserves whole-number labels through export; combine
+it with `limit_major_ticks(integer=True)` for adaptive integer tick spacing.
+Other numeric axes retain the two-decimal default.
 
 `src/plotting.py` is the shared renderer for Stage-1 temporal composites and
 top-event figures. Its callers therefore use the shared style indirectly even
@@ -123,6 +126,8 @@ Pearson r and the atmospheric/surface SD ratio. It uses the shared single-column
 6-by-3.6-inch canvas, preserves that aspect in PNG/PDF, and leaves region,
 period and population descriptions to the manuscript caption and saved
 metadata. There is no hourly panel, yearly ratio panel or figure title.
+Paper temperature axes display whole kelvin tick labels. This changes only
+tick formatting, not the temperature values or statistical precision.
 This is a rendering option: it uses exactly the same daily pairs and retains
 all numerical tables, including hourly statistics when an hourly input is
 supplied. It also works with explicit `--daily-only` input mode. No existing
@@ -141,6 +146,19 @@ null, not zero. No independent-sample p-values or causal interpretations are
 reported. These are raw-temperature statistics; shared seasonal cycles and
 trends remain, so they do not establish an anomaly relationship.
 
+Use `--plot-kind hexbin` to replace the point layer with hexagonal sample
+counts. The default remains `scatter`, and both figure layouts support either
+kind. `--hexbin-gridsize` sets the number of hexagons across the x range
+(default 35, minimum 2). Every retained pair contributes once, empty cells are
+hidden (`mincnt=1`), and a shared sequential colormap with logarithmic count
+normalization exposes both sparse and crowded cells. The colorbar identifies
+days per hexagon for daily data and hours per hexagon for hourly data, using
+the shared legend font size for its label and ticks. Fit lines
+and annotations always use the original pairs, without bin weighting or
+smoothing. Validate count conservation, known repeated-point bin counts,
+unchanged numerical exports, integer paper ticks after export, and readability
+of the colorbar within the fixed single-column canvas.
+
 For example, inside an authorized Venus PBS allocation:
 
 ```bash
@@ -157,6 +175,9 @@ provenance, numerical results and output hashes. Figure filenames are
 `temperature_variability` for the diagnostic layout and
 `temperature_daily_scatter` for the paper layout. JSON also records the layout,
 canvas dimensions, shared font sizes, crop policy and style-source hash.
+Hexbin filenames are `temperature_variability_hexbin` and
+`temperature_daily_hexbin`, respectively. JSON records the plot kind, tick
+precision and binning settings, including count meaning and normalization.
 Daily-only diagnostic output explicitly marks the hourly panels unavailable.
 Local validation checks that the paper panel contains every selected daily
 pair and its fitted line, preserves the standard canvas and fonts, and exports
@@ -173,7 +194,9 @@ cache. Supply `INPUT_PATH`, `HOURLY_T2M_PATH`, `CACHE_MANIFEST_PATH`, a fresh
 `OUTPUT_DIR`, and the usual commit and storage settings. `START_YEAR` and
 `END_YEAR` default to 1940 and 2024; `SEASON_MONTHS` defaults to `6 7 8`.
 Set `FIGURE_LAYOUT=paper` for the single-panel paper figure; the default is
-`diagnostic`. For the PNW Bartusek paper render, reuse the accepted Stage-1 and
+`diagnostic`. `PLOT_KIND` defaults to `scatter`; set it to `hexbin` for the
+count view, with optional `HEXBIN_GRIDSIZE` (default 35). For the PNW Bartusek
+paper renders, reuse the accepted Stage-1 and
 hourly-cache inputs and the 1940-2024 JJA selection in a fresh output directory.
 This job does not rebuild or modify the cache. It writes the diagnostic and
 `independent_validation.json`. The validator checks the entire cache's hourly

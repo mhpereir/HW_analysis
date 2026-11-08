@@ -23,6 +23,7 @@ import xarray as xr
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 from matplotlib.ticker import MaxNLocator
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -67,12 +68,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="diagnostic",
         help="Paper renders only the daily scatter; statistical exports are unchanged.",
     )
+    parser.add_argument(
+        "--plot-kind",
+        choices=("scatter", "hexbin"),
+        default="scatter",
+        help="Show individual pairs or hexagonal sample counts.",
+    )
+    parser.add_argument(
+        "--hexbin-gridsize",
+        type=int,
+        default=plot_style.HEXBIN_GRIDSIZE,
+        help="Number of hexagons across the x range (default: 35, minimum: 2).",
+    )
     season = parser.add_mutually_exclusive_group()
     season.add_argument("--season-months", type=int, nargs="+", choices=range(1, 13))
     season.add_argument("--all-seasons", action="store_true")
     parser.add_argument("--start-year", type=int)
     parser.add_argument("--end-year", type=int)
     args = parser.parse_args(argv)
+    if args.hexbin_gridsize < 2:
+        parser.error("--hexbin-gridsize must be at least 2.")
     if args.start_year and args.end_year and args.start_year > args.end_year:
         parser.error("--start-year must not exceed --end-year.")
     args.season_months = (
@@ -311,15 +326,43 @@ def format_stat(value: float | None) -> str:
     return "undefined" if value is None else f"{value:.3f}"
 
 
-def draw_scatter(ax, data: pd.DataFrame, summary: dict, *, compact: bool = False):
+def draw_scatter(
+    ax,
+    data: pd.DataFrame,
+    summary: dict,
+    *,
+    compact: bool = False,
+    kind: str = "scatter",
+    gridsize: int = plot_style.HEXBIN_GRIDSIZE,
+):
     """Render every retained pair and the fit computed from that same sample."""
-    ax.scatter(
-        data.tas_region,
-        data.T_mean,
-        s=plot_style.SCATTER_SIZE_PT2,
-        alpha=plot_style.SCATTER_ALPHA,
-        rasterized=True,
-    )
+    if kind == "hexbin":
+        counts = ax.hexbin(
+            data.tas_region,
+            data.T_mean,
+            gridsize=gridsize,
+            mincnt=1,
+            cmap=plot_style.COUNT_COLOR_MAP,
+            linewidths=0,
+            rasterized=True,
+        )
+        if counts.get_array().sum() != len(data):
+            raise ValueError("Hexbin counts must include every retained pair.")
+        counts.set_norm(LogNorm(vmin=1, vmax=max(2, counts.get_array().max())))
+        colorbar = ax.figure.colorbar(counts, ax=ax, pad=0.02)
+        unit = "Hours" if summary["timescale"] == "hourly" else "Days"
+        colorbar.set_label(
+            f"{unit} per hexagon (log)", fontsize=plot_style.LEGEND_FONT_SIZE_PT
+        )
+        colorbar.ax.tick_params(labelsize=plot_style.LEGEND_FONT_SIZE_PT)
+    else:
+        ax.scatter(
+            data.tas_region,
+            data.T_mean,
+            s=plot_style.SCATTER_SIZE_PT2,
+            alpha=plot_style.SCATTER_ALPHA,
+            rasterized=True,
+        )
     if summary["slope_K_per_K"] is not None:
         xx = np.array([data.tas_region.min(), data.tas_region.max()])
         ax.plot(
@@ -346,16 +389,29 @@ def draw_scatter(ax, data: pd.DataFrame, summary: dict, *, compact: bool = False
         bbox={"facecolor": "white", "alpha": 0.85, "edgecolor": "none"},
     )
     ax.set(xlabel=f"{T2M_LABEL} [K]", ylabel=f"{TMEAN_LABEL} [K]")
-    plot_style.limit_major_ticks(ax.xaxis, max_intervals=4)
-    plot_style.limit_major_ticks(ax.yaxis, max_intervals=5)
+    if compact:
+        plot_style.format_integer_axis(ax.xaxis)
+        plot_style.format_integer_axis(ax.yaxis)
+    plot_style.limit_major_ticks(ax.xaxis, max_intervals=4, integer=compact)
+    plot_style.limit_major_ticks(ax.yaxis, max_intervals=5, integer=compact)
     plot_style.style_axis(ax)
 
 
 def plot_comparison(
-    pairs: dict[str, pd.DataFrame], rows: list[dict], title: str, *, layout="diagnostic"
+    pairs: dict[str, pd.DataFrame],
+    rows: list[dict],
+    title: str,
+    *,
+    layout="diagnostic",
+    kind="scatter",
+    gridsize=plot_style.HEXBIN_GRIDSIZE,
 ):
     if layout not in {"diagnostic", "paper"}:
         raise ValueError(f"Unknown figure layout: {layout!r}")
+    if kind not in {"scatter", "hexbin"}:
+        raise ValueError(f"Unknown plot kind: {kind!r}")
+    if isinstance(gridsize, bool) or not isinstance(gridsize, int) or gridsize < 2:
+        raise ValueError("Hexbin gridsize must be an integer of at least 2.")
     plot_style.apply_theme()
     if layout == "paper":
         fig, ax = plt.subplots(
@@ -366,7 +422,9 @@ def plot_comparison(
             for row in rows
             if row["timescale"] == "daily" and row["period"] == "all"
         )
-        draw_scatter(ax, pairs["daily"], summary, compact=True)
+        draw_scatter(
+            ax, pairs["daily"], summary, compact=True, kind=kind, gridsize=gridsize
+        )
         return fig
     fig, axes = plt.subplots(
         2,
@@ -392,7 +450,7 @@ def plot_comparison(
         summary = next(
             row for row in rows if row["timescale"] == scale and row["period"] == "all"
         )
-        draw_scatter(ax, data, summary)
+        draw_scatter(ax, data, summary, kind=kind, gridsize=gridsize)
         ax.set_title(
             "Hourly native temperatures"
             if scale == "hourly"
@@ -566,11 +624,33 @@ def main(argv: list[str] | None = None) -> Path:
         f"{region}: {bottom} to {top} | {season}, {daily.index.year.min()}-{daily.index.year.max()}\n"
         f"Raw temperatures | {len(daily):,} complete UTC days | SD ratio > 1: greater atmospheric variability"
     )
-    fig = plot_comparison(pairs, rows, title, layout=args.figure_layout)
+    fig = plot_comparison(
+        pairs,
+        rows,
+        title,
+        layout=args.figure_layout,
+        kind=args.plot_kind,
+        gridsize=args.hexbin_gridsize,
+    )
     paper = args.figure_layout == "paper"
-    basename = "temperature_daily_scatter" if paper else "temperature_variability"
+    basename = (
+        f"temperature_daily_{args.plot_kind}" if paper else "temperature_variability"
+    )
+    if not paper and args.plot_kind == "hexbin":
+        basename += "_hexbin"
     metadata["figure"] = {
         "layout": args.figure_layout,
+        "plot_kind": args.plot_kind,
+        "temperature_tick_decimals": 0 if paper else plot_style.AXIS_TICK_DECIMALS,
+        "hexbin": {
+            "gridsize": args.hexbin_gridsize,
+            "min_count": 1,
+            "normalization": "logarithmic",
+            "quantity": "retained pairs per hexagon (days for daily, hours for hourly)",
+            "colormap": plot_style.COUNT_COLOR_MAP,
+        }
+        if args.plot_kind == "hexbin"
+        else None,
         "basename": basename,
         "size_inches": fig.get_size_inches().tolist(),
         "font_size_pt": plot_style.PAPER_FONT_SIZE_PT,

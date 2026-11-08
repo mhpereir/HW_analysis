@@ -32,6 +32,8 @@ LINE_WIDTH_PT = 1.25
 REFERENCE_LINE_WIDTH_PT = 0.9
 SCATTER_SIZE_PT2 = 16
 SCATTER_ALPHA = 0.35
+HEXBIN_GRIDSIZE = 35
+COUNT_COLOR_MAP = "viridis"
 DPI = 300
 AXIS_TICK_DECIMALS = 2
 AXIS_SCALE_LOW_THRESHOLD = 1e-2
@@ -295,7 +297,7 @@ def format_integer_axis(
     use_default_numeric_formatter(axis)
 
 
-def limit_major_ticks(axis, *, max_intervals: int) -> None:
+def limit_major_ticks(axis, *, max_intervals: int, integer: bool = False) -> None:
     """Limit numeric tick density without changing shared decimal formatting."""
     if (
         isinstance(max_intervals, bool)
@@ -303,7 +305,7 @@ def limit_major_ticks(axis, *, max_intervals: int) -> None:
         or max_intervals < 1
     ):
         raise ValueError("max_intervals must be a positive integer.")
-    axis.set_major_locator(MaxNLocator(nbins=max_intervals))
+    axis.set_major_locator(MaxNLocator(nbins=max_intervals, integer=integer))
 
 
 def event_severity_legend_handle(*, point_size: float, alpha: float) -> Line2D:
