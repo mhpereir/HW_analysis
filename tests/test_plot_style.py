@@ -7,7 +7,11 @@ from PIL import Image
 
 
 def test_font_context_is_nested_and_restores_style_after_failure():
-    before = plot_style.plt.rcParams.copy()
+    # Matplotlib resolves its backend lazily and rc_context deliberately does
+    # not restore it. Compare the style settings, independently of test order.
+    before = {
+        key: value for key, value in plot_style.plt.rcParams.items() if key != "backend"
+    }
     with (
         pytest.raises(RuntimeError, match="interrupted"),
         plot_style.font_context("single"),
@@ -19,7 +23,7 @@ def test_font_context_is_nested_and_restores_style_after_failure():
             assert plot_style.legend_kwargs()["fontsize"] == 9
         assert plot_style.plt.rcParams["axes.labelsize"] == 18
         raise RuntimeError("interrupted")
-    assert plot_style.plt.rcParams == before
+    assert {key: plot_style.plt.rcParams[key] for key in before} == before
     with pytest.raises(ValueError, match="width"), plot_style.font_context("unknown"):
         pass
 
