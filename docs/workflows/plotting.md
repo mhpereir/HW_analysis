@@ -24,6 +24,19 @@ reductions.
 Add a reusable visual choice there rather than defining a new palette, label
 mapping, font configuration, or export convention in one script.
 
+Publication canvases remain 6 inches wide for a single column and 12 inches
+for two columns; the standard single-panel height/width ratio is 0.6. Shared
+labels, ticks and titles use 18 pt, and legends and statistical annotations
+use 14 pt. These replace the former 14/9 pt settings so text stays readable
+when figures are reduced to manuscript column width (at 3.5 inches, roughly
+10.5/8.2 pt). The change applies to newly rendered shared-style figures;
+existing artifacts are retained. Review representative single- and multi-panel
+layouts for clipping and overlap when changing these settings.
+
+`save_figure()` normally crops unused margins. Use `crop=False` with a layout
+that fits all artists inside the canvas when an exact publication aspect is
+required; PNG and PDF then preserve the requested canvas dimensions.
+
 `src/plotting.py` is the shared renderer for Stage-1 temporal composites and
 top-event figures. Its callers therefore use the shared style indirectly even
 when they do not import `plot_style` themselves.
@@ -103,8 +116,17 @@ The daily scatter uses Stage-1 `tas_region`, checked for constancy within a
 UTC day. With an hourly companion, an additional daily-from-hourly statistical
 comparison and differences from daily event T2m expose source disagreement.
 
-The figure shows hourly and daily scatter plots and yearly standard-deviation
-ratios. Statistics use every retained pair, independently of plotting:
+The default `--figure-layout diagnostic` shows hourly and daily scatter plots
+and yearly standard-deviation ratios. `--figure-layout paper` instead exports
+only the daily scatter, its OLS fit, and a compact annotation with sample size,
+Pearson r and the atmospheric/surface SD ratio. It uses the shared single-column
+6-by-3.6-inch canvas, preserves that aspect in PNG/PDF, and leaves region,
+period and population descriptions to the manuscript caption and saved
+metadata. There is no hourly panel, yearly ratio panel or figure title.
+This is a rendering option: it uses exactly the same daily pairs and retains
+all numerical tables, including hourly statistics when an hourly input is
+supplied. It also works with explicit `--daily-only` input mode. No existing
+dataset needs rebuilding. Statistics use every retained pair, independently of plotting:
 Pearson r, Spearman rho, OLS of `T_mean` on T2m (slope, intercept and R-squared),
 means, sample standard deviations and variances (`ddof=1`), interquartile
 ranges, and atmospheric-to-surface SD and variance ratios, pooled and per year.
@@ -131,8 +153,14 @@ python scripts/plot_temperature_variability.py \
 The output directory must be new. It contains PNG/PDF figures,
 `statistics.csv`, `daily_pairs.csv`, and `statistics.json` with coverage,
 selection, definitions, input paths/hashes/metadata, execution Git/script
-provenance, numerical results and output hashes. Daily-only output explicitly
-marks the hourly panels unavailable. Local validation uses synthetic known
+provenance, numerical results and output hashes. Figure filenames are
+`temperature_variability` for the diagnostic layout and
+`temperature_daily_scatter` for the paper layout. JSON also records the layout,
+canvas dimensions, shared font sizes, crop policy and style-source hash.
+Daily-only diagnostic output explicitly marks the hourly panels unavailable.
+Local validation checks that the paper panel contains every selected daily
+pair and its fitted line, preserves the standard canvas and fonts, and exports
+the same statistical results as the diagnostic. It also uses synthetic known
 correlations and variance ratios, unit conversion, missing-day/season/year
 boundaries, source disagreement, invalid inputs, immutability and exclusive
 output creation, followed by the full `dev_env` suite. Production acceptance
@@ -144,6 +172,9 @@ Use `schedulers/schedule_temperature_variability.sh` for an existing hourly
 cache. Supply `INPUT_PATH`, `HOURLY_T2M_PATH`, `CACHE_MANIFEST_PATH`, a fresh
 `OUTPUT_DIR`, and the usual commit and storage settings. `START_YEAR` and
 `END_YEAR` default to 1940 and 2024; `SEASON_MONTHS` defaults to `6 7 8`.
+Set `FIGURE_LAYOUT=paper` for the single-panel paper figure; the default is
+`diagnostic`. For the PNW Bartusek paper render, reuse the accepted Stage-1 and
+hourly-cache inputs and the 1940-2024 JJA selection in a fresh output directory.
 This job does not rebuild or modify the cache. It writes the diagnostic and
 `independent_validation.json`. The validator checks the entire cache's hourly
 coverage and hash, source-file identities, direct native-grid means at four
@@ -282,6 +313,8 @@ and population size. PNG and PDF outputs must not overwrite earlier figures.
   without changing the plotted range. For unusually broad ranges, increase
   spacing to an integer multiple of 5 K to cap the guide count at 17. Omit
   corner-only segments shorter than 10% of the panel in both dimensions.
+  Place labels at segment midpoints so the larger shared fonts stay clear of
+  the corners and adjacent labels; preserve the guide values and axis limits.
 - Each presentation uses one common finite population for all five budget
   fields (`I_adiabatic_pre`, `I_advection_pre`, stored `I_dyn_pre`,
   `I_dTdt_pre`, and `I_diabatic_pre`) and the requested event colour variable,

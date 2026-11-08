@@ -61,6 +61,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--output-dir", type=Path, required=True, help="New output directory."
     )
+    parser.add_argument(
+        "--figure-layout",
+        choices=("diagnostic", "paper"),
+        default="diagnostic",
+        help="Paper renders only the daily scatter; statistical exports are unchanged.",
+    )
     season = parser.add_mutually_exclusive_group()
     season.add_argument("--season-months", type=int, nargs="+", choices=range(1, 13))
     season.add_argument("--all-seasons", action="store_true")
@@ -305,8 +311,63 @@ def format_stat(value: float | None) -> str:
     return "undefined" if value is None else f"{value:.3f}"
 
 
-def plot_comparison(pairs: dict[str, pd.DataFrame], rows: list[dict], title: str):
+def draw_scatter(ax, data: pd.DataFrame, summary: dict, *, compact: bool = False):
+    """Render every retained pair and the fit computed from that same sample."""
+    ax.scatter(
+        data.tas_region,
+        data.T_mean,
+        s=plot_style.SCATTER_SIZE_PT2,
+        alpha=plot_style.SCATTER_ALPHA,
+        rasterized=True,
+    )
+    if summary["slope_K_per_K"] is not None:
+        xx = np.array([data.tas_region.min(), data.tas_region.max()])
+        ax.plot(
+            xx,
+            summary["slope_K_per_K"] * xx + summary["intercept_K"],
+            color=plot_style.VARIABLE_COLORS["T_mean"],
+            label="OLS fit",
+        )
+        ax.legend(**plot_style.legend_kwargs(loc="lower right"))
+    annotation = f"N = {summary['n']:,}\nr = {format_stat(summary['pearson_r'])}\n"
+    if not compact:
+        annotation += f"rho = {format_stat(summary['spearman_rho'])}\n"
+    annotation += (
+        f"{RATIO_LABEL if compact else 'SD ratio'} = "
+        f"{format_stat(summary['sd_ratio_T_mean_over_tas_region'])}"
+    )
+    ax.text(
+        0.03,
+        0.97,
+        annotation,
+        transform=ax.transAxes,
+        va="top",
+        fontsize=plot_style.LEGEND_FONT_SIZE_PT,
+        bbox={"facecolor": "white", "alpha": 0.85, "edgecolor": "none"},
+    )
+    ax.set(xlabel=f"{T2M_LABEL} [K]", ylabel=f"{TMEAN_LABEL} [K]")
+    plot_style.limit_major_ticks(ax.xaxis, max_intervals=4)
+    plot_style.limit_major_ticks(ax.yaxis, max_intervals=5)
+    plot_style.style_axis(ax)
+
+
+def plot_comparison(
+    pairs: dict[str, pd.DataFrame], rows: list[dict], title: str, *, layout="diagnostic"
+):
+    if layout not in {"diagnostic", "paper"}:
+        raise ValueError(f"Unknown figure layout: {layout!r}")
     plot_style.apply_theme()
+    if layout == "paper":
+        fig, ax = plt.subplots(
+            figsize=plot_style.publication_figsize("single"), constrained_layout=True
+        )
+        summary = next(
+            row
+            for row in rows
+            if row["timescale"] == "daily" and row["period"] == "all"
+        )
+        draw_scatter(ax, pairs["daily"], summary, compact=True)
+        return fig
     fig, axes = plt.subplots(
         2,
         2,
@@ -331,42 +392,12 @@ def plot_comparison(pairs: dict[str, pd.DataFrame], rows: list[dict], title: str
         summary = next(
             row for row in rows if row["timescale"] == scale and row["period"] == "all"
         )
-        ax.scatter(
-            data.tas_region,
-            data.T_mean,
-            s=plot_style.SCATTER_SIZE_PT2,
-            alpha=plot_style.SCATTER_ALPHA,
-            rasterized=True,
-        )
-        if summary["slope_K_per_K"] is not None:
-            xx = np.array([data.tas_region.min(), data.tas_region.max()])
-            ax.plot(
-                xx,
-                summary["slope_K_per_K"] * xx + summary["intercept_K"],
-                color=plot_style.VARIABLE_COLORS["T_mean"],
-                label="OLS fit",
-            )
-            ax.legend(**plot_style.legend_kwargs(loc="lower right"))
-        ax.text(
-            0.03,
-            0.97,
-            f"N = {summary['n']:,}\nr = {format_stat(summary['pearson_r'])}\n"
-            f"rho = {format_stat(summary['spearman_rho'])}\n"
-            f"SD ratio = {format_stat(summary['sd_ratio_T_mean_over_tas_region'])}",
-            transform=ax.transAxes,
-            va="top",
-            fontsize=plot_style.LEGEND_FONT_SIZE_PT,
-            bbox={"facecolor": "white", "alpha": 0.85, "edgecolor": "none"},
-        )
-        ax.set(
-            xlabel=f"{T2M_LABEL} [K]",
-            ylabel=f"{TMEAN_LABEL} [K]",
-            title="Hourly native temperatures"
+        draw_scatter(ax, data, summary)
+        ax.set_title(
+            "Hourly native temperatures"
             if scale == "hourly"
-            else "Daily means (event-selection T2m)",
+            else "Daily means (event-selection T2m)"
         )
-        plot_style.limit_major_ticks(ax.xaxis, max_intervals=4)
-        plot_style.limit_major_ticks(ax.yaxis, max_intervals=5)
         yearly = [
             row for row in rows if row["timescale"] == scale and row["period"] != "all"
         ]
@@ -387,8 +418,7 @@ def plot_comparison(pairs: dict[str, pd.DataFrame], rows: list[dict], title: str
         ratio_ax.xaxis.set_major_locator(MaxNLocator(nbins=6, integer=True))
         plot_style.use_default_numeric_formatter(ratio_ax.xaxis)
         ratio_ax.ticklabel_format(axis="x", style="plain", useOffset=False)
-        for panel in (ax, ratio_ax):
-            plot_style.style_axis(panel)
+        plot_style.style_axis(ratio_ax)
     fig.suptitle(title)
     return fig
 
@@ -536,11 +566,22 @@ def main(argv: list[str] | None = None) -> Path:
         f"{region}: {bottom} to {top} | {season}, {daily.index.year.min()}-{daily.index.year.max()}\n"
         f"Raw temperatures | {len(daily):,} complete UTC days | SD ratio > 1: greater atmospheric variability"
     )
-    fig = plot_comparison(pairs, rows, title)
+    fig = plot_comparison(pairs, rows, title, layout=args.figure_layout)
+    paper = args.figure_layout == "paper"
+    basename = "temperature_daily_scatter" if paper else "temperature_variability"
+    metadata["figure"] = {
+        "layout": args.figure_layout,
+        "basename": basename,
+        "size_inches": fig.get_size_inches().tolist(),
+        "font_size_pt": plot_style.PAPER_FONT_SIZE_PT,
+        "legend_font_size_pt": plot_style.LEGEND_FONT_SIZE_PT,
+        "crop": not paper,
+        "style_sha256": sha256(Path(plot_style.__file__)),
+    }
     try:
         for suffix in ("png", "pdf"):
             plot_style.save_figure(
-                fig, output_dir / f"temperature_variability.{suffix}"
+                fig, output_dir / f"{basename}.{suffix}", crop=not paper
             )
     finally:
         plt.close(fig)

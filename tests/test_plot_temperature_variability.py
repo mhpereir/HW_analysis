@@ -9,7 +9,8 @@ import pytest
 import xarray as xr
 from HW_analysis.scripts import plot_temperature_variability as plotter
 from HW_analysis.scripts import validate_temperature_variability as validator
-from HW_analysis.src import analysis_io
+from HW_analysis.src import analysis_io, plot_style
+from PIL import Image
 
 
 def make_inputs(years=(2000,)):
@@ -245,6 +246,45 @@ def test_yearly_stats_and_scatter_use_all_pairs():
         plt.close(fig)
 
 
+def test_paper_scatter_uses_daily_population_and_shared_single_column_style():
+    stage1, hourly = make_inputs((2000, 2001))
+    pairs, _, _ = plotter.prepare_pairs(stage1, hourly)
+    fig = plotter.plot_comparison(
+        pairs, plotter.statistics_table(pairs), "Not a paper title", layout="paper"
+    )
+    try:
+        assert len(fig.axes) == 1
+        ax = fig.axes[0]
+        np.testing.assert_allclose(ax.collections[0].get_offsets(), pairs["daily"])
+        assert len(ax.lines) == 1
+        np.testing.assert_allclose(
+            ax.lines[0].get_ydata(), 2 * ax.lines[0].get_xdata() - 300
+        )
+        assert ax.get_title() == ""
+        assert fig._suptitle is None
+        assert len(ax.texts) == 1
+        assert "N = 8" in ax.texts[0].get_text()
+        assert "r = 1.000" in ax.texts[0].get_text()
+        assert "2.000" in ax.texts[0].get_text()
+        assert "rho" not in ax.texts[0].get_text()
+        np.testing.assert_allclose(fig.get_size_inches(), (6, 3.6))
+        assert ax.xaxis.label.get_fontsize() == plot_style.PAPER_FONT_SIZE_PT
+        assert ax.texts[0].get_fontsize() == plot_style.LEGEND_FONT_SIZE_PT
+        plot_style.format_numeric_axes(fig)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        for axis in (ax.xaxis, ax.yaxis):
+            assert all(
+                label.get_fontsize() == plot_style.PAPER_FONT_SIZE_PT
+                for label in axis.get_ticklabels()
+            )
+            bounds = axis.label.get_window_extent(renderer)
+            assert fig.bbox.contains(bounds.x0, bounds.y0)
+            assert fig.bbox.contains(bounds.x1, bounds.y1)
+    finally:
+        plt.close(fig)
+
+
 @pytest.mark.parametrize(
     "corruption", [None, "statistic", "daily_pair", "coverage", "missing_row"]
 )
@@ -276,7 +316,10 @@ def test_independent_validation_detects_saved_product_corruption(corruption):
 
 
 @pytest.mark.parametrize("daily_only", [False, True])
-def test_cli_exports_reproducible_outputs_and_refuses_overwrite(tmp_path, daily_only):
+@pytest.mark.parametrize("layout", ["diagnostic", "paper"])
+def test_cli_exports_reproducible_outputs_and_refuses_overwrite(
+    tmp_path, daily_only, layout
+):
     stage1, hourly = make_inputs((2000, 2001))
     stage1.attrs["pipeline_stage"] = analysis_io.EXPECTED_PIPELINE_STAGE
     for name in analysis_io.REQUIRED_HARMONIZED_VARIABLES.difference(stage1.data_vars):
@@ -288,16 +331,27 @@ def test_cli_exports_reproducible_outputs_and_refuses_overwrite(tmp_path, daily_
     output_dir = tmp_path / "new-run"
     args = ["--input-path", str(stage1_path), "--output-dir", str(output_dir)]
     args += ["--daily-only"] if daily_only else ["--hourly-t2m-path", str(hourly_path)]
+    args += ["--figure-layout", layout]
     assert plotter.main(args) == output_dir
     report = json.loads((output_dir / "statistics.json").read_text())
     assert report["coverage"]["retained_days"] == 8
     assert report["hourly_available"] is not daily_only
     assert report["inputs"]["stage1"]["sha256"] == before[0]
     assert report["execution"]["script_sha256"]
-    assert (
-        (output_dir / "temperature_variability.png").read_bytes().startswith(b"\x89PNG")
+    basename = (
+        "temperature_daily_scatter" if layout == "paper" else "temperature_variability"
     )
-    assert (output_dir / "temperature_variability.pdf").read_bytes().startswith(b"%PDF")
+    assert (output_dir / f"{basename}.png").read_bytes().startswith(b"\x89PNG")
+    assert (output_dir / f"{basename}.pdf").read_bytes().startswith(b"%PDF")
+    assert len(list(output_dir.glob("*.png"))) == 1
+    assert report["figure"]["layout"] == layout
+    assert report["figure"]["crop"] is (layout != "paper")
+    assert report["figure"]["style_sha256"]
+    if layout == "paper":
+        with Image.open(output_dir / f"{basename}.png") as image:
+            assert image.size == (1800, 1080)
+    expected_pairs, _, _ = plotter.prepare_pairs(stage1, None if daily_only else hourly)
+    assert report["statistics"] == plotter.statistics_table(expected_pairs)
     for name, digest in report["output_sha256"].items():
         assert plotter.sha256(output_dir / name) == digest
     table = pd.read_csv(output_dir / "statistics.csv")
@@ -326,6 +380,7 @@ def test_cli_requires_explicit_mode_and_season_options():
     with pytest.raises(SystemExit):
         plotter.parse_args(base)
     assert plotter.parse_args([*base, "--daily-only"]).season_months == [6, 7, 8]
+    assert plotter.parse_args([*base, "--daily-only"]).figure_layout == "diagnostic"
     assert (
         plotter.parse_args(
             [*base, "--hourly-t2m-path", "hourly.nc"]

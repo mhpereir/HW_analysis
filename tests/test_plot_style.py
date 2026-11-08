@@ -3,6 +3,22 @@
 import numpy as np
 import pytest
 from HW_analysis.src import plot_style
+from PIL import Image
+
+
+@pytest.mark.parametrize("crop", [False, True])
+def test_export_can_preserve_canvas_despite_ambient_tight_crop(tmp_path, crop):
+    path = tmp_path / "figure.png"
+    with plot_style.plt.rc_context({"savefig.bbox": "tight"}):
+        fig, ax = plot_style.plt.subplots(figsize=(4, 3))
+        try:
+            ax.plot([0, 1], [0, 1])
+            plot_style.save_figure(fig, path, crop=crop)
+            with Image.open(path) as image:
+                assert (image.size == (1200, 900)) is (not crop)
+            assert plot_style.plt.rcParams["savefig.bbox"] == "tight"
+        finally:
+            plot_style.plt.close(fig)
 
 
 def test_day_lag_axis_keeps_fractional_major_ticks_for_short_windows():

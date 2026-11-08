@@ -17,6 +17,7 @@ OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR is required}"
 START_YEAR="${START_YEAR:-1940}"
 END_YEAR="${END_YEAR:-2024}"
 SEASON_MONTHS="${SEASON_MONTHS:-6 7 8}"
+FIGURE_LAYOUT="${FIGURE_LAYOUT:-diagnostic}"
 
 hwa_start_log "temperature_variability"
 hwa_validate_artifact_paths INPUT_PATH HOURLY_T2M_PATH CACHE_MANIFEST_PATH OUTPUT_DIR
@@ -34,11 +35,12 @@ cd "${PROJECT_ROOT}"
 read -r -a months <<< "${SEASON_MONTHS}"
 echo "[start] $(date -Is) job=${PBS_JOBID} host=$(hostname) commit=${EXPECTED_COMMIT}"
 echo "[paths] stage1=${INPUT_PATH} hourly=${HOURLY_T2M_PATH} manifest=${CACHE_MANIFEST_PATH} output=${OUTPUT_DIR}"
+echo "[selection] years=${START_YEAR}-${END_YEAR} months=${SEASON_MONTHS} figure_layout=${FIGURE_LAYOUT}"
 python -c 'import sys; print(sys.executable, sys.version)'
 /usr/bin/time -v python scripts/plot_temperature_variability.py \
     --input-path "${INPUT_PATH}" --hourly-t2m-path "${HOURLY_T2M_PATH}" \
     --start-year "${START_YEAR}" --end-year "${END_YEAR}" \
-    --season-months "${months[@]}" --output-dir "${OUTPUT_DIR}"
+    --season-months "${months[@]}" --figure-layout "${FIGURE_LAYOUT}" --output-dir "${OUTPUT_DIR}"
 /usr/bin/time -v python scripts/validate_temperature_variability.py \
     --output-dir "${OUTPUT_DIR}" --cache-manifest "${CACHE_MANIFEST_PATH}"
 echo "[done] $(date -Is) job=${PBS_JOBID}"

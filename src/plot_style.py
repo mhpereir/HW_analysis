@@ -26,8 +26,8 @@ FULL_TWO_COLUMN_WIDTH_IN = 12
 PRESENTATION_WIDTH_IN = 13.333
 PRESENTATION_HEIGHT_IN = 7.5
 
-PAPER_FONT_SIZE_PT = 14
-LEGEND_FONT_SIZE_PT = 9
+PAPER_FONT_SIZE_PT = 18
+LEGEND_FONT_SIZE_PT = 14
 LINE_WIDTH_PT = 1.25
 REFERENCE_LINE_WIDTH_PT = 0.9
 SCATTER_SIZE_PT2 = 16
@@ -358,7 +358,7 @@ def add_sum_reference_lines(ax, *, spacing: float = 5.0, max_lines: int = 17) ->
             zorder=0,
             label=f"reference {level:g} K",
         )
-        xpos = lo + 0.82 * (hi - lo)
+        xpos = (lo + hi) / 2
         xleft, xright = ax.get_xlim()
         fraction = (xpos - xleft) / (xright - xleft)
         ax.text(
@@ -543,9 +543,11 @@ def apply_stacked_layout(fig, nrows: int, *, width: str = "single") -> None:
     fig.subplots_adjust(**STACKED_FIGURE_LAYOUTS[(width, nrows)])
 
 
-def save_figure(fig, path: str | Path) -> None:
+def save_figure(fig, path: str | Path, *, crop: bool = True) -> None:
+    """Export with shared formatting, optionally preserving the exact canvas."""
     format_numeric_axes(fig)
-    fig.savefig(path, dpi=DPI, bbox_inches="tight", pad_inches=0.04)
+    with plt.rc_context({"savefig.bbox": "tight" if crop else None}):
+        fig.savefig(path, dpi=DPI, pad_inches=0.04)
 
 
 def legend_kwargs(**overrides) -> dict:
