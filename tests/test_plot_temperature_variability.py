@@ -283,8 +283,10 @@ def test_paper_scatter_uses_daily_population_and_shared_single_column_style(
         assert "2.000" in ax.texts[0].get_text()
         assert "rho" not in ax.texts[0].get_text()
         np.testing.assert_allclose(fig.get_size_inches(), (6, 3.6))
-        assert ax.xaxis.label.get_fontsize() == plot_style.PAPER_FONT_SIZE_PT
-        assert ax.texts[0].get_fontsize() == plot_style.LEGEND_FONT_SIZE_PT
+        assert ax.xaxis.label.get_fontsize() == plot_style.SINGLE_COLUMN_FONT_SIZE_PT
+        assert (
+            ax.texts[0].get_fontsize() == plot_style.SINGLE_COLUMN_LEGEND_FONT_SIZE_PT
+        )
         plot_style.save_figure(fig, tmp_path / f"{kind}.png", crop=False)
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
@@ -294,7 +296,7 @@ def test_paper_scatter_uses_daily_population_and_shared_single_column_style(
             )
             assert all("." not in label.get_text() for label in axis.get_ticklabels())
             assert all(
-                label.get_fontsize() == plot_style.PAPER_FONT_SIZE_PT
+                label.get_fontsize() == plot_style.SINGLE_COLUMN_FONT_SIZE_PT
                 for label in axis.get_ticklabels()
             )
             bounds = axis.label.get_window_extent(renderer)

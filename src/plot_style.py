@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from contextlib import contextmanager
 from pathlib import Path
 
 import matplotlib.dates as mdates
@@ -26,8 +27,10 @@ FULL_TWO_COLUMN_WIDTH_IN = 12
 PRESENTATION_WIDTH_IN = 13.333
 PRESENTATION_HEIGHT_IN = 7.5
 
-PAPER_FONT_SIZE_PT = 18
-LEGEND_FONT_SIZE_PT = 14
+PAPER_FONT_SIZE_PT = 14
+LEGEND_FONT_SIZE_PT = 9
+SINGLE_COLUMN_FONT_SIZE_PT = 18
+SINGLE_COLUMN_LEGEND_FONT_SIZE_PT = 14
 LINE_WIDTH_PT = 1.25
 REFERENCE_LINE_WIDTH_PT = 0.9
 SCATTER_SIZE_PT2 = 16
@@ -240,6 +243,39 @@ def publication_figsize(
     return figure_width, figure_width * aspect
 
 
+@contextmanager
+def font_context(width: str = "full"):
+    """Scope typography to figure construction without affecting other layouts."""
+    sizes = {
+        "single": (SINGLE_COLUMN_FONT_SIZE_PT, SINGLE_COLUMN_LEGEND_FONT_SIZE_PT),
+        "full": (PAPER_FONT_SIZE_PT, LEGEND_FONT_SIZE_PT),
+    }
+    if width not in sizes:
+        raise ValueError("Font width must be 'single' or 'full'.")
+    paper_size, legend_size = sizes[width]
+    settings = dict.fromkeys(
+        (
+            "font.size",
+            "axes.labelsize",
+            "axes.titlesize",
+            "xtick.labelsize",
+            "ytick.labelsize",
+            "figure.titlesize",
+        ),
+        paper_size,
+    )
+    settings.update(
+        {"legend.fontsize": legend_size, "legend.title_fontsize": legend_size}
+    )
+    with plt.rc_context(settings):
+        yield
+
+
+def legend_font_size() -> float:
+    """Return the numeric legend size from the active shared font context."""
+    return float(plt.rcParams["legend.fontsize"])
+
+
 def two_panel_presentation_figsize() -> tuple[float, float]:
     """Return the widened two-row presentation canvas dimensions."""
     figure_width, figure_height = publication_figsize(
@@ -367,7 +403,7 @@ def add_sum_reference_lines(ax, *, spacing: float = 5.0, max_lines: int = 17) ->
             xpos,
             level - xpos,
             f"{level:g} K",
-            fontsize=LEGEND_FONT_SIZE_PT - 1,
+            fontsize=legend_font_size() - 1,
             color="0.35",
             ha="right" if fraction > 0.9 else "left" if fraction < 0.1 else "center",
             va="center",
@@ -387,8 +423,8 @@ def style_axis(ax, *, grid: bool = True) -> None:
     ax.tick_params(axis="both", which="major", length=4, pad=3)
     ax.tick_params(axis="both", which="minor", length=2.5)
     ax.margins(x=0.015)
-    ax.yaxis.get_offset_text().set_fontsize(PAPER_FONT_SIZE_PT)
-    ax.xaxis.get_offset_text().set_fontsize(PAPER_FONT_SIZE_PT)
+    ax.yaxis.get_offset_text().set_fontsize(ax.yaxis.label.get_fontsize())
+    ax.xaxis.get_offset_text().set_fontsize(ax.xaxis.label.get_fontsize())
     sns.despine(ax=ax)
 
 
@@ -561,7 +597,7 @@ def legend_kwargs(**overrides) -> dict:
         "handlelength": 2.2,
         "borderpad": 0.5,
         "labelspacing": 0.4,
-        "fontsize": LEGEND_FONT_SIZE_PT,
+        "fontsize": legend_font_size(),
     }
     kwargs.update(overrides)
     return kwargs

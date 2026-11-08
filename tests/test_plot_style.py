@@ -6,6 +6,24 @@ from HW_analysis.src import plot_style
 from PIL import Image
 
 
+def test_font_context_is_nested_and_restores_style_after_failure():
+    before = plot_style.plt.rcParams.copy()
+    with (
+        pytest.raises(RuntimeError, match="interrupted"),
+        plot_style.font_context("single"),
+    ):
+        assert plot_style.plt.rcParams["axes.labelsize"] == 18
+        assert plot_style.legend_kwargs()["fontsize"] == 14
+        with plot_style.font_context("full"):
+            assert plot_style.plt.rcParams["axes.labelsize"] == 14
+            assert plot_style.legend_kwargs()["fontsize"] == 9
+        assert plot_style.plt.rcParams["axes.labelsize"] == 18
+        raise RuntimeError("interrupted")
+    assert plot_style.plt.rcParams == before
+    with pytest.raises(ValueError, match="width"), plot_style.font_context("unknown"):
+        pass
+
+
 @pytest.mark.parametrize("crop", [False, True])
 def test_export_can_preserve_canvas_despite_ambient_tight_crop(tmp_path, crop):
     path = tmp_path / "figure.png"

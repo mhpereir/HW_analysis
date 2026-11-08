@@ -29,6 +29,11 @@ GROUP_LABELS = {
     "advection_vertical": "Vertical",
     "advection_face_total": "All faces",
 }
+SINGLE_COLUMN_GROUP_LABELS = {
+    **GROUP_LABELS,
+    "advection_zonal": "Zonal (W + E)",
+    "advection_meridional": "Meridional (S + N)",
+}
 GROUP_NAMES = tuple(GROUP_LABELS)
 MATCHED_SIGN_LINESTYLES = {
     "positive": "-",
@@ -57,6 +62,7 @@ LEGEND_HEADROOM_FRACTION = 0.30
 DEFAULT_SMOOTHING_WINDOW = 24
 
 
+@plot_style.font_context("single")
 def plot_advection_direction_exploration(
     composite: xr.Dataset,
 ) -> Figure:
@@ -79,8 +85,8 @@ def plot_advection_direction_exploration(
         nrows=2,
         ncols=1,
         figsize=plot_style.publication_figsize(
-            "full",
-            aspect=plot_style.TWO_PANEL_STACK_ASPECT,
+            "single",
+            aspect=plot_style.TWO_PANEL_COLUMN_ASPECT,
         ),
         sharex=True,
         constrained_layout=True,
@@ -100,7 +106,8 @@ def plot_advection_direction_exploration(
             zorder=1,
         )
         plot_style.style_axis(ax)
-        plot_style.format_integer_axis(ax.xaxis, spacing=1)
+        plot_style.format_integer_axis(ax.xaxis, minor_spacing=1)
+        plot_style.limit_major_ticks(ax.xaxis, max_intervals=6, integer=True)
         ax.set_xlim(float(lag_days.min()), float(lag_days.max()))
     grouped_ax.set_xlabel("Days relative to event peak")
 
@@ -448,7 +455,7 @@ def _plot_face_timeseries(
     ax.set_ylabel("K hr-1")
     ax.set_title("Signed face contributions")
     _add_upper_axis_headroom(ax)
-    ax.legend(ncol=5, loc="upper center", **plot_style.legend_kwargs())
+    ax.legend(ncol=3, loc="upper center", **plot_style.legend_kwargs())
 
 
 def _plot_grouped_timeseries(
@@ -467,14 +474,14 @@ def _plot_grouped_timeseries(
             lag_days,
             ds[name].values,
             color=GROUP_COLORS[name],
-            label=GROUP_LABELS[name],
+            label=SINGLE_COLUMN_GROUP_LABELS[name],
             linestyle="--" if name == "advection_face_total" else "-",
         )
     plot_style.zero_line(ax)
     ax.set_ylabel("K hr-1")
     ax.set_title("Grouped advective contributions")
-    _add_upper_axis_headroom(ax)
-    ax.legend(ncol=5, loc="upper center", **plot_style.legend_kwargs())
+    _add_upper_axis_headroom(ax, fraction=0.5)
+    ax.legend(ncol=2, loc="upper center", **plot_style.legend_kwargs())
 
 
 def _plot_matched_face_timeseries(
@@ -870,14 +877,15 @@ def _figure_title(ds: xr.Dataset) -> str:
     pre_days = ds.attrs.get("pre_days", "?")
     post_days = ds.attrs.get("post_days", "?")
     representation = (
-        " climatological-anomaly"
+        "Climatological-anomaly composite"
         if ds.attrs.get("data_representation") == "climatological_anomaly"
-        else ""
+        else "All-event composite"
     )
     smoothing_label = _smoothing_title_label(ds)
     return (
-        f"Face-resolved advection{representation} composite for {region} "
-        f"(n={n_events}, -{pre_days} to +{post_days} days{smoothing_label})"
+        f"Face-resolved advection\n{representation}\n"
+        f"{region} (n={n_events}, -{pre_days} to +{post_days} days)"
+        + (f"\n{smoothing_label.removeprefix(', ')}" if smoothing_label else "")
     )
 
 

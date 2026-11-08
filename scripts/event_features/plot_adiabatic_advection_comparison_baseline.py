@@ -444,6 +444,7 @@ def plot_tendency_scatter(
     return fig
 
 
+@plot_style.font_context("single")
 def plot_presentation_tendency_scatter(
     baseline: dict[str, np.ndarray],
     events: dict[str, np.ndarray],
@@ -539,7 +540,7 @@ def plot_presentation_tendency_scatter(
             if anomaly
             else plot_style.BUDGET_REFERENCE_CAPTION
         ),
-        fontsize=plot_style.LEGEND_FONT_SIZE_PT,
+        fontsize=plot_style.legend_font_size(),
     )
     fig.suptitle(
         (

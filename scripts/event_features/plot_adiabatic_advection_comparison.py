@@ -397,6 +397,7 @@ def plot_full_tendency_scatter(
     return fig
 
 
+@plot_style.font_context("single")
 def plot_presentation_tendency_scatter(
     x_values: np.ndarray,
     advection_values: np.ndarray,
@@ -471,7 +472,7 @@ def plot_presentation_tendency_scatter(
 
     plot_style.add_sum_reference_lines(axes[1])
     fig.supxlabel(
-        plot_style.BUDGET_REFERENCE_CAPTION, fontsize=plot_style.LEGEND_FONT_SIZE_PT
+        plot_style.BUDGET_REFERENCE_CAPTION, fontsize=plot_style.legend_font_size()
     )
     fig.suptitle(
         f"Advection and Net Dynamical Contribution\nEvents n = {int(finite.sum())}"

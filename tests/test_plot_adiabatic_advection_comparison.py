@@ -8,6 +8,27 @@ from HW_analysis.scripts.event_features import (
 )
 
 
+def test_single_column_fonts_do_not_leak_into_full_layout(tmp_path):
+    features = _make_feature_table()
+    args = (features,)
+    for index, (layout, expected_size) in enumerate(
+        [("full", 14), ("presentation", 18), ("full", 14)]
+    ):
+        fig = plot_diag.plot_tendency_scatter(*args, layout=layout)
+        try:
+            plot_diag.plot_style.save_figure(fig, tmp_path / f"{index}.png")
+            for ax in fig.axes:
+                assert ax.yaxis.label.get_fontsize() == expected_size
+                assert all(
+                    t.get_fontsize() == expected_size for t in ax.get_yticklabels()
+                )
+            if layout == "presentation":
+                assert fig._supxlabel.get_fontsize() == 14
+            assert plot_diag.plt.rcParams["axes.labelsize"] == 14
+        finally:
+            plot_diag.plt.close(fig)
+
+
 def test_presentation_layout_retains_first_and_fourth_panels_in_one_column():
     features = _make_feature_table()
 

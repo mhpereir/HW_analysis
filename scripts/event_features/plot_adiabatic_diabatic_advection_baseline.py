@@ -241,6 +241,7 @@ def write_tendency_scatter_plot(
     return output_path
 
 
+@plot_style.font_context("single")
 def plot_tendency_scatter(
     baseline_features: xr.Dataset,
     event_features: xr.Dataset,
@@ -387,7 +388,7 @@ def plot_one_tendency_panel(
         transform=ax.transAxes,
         ha="left",
         va="top",
-        fontsize=9,
+        fontsize=plot_style.legend_font_size(),
         bbox={"facecolor": "white", "edgecolor": "0.8", "alpha": 0.85},
     )
     plot_style.style_axis(ax)

@@ -25,13 +25,33 @@ Add a reusable visual choice there rather than defining a new palette, label
 mapping, font configuration, or export convention in one script.
 
 Publication canvases remain 6 inches wide for a single column and 12 inches
-for two columns; the standard single-panel height/width ratio is 0.6. Shared
-labels, ticks and titles use 18 pt, and legends and statistical annotations
-use 14 pt. These replace the former 14/9 pt settings so text stays readable
-when figures are reduced to manuscript column width (at 3.5 inches, roughly
-10.5/8.2 pt). The change applies to newly rendered shared-style figures;
-existing artifacts are retained. Review representative single- and multi-panel
-layouts for clipping and overlap when changing these settings.
+for two columns; the standard single-panel height/width ratio is 0.6.
+Single-column labels, ticks and titles use 18 pt, and legends and statistical
+annotations use 14 pt so text stays readable when reduced to manuscript
+column width (at 3.5 inches, roughly 10.5/8.2 pt). Two-column figures retain
+their original 14 pt labels/ticks/titles and 9 pt legends. Widescreen layouts
+also retain their original settings.
+
+Single-column renderers opt in with `font_context("single")` while creating
+all figure artists; the context restores the preceding settings on exit.
+The default theme remains 14/9 pt. Figure-size helpers are pure and do not
+change the font context. This includes the 7.5-by-9-inch portrait budget
+comparisons, even though their CLI calls the layout `presentation`. Their
+four-panel full-width counterparts and the EHB/diagnostic-variable temporal
+composites retain 14/9 pt. Explicit shared legend/annotation sizes must use
+`legend_font_size()` inside the context. Exports preserve each figure's fonts,
+including when different layouts are created in the same process.
+
+Retain existing artifacts. Regression tests must render both layout classes
+in succession and verify fonts before and after export, unchanged data and
+global-style restoration. Review representative single-column outputs for
+clipping and overlap, and a two-column temporal composite for unchanged style.
+
+The standalone all-event face-advection comparison is a single-column figure:
+use the 6-by-9-inch two-panel column canvas, the single-column font context,
+wrapped legends, and adaptive whole-day major ticks with daily minor ticks.
+Retain its data, smoothing, units and two-panel order. The separate top-event
+and matched face-advection renderers retain their full-width layout and fonts.
 
 `save_figure()` normally crops unused margins. Use `crop=False` with a layout
 that fits all artists inside the canvas when an exact publication aspect is

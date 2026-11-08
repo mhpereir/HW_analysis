@@ -352,9 +352,9 @@ def draw_scatter(
         colorbar = ax.figure.colorbar(counts, ax=ax, pad=0.02)
         unit = "Hours" if summary["timescale"] == "hourly" else "Days"
         colorbar.set_label(
-            f"{unit} per hexagon (log)", fontsize=plot_style.LEGEND_FONT_SIZE_PT
+            f"{unit} per hexagon (log)", fontsize=plot_style.legend_font_size()
         )
-        colorbar.ax.tick_params(labelsize=plot_style.LEGEND_FONT_SIZE_PT)
+        colorbar.ax.tick_params(labelsize=plot_style.legend_font_size())
     else:
         ax.scatter(
             data.tas_region,
@@ -385,7 +385,7 @@ def draw_scatter(
         annotation,
         transform=ax.transAxes,
         va="top",
-        fontsize=plot_style.LEGEND_FONT_SIZE_PT,
+        fontsize=plot_style.legend_font_size(),
         bbox={"facecolor": "white", "alpha": 0.85, "edgecolor": "none"},
     )
     ax.set(xlabel=f"{T2M_LABEL} [K]", ylabel=f"{TMEAN_LABEL} [K]")
@@ -414,18 +414,20 @@ def plot_comparison(
         raise ValueError("Hexbin gridsize must be an integer of at least 2.")
     plot_style.apply_theme()
     if layout == "paper":
-        fig, ax = plt.subplots(
-            figsize=plot_style.publication_figsize("single"), constrained_layout=True
-        )
-        summary = next(
-            row
-            for row in rows
-            if row["timescale"] == "daily" and row["period"] == "all"
-        )
-        draw_scatter(
-            ax, pairs["daily"], summary, compact=True, kind=kind, gridsize=gridsize
-        )
-        return fig
+        with plot_style.font_context("single"):
+            fig, ax = plt.subplots(
+                figsize=plot_style.publication_figsize("single"),
+                constrained_layout=True,
+            )
+            summary = next(
+                row
+                for row in rows
+                if row["timescale"] == "daily" and row["period"] == "all"
+            )
+            draw_scatter(
+                ax, pairs["daily"], summary, compact=True, kind=kind, gridsize=gridsize
+            )
+            return fig
     fig, axes = plt.subplots(
         2,
         2,
@@ -653,8 +655,16 @@ def main(argv: list[str] | None = None) -> Path:
         else None,
         "basename": basename,
         "size_inches": fig.get_size_inches().tolist(),
-        "font_size_pt": plot_style.PAPER_FONT_SIZE_PT,
-        "legend_font_size_pt": plot_style.LEGEND_FONT_SIZE_PT,
+        "font_size_pt": (
+            plot_style.SINGLE_COLUMN_FONT_SIZE_PT
+            if paper
+            else plot_style.PAPER_FONT_SIZE_PT
+        ),
+        "legend_font_size_pt": (
+            plot_style.SINGLE_COLUMN_LEGEND_FONT_SIZE_PT
+            if paper
+            else plot_style.LEGEND_FONT_SIZE_PT
+        ),
         "crop": not paper,
         "style_sha256": sha256(Path(plot_style.__file__)),
     }

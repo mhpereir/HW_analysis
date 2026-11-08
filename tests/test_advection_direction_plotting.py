@@ -24,13 +24,16 @@ def test_plot_advection_direction_exploration_has_selected_two_panels():
             "Top",
         }
         assert {text.get_text() for text in fig.axes[1].get_legend().get_texts()} == {
-            "Zonal (west + east)",
-            "Meridional (south + north)",
+            "Zonal (W + E)",
+            "Meridional (S + N)",
             "Horizontal",
             "Vertical",
             "All faces",
         }
-        assert fig.axes[1].get_legend()._ncols == 5
+        assert fig.axes[1].get_legend()._ncols == 2
+        np.testing.assert_allclose(fig.get_size_inches(), [6, 9])
+        assert fig.axes[0].yaxis.label.get_fontsize() == 18
+        assert all(t.get_fontsize() == 14 for t in fig.axes[1].get_legend().get_texts())
         assert [ax.get_ylabel() for ax in fig.axes] == ["K hr-1", "K hr-1"]
         assert fig.axes[1].get_xlabel() == "Days relative to event peak"
         visible_ticks = fig.axes[1].get_xticks()
@@ -78,7 +81,39 @@ def test_climatological_anomaly_title_is_explicit():
 
     fig = advection_direction_plotting.plot_advection_direction_exploration(composite)
     try:
-        assert "advection climatological-anomaly composite" in fig._suptitle.get_text()
+        assert "Climatological-anomaly composite" in fig._suptitle.get_text()
+    finally:
+        plt.close(fig)
+
+
+def test_single_column_title_and_legends_fit_after_export(tmp_path):
+    composite = _make_composite()
+    composite.attrs.update(
+        region="pnw_bartusek",
+        data_representation="climatological_anomaly",
+        n_events=250,
+        pre_days=7,
+        post_days=7,
+        smoothing_window=24,
+    )
+    composite = composite.assign_coords(lag_hour=composite.lag_hour * 3.5)
+    before = composite.copy(deep=True)
+    fig = advection_direction_plotting.plot_advection_direction_exploration(composite)
+    try:
+        style = advection_direction_plotting.plot_style
+        style.save_figure(fig, tmp_path / "single_column.png")
+        fig.set_dpi(style.DPI)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        artists = [fig._suptitle]
+        for ax in fig.axes:
+            artists.extend([ax.title, ax.xaxis.label, ax.yaxis.label, ax.get_legend()])
+        for artist in artists:
+            bounds = artist.get_window_extent(renderer)
+            assert fig.bbox.contains(bounds.x0, bounds.y0)
+            assert fig.bbox.contains(bounds.x1, bounds.y1)
+        xr.testing.assert_identical(composite, before)
+        assert plt.rcParams["axes.labelsize"] == 14
     finally:
         plt.close(fig)
 

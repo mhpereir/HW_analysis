@@ -48,6 +48,29 @@ def test_plot_composite_timeseries_adds_percentile_envelopes():
         plt.close(fig)
 
 
+def test_two_column_composite_keeps_original_fonts_after_single_column(tmp_path):
+    with plotting.plot_style.font_context("single"):
+        single, ax = plt.subplots()
+        ax.set_ylabel("Single column")
+    composite = _make_composite()
+    before = composite.copy(deep=True)
+    fig = plotting.plot_composite_timeseries(composite, plot_extended_variables=True)
+    try:
+        plotting.plot_style.save_figure(fig, tmp_path / "two_column.png")
+        assert single.axes[0].yaxis.label.get_fontsize() == 18
+        assert fig.get_size_inches()[0] == 12
+        for axis in fig.axes:
+            assert axis.yaxis.label.get_fontsize() == 14
+            assert all(label.get_fontsize() == 14 for label in axis.get_yticklabels())
+            legend = axis.get_legend()
+            if legend is not None:
+                assert all(text.get_fontsize() == 9 for text in legend.get_texts())
+        xr.testing.assert_identical(composite, before)
+    finally:
+        plt.close(single)
+        plt.close(fig)
+
+
 def test_plot_composite_timeseries_adds_iqr_legend_to_first_panel():
     fig = plotting.plot_composite_timeseries(_make_composite())
     try:
