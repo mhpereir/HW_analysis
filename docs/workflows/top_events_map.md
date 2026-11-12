@@ -75,6 +75,8 @@ keep these artists inside the canvas. Export at 300 DPI without tight cropping
 so the saved PNG retains the exact 6-inch width. Other figure families keep
 their existing style. Neither the fields nor the color and contour scales
 change with the layout.
+Contour labels use a white halo for contrast and omit labels that would cross
+the map frame; the underlying contour lines remain continuous and unchanged.
 
 For a typography-only reproduction, the PBS wrapper accepts
 `PREPARED_MAP_PATH` and `SOURCE_VALIDATION_PATH` instead of builder inputs.

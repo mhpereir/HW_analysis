@@ -100,6 +100,7 @@ def _plot_top_event_map(
     levels = np.arange(first, high, height_contour_interval)
     levels = levels[(levels > low) & (levels < high)]
     levels[levels == 0] = 0.0
+    contour_labels = []
     if levels.size > 200:
         plt.close(fig)
         raise ValueError("Contour interval requests more than 200 levels.")
@@ -114,12 +115,17 @@ def _plot_top_event_map(
             linestyles=["dashed" if value < 0 else "solid" for value in levels],
             transform=data_crs,
         )
-        ax.clabel(
+        contour_labels = ax.clabel(
             contours,
             fmt="%g",
             fontsize=plot_style.legend_font_size(),
-            inline_spacing=3,
+            inline=False,
         )
+        for label in contour_labels:
+            label.set_path_effects([
+                path_effects.Stroke(linewidth=2, foreground="white"),
+                path_effects.Normal(),
+            ])
     _decorate_map(ax, data_crs)
     handles = []
     for name in outlines:
@@ -149,7 +155,7 @@ def _plot_top_event_map(
     colorbar = fig.colorbar(mesh, cax=color_axis, extend="both", orientation="horizontal")
     colorbar.set_label("2 m temperature anomaly [K]")
     plot_style.format_integer_axis(color_axis.xaxis)
-    plot_style.limit_major_ticks(color_axis.xaxis, max_intervals=6, integer=True)
+    plot_style.limit_major_ticks(color_axis.xaxis, max_intervals=8, integer=True)
     first_day, last_day = pd.to_datetime(panel.sample_date.values[[0, -1]])
     date_label = _date_range_label(first_day, last_day)
     rank = int(panel.selection_rank.item())
@@ -177,6 +183,15 @@ def _plot_top_event_map(
         va="bottom",
         fontsize=plot_style.legend_font_size(),
     )
+    # Retain every contour line; hide only labels that would be cut by the
+    # geographic frame. Non-inline labels leave no gaps when omitted.
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    frame = ax.get_window_extent(renderer).padded(-3 * fig.dpi / 72)
+    for label in contour_labels:
+        box = label.get_window_extent(renderer)
+        if not (frame.contains(box.x0, box.y0) and frame.contains(box.x1, box.y1)):
+            label.set_visible(False)
     return fig
 
 

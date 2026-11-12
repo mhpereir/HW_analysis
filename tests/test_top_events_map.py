@@ -355,6 +355,13 @@ def test_single_panel_plot_shows_dates_units_contour_signs_and_both_regions(
             assert saved.size == (1800, 2400)
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
+        frame = ax.get_window_extent(renderer)
+        for label in contour.labelTexts:
+            if label.get_visible():
+                box = label.get_window_extent(renderer)
+                assert frame.contains(box.x0, box.y0)
+                assert frame.contains(box.x1, box.y1)
+                assert label.get_fontsize() == 14
         for artist in [ax.title, fig.axes[1].xaxis.label, fig.legends[0], *fig.texts]:
             bounds = artist.get_window_extent(renderer)
             assert bounds.x0 >= 0 and bounds.y0 >= 0
