@@ -18,7 +18,6 @@ Out of scope:
 - Plotting.
 """
 
-
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -35,6 +34,16 @@ SIGN_MATCH_METHOD = "maximum_cardinality_minimum_distance"
 SIGN_MATCH_STANDARDIZATION = "pooled_group_standard_deviation"
 SIGN_MATCH_DISTANCE = "root_mean_square_standardized_difference"
 SIGN_MATCH_CALIPER_RULE = "all_variables_within_threshold"
+
+
+def common_finite_mask(*values: np.ndarray) -> np.ndarray:
+    """Select rows finite in every supplied field without mutating inputs."""
+    arrays = [np.asarray(value) for value in values]
+    if not arrays or any(
+        array.ndim != 1 or array.shape != arrays[0].shape for array in arrays
+    ):
+        raise ValueError("Expected one-dimensional arrays of equal shape.")
+    return np.logical_and.reduce([np.isfinite(array) for array in arrays])
 
 
 @dataclass(frozen=True)
@@ -188,9 +197,9 @@ def pooled_standard_deviation(left: np.ndarray, right: np.ndarray) -> float:
     right = np.asarray(right, dtype=float)
     if left.size < 2 or right.size < 2:
         return float("nan")
-    numerator = (left.size - 1) * np.var(left, ddof=1) + (
-        right.size - 1
-    ) * np.var(right, ddof=1)
+    numerator = (left.size - 1) * np.var(left, ddof=1) + (right.size - 1) * np.var(
+        right, ddof=1
+    )
     return float(np.sqrt(numerator / (left.size + right.size - 2)))
 
 
@@ -262,7 +271,7 @@ def select_events_by_metric(
     metric_units = _selection_metric_units(event_table[metric])
     if metric_units is not None:
         attrs["selection_metric_units"] = metric_units
-    out.attrs.update(attrs)
+    out = out.assign_attrs(attrs)
     return out
 
 
@@ -343,7 +352,7 @@ def select_top_n_events(
     out = event_table.isel({event_dim: selected_idx})
     rank_values = _rank_values_for_selected_indices(selected_idx, ranked_idx)
     out["selection_rank"] = (event_dim, rank_values)
-    out.attrs.update(
+    out = out.assign_attrs(
         {
             "selection_type": "top_n",
             "selection_metric": metric,
@@ -433,7 +442,7 @@ def select_event_quantile_bin(
     }
     if metric_units is not None:
         attrs["selection_metric_units"] = metric_units
-    out.attrs.update(attrs)
+    out = out.assign_attrs(attrs)
     return out
 
 
@@ -495,7 +504,7 @@ def select_events_by_season(
         selected = _event_time_month_mask(event_table[time_name], months)
 
     out = _apply_event_selection(event_table, selected, event_dim=event_dim, drop=drop)
-    out.attrs.update(
+    out = out.assign_attrs(
         {
             "selection_type": "season",
             "selection_months": ",".join(str(month) for month in months),
@@ -570,7 +579,7 @@ def select_events_by_id(
         dtype=np.int64,
     )
     out = event_table.isel({event_dim: selected_indices})
-    out.attrs.update(
+    out = out.assign_attrs(
         {
             "selection_type": "event_id",
             "selection_event_ids": ",".join(str(int(value)) for value in requested),
@@ -636,7 +645,7 @@ def filter_dataset_to_events(
 
     mask = event_id_mask(ds[event_id_name], ids)
     out = ds.where(mask, drop=drop)
-    out.attrs.update(
+    out = out.assign_attrs(
         {
             "event_filter_source": event_id_name,
             "event_filter_ids": ",".join(str(int(eid)) for eid in ids),
@@ -992,7 +1001,7 @@ def _empty_ranked_selection(
     """Return an empty event-table selection with rank metadata."""
     out = event_table.isel({event_dim: slice(0, 0)})
     out["selection_rank"] = (event_dim, np.asarray([], dtype=np.int64))
-    out.attrs.update(
+    out = out.assign_attrs(
         {
             "selection_type": selection_type,
             "selection_metric": metric,
@@ -1022,5 +1031,5 @@ def _empty_quantile_selection(
     }
     if metric_units is not None:
         attrs["selection_metric_units"] = metric_units
-    out.attrs.update(attrs)
+    out = out.assign_attrs(attrs)
     return out

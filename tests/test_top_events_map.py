@@ -1,5 +1,6 @@
 """Scientific and offline plotting checks for the single-event map workflow."""
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -15,8 +16,12 @@ from HW_analysis.scripts.top_events_map import plot_top_events_map as plot_cli
 from HW_analysis.src import analysis_io, config, data_io, plot_style
 from HW_analysis.src import top_events_map as maps
 from HW_analysis.src import top_events_map_plotting as plotting
-from HW_analysis.src.top_events_map_validation import validate_against_sources
+from HW_analysis.src.top_events_map_validation import (
+    validate_against_sources,
+    validate_saved_source_report,
+)
 from matplotlib.colors import to_rgba
+from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULER = REPO_ROOT / "scripts/top_events_map/schedule_top_events_map.sh"
@@ -320,7 +325,13 @@ def test_single_panel_plot_shows_dates_units_contour_signs_and_both_regions(
         ax = fig.axes[0]
         assert "28-30 June 2021" in ax.get_title()
         assert "Bartusek" in ax.get_title()
-        assert fig.axes[1].get_ylabel() == "2 m temperature anomaly [K]"
+        assert fig.axes[1].get_xlabel() == "2 m temperature anomaly [K]"
+        np.testing.assert_array_equal(fig.get_size_inches(), [6, 8])
+        assert ax.title.get_fontsize() == 18
+        assert fig.axes[1].xaxis.label.get_fontsize() == 18
+        assert all(text.get_fontsize() == 14 for text in fig.legends[0].get_texts())
+        assert fig.texts[0].get_fontsize() == 14
+        assert plt.rcParams["axes.labelsize"] == plot_style.PAPER_FONT_SIZE_PT
         assert len(ax.patches) == 2
         for patch, region in zip(ax.patches, plotting.PNW_REGIONS, strict=True):
             west, east, south, north = maps.region_bounds(region)
@@ -338,6 +349,23 @@ def test_single_panel_plot_shows_dates_units_contour_signs_and_both_regions(
         assert "1940-2024" in fig.texts[0].get_text()
         assert "Z500 anomaly contours [m]" in fig.texts[0].get_text()
         assert plt.rcParams["savefig.dpi"] == plot_style.DPI
+        output = tmp_path / "single-column.png"
+        plot_style.save_figure(fig, output, crop=False)
+        with Image.open(output) as saved:
+            assert saved.size == (1800, 2400)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        for artist in [ax.title, fig.axes[1].xaxis.label, fig.legends[0], *fig.texts]:
+            bounds = artist.get_window_extent(renderer)
+            assert bounds.x0 >= 0 and bounds.y0 >= 0
+            assert bounds.x1 <= fig.bbox.width and bounds.y1 <= fig.bbox.height
+        full_fig, full_ax = plt.subplots(figsize=plot_style.publication_figsize("full"))
+        try:
+            full_ax.set_title("Subsequent full-width plot")
+            assert full_ax.title.get_fontsize() == 14
+            assert ax.title.get_fontsize() == 18
+        finally:
+            plt.close(full_fig)
         xr.testing.assert_identical(ds, original)
     finally:
         plt.close(fig)
@@ -410,6 +438,8 @@ def test_pbs_script_parses_and_rejects_stale_commit_without_creating_outputs(tmp
         CLIMATOLOGY_PATH=str(tmp_path / "not-read.nc"),
         RUN_DIR=str(tmp_path / "run"),
         LOG_DIR=str(tmp_path / "logs"),
+        HWA_ARTIFACT_ROOT=str(tmp_path),
+        HWA_LOG_ROOT=str(tmp_path / "logs"),
         PBS_JOBID="test",
     )
     result = subprocess.run(
@@ -417,7 +447,53 @@ def test_pbs_script_parses_and_rejects_stale_commit_without_creating_outputs(tmp
     )
     assert result.returncode != 0
     assert not (tmp_path / "run").exists()
-    assert not (tmp_path / "logs").exists()
+    assert len(list((tmp_path / "logs").glob("*.log"))) == 1
+
+
+def test_rank_subset_keeps_original_scale_and_source_data(tmp_path, monkeypatch):
+    features, kwargs = _inputs(tmp_path, ("2021-06-29", "2020-02-29"))
+    product = maps.build_top_event_maps(features, top_n=2, **kwargs)
+    original = product.copy(deep=True)
+    monkeypatch.setattr(plotting, "_decorate_map", lambda *args: None)
+    original_plot = plotting.plot_top_event_map
+    scales = []
+
+    def capture(*args, **kwargs):
+        fig = original_plot(*args, **kwargs)
+        scales.append(fig.axes[0].collections[0].norm.vmax)
+        return fig
+
+    monkeypatch.setattr(plotting, "plot_top_event_map", capture)
+    paths = plotting.write_top_event_maps(product, tmp_path / "subset", event_ranks=[1])
+    assert [path.name for path in paths] == [plotting.map_filename(product, 0)]
+    assert scales == [max(1, np.ceil(abs(product.t2m_anomaly).max().item()))]
+    assert plotting.event_indices_for_ranks(product, [2, 1]) == [0, 1]
+    for ranks in ([], [1, 1], [3]):
+        with pytest.raises(ValueError):
+            plotting.write_top_event_maps(product, tmp_path / "invalid", event_ranks=ranks)
+    assert not (tmp_path / "invalid").exists()
+    xr.testing.assert_identical(product, original)
+
+
+def test_saved_source_audit_requires_success_and_exact_product_bytes(tmp_path):
+    features, kwargs = _inputs(tmp_path)
+    product = maps.build_top_event_maps(features, **kwargs)
+    path = analysis_io.save_top_event_maps(product, tmp_path / "map.nc")
+    report = validate_against_sources(product)
+    report["product_sha256"] = maps.sha256_file(path)
+    report_path = tmp_path / "source_validation.json"
+    report_path.write_text(json.dumps(report))
+    assert validate_saved_source_report(path, report_path) == report
+    report["status"] = "failed"
+    report_path.write_text(json.dumps(report))
+    with pytest.raises(ValueError, match="did not pass"):
+        validate_saved_source_report(path, report_path)
+    report["status"] = "passed"
+    report_path.write_text(json.dumps(report))
+    with path.open("ab") as output:
+        output.write(b"changed")
+    with pytest.raises(ValueError, match="checksum"):
+        validate_saved_source_report(path, report_path)
 
 
 def test_independent_validator_covers_multiple_years_and_detects_consistent_corruption(

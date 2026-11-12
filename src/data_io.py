@@ -176,7 +176,7 @@ SURFACE_DIAGNOSTIC_ROOTS: dict[str, str] = {
     "soil_moisture": config.ERA5_SOIL_MOISTURE_ROOT,
 }
 
-#file name stems
+# file name stems
 SURFACE_DIAGNOSTIC_FILE_STEMS: dict[str, str] = {
     "nslr": "nslr_hour_ERA5",
     "nssr": "nssr_hour_ERA5",
@@ -184,6 +184,28 @@ SURFACE_DIAGNOSTIC_FILE_STEMS: dict[str, str] = {
     "sshf": "sshf_hour_ERA5",
     "soil_moisture": "soil_moisture_hour_ERA5",
 }
+
+
+def open_era5_hourly_t2m_year(
+    year: int, *, root: str | Path | None = None
+) -> xr.Dataset:
+    """Open one native annual grid lazily for bounded regional preparation."""
+    path = (
+        Path(root or config.ERA5_HOURLY_T2M_ROOT).expanduser()
+        / f"2mT_hour_ERA5_{year}.nc"
+    )
+    source = xr.open_dataset(
+        path, engine="h5netcdf", cache=False, decode_timedelta=True
+    )
+    try:
+        out = _standardize_common_structure(source)
+        if "t2m" not in out:
+            raise ValueError(f"Native hourly ERA5 source is missing t2m: {path}")
+        out.set_close(source.close)
+        return out
+    except Exception:
+        source.close()
+        raise
 
 
 def open_era5_tas(
@@ -431,17 +453,14 @@ def open_era5_total_cloud_cover(
     else:
         if root is None:
             raise ValueError(
-                "root is required for the temporary legacy-regional "
-                "cloud-cover layout."
+                "root is required for the temporary legacy-regional cloud-cover layout."
             )
         if region is None:
             raise ValueError(
                 "region is required for the legacy-regional cloud-cover layout."
             )
         source_root = Path(root)
-        pattern = str(
-            source_root / f"ERA5_ARCO_total_cloud_cover_{region}_*.nc"
-        )
+        pattern = str(source_root / f"ERA5_ARCO_total_cloud_cover_{region}_*.nc")
         source_chunks = chunks or DEFAULT_REGIONAL_HOURLY_CHUNKS
 
     paths = _glob_required(pattern)
@@ -558,7 +577,9 @@ def _filter_dataset_time_years(
     out = ds.where(ds[time_dim].dt.year.isin(years), drop=True)
     if out.sizes.get(time_dim, 0) == 0:
         requested = ", ".join(str(year) for year in sorted(set(years)))
-        raise ValueError(f"No {time_dim!r} values matched requested years ({requested}).")
+        raise ValueError(
+            f"No {time_dim!r} values matched requested years ({requested})."
+        )
     return out
 
 
@@ -575,7 +596,9 @@ def _filter_dataset_year_coord(
     out = ds.where(ds[year_dim].isin(years), drop=True)
     if out.sizes.get(year_dim, 0) == 0:
         requested = ", ".join(str(year) for year in sorted(set(years)))
-        raise ValueError(f"No {year_dim!r} values matched requested years ({requested}).")
+        raise ValueError(
+            f"No {year_dim!r} values matched requested years ({requested})."
+        )
     return out
 
 

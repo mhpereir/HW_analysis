@@ -12,7 +12,7 @@ if str(REPO_ROOT) not in sys.path:
 
 
 from scripts import plot_top_events as absolute_plot
-from src import analysis_io, climatology, plot_paths, plotting
+from src import analysis_io, climatology, plot_paths, plotting, season_selection
 
 PLOT_NAME = "top_events_clim_anom"
 PRESENTATION_PLOT_NAME = f"{PLOT_NAME}_presentation"
@@ -32,7 +32,7 @@ def parse_args() -> argparse.Namespace:
         help="Regional hourly climatology companion NetCDF path.",
     )
     absolute_plot.add_top_event_plot_arguments(parser)
-    parsed = parser.parse_args()
+    parsed = season_selection.parse_args(parser)
     args = plot_paths.finalize_stage1_plot_paths(
         parsed,
         parser,
@@ -65,7 +65,10 @@ def main() -> int:
     climate = analysis_io.open_regional_hourly_climatology(args.climatology_path)
     try:
         absolute_plot.describe_harmonized_dataset(stage1)
-        selected_events = absolute_plot.select_top_tas_events(stage1, n=args.top_n)
+        event_table = season_selection.select_event_population(
+            stage1, **season_selection.season_kwargs(args)
+        )
+        selected_events = absolute_plot.select_top_tas_events(event_table, n=args.top_n)
         variables = absolute_plot._top_event_variables(
             args.plot_extended_variables,
             args.layout,
@@ -80,7 +83,7 @@ def main() -> int:
             anomaly_source,
             selected_events,
             output_dir=args.output_dir,
-            event_table=stage1,
+            event_table=event_table,
             window_days=args.window_days,
             smoothing_window=args.smoothing_window,
             plot_extended_variables=args.plot_extended_variables,

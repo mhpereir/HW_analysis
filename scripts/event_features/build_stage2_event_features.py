@@ -17,7 +17,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.event_features import event_feature_config as config
 from scripts.event_features import fixed_window_features as fixed
-from src import analysis_io, selectors
+from src import analysis_io, season_selection, selectors
 
 SURFACE_FLUX_FEATURES = frozenset({"I_sshf_pre", "I_slhf_pre"})
 
@@ -26,6 +26,13 @@ def parse_args() -> argparse.Namespace:
     """Parse fixed-window feature extraction CLI arguments."""
     parser = argparse.ArgumentParser(
         description="Build event-level fixed-window features from a Stage-1 dataset."
+    )
+    season_selection.add_season_arguments(parser, default_full_event=False)
+    parser.add_argument(
+        "--integration-hours",
+        type=int,
+        default=None,
+        help="Positive pre-peak heat-budget/LWA span in hours (default: 96).",
     )
     parser.add_argument(
         "--input-path",
@@ -55,31 +62,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip unavailable extended variables instead of failing.",
     )
-    season = parser.add_mutually_exclusive_group(required=True)
-    season.add_argument(
-        "--season-months",
-        type=int,
-        nargs="+",
-        default=None,
-        metavar="MONTH",
-        help="Calendar months to retain before feature extraction, e.g. 6 7 8.",
-    )
-    season.add_argument(
-        "--all-seasons",
-        action="store_true",
-        help="Use every event in the Stage-1 event summary table.",
-    )
-    parser.add_argument(
-        "--require-full-event",
-        action="store_true",
-        help="Require event start/end months to fall within --season-months.",
-    )
     parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Allow output files to replace existing files.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -104,13 +92,17 @@ def build_event_features(
     all_seasons: bool = False,
     require_full_event: bool = False,
     input_path: str | Path | None = None,
+    integration_hours: int | None = None,
 ) -> xr.Dataset:
     """Return one event-level fixed-window feature table."""
-    if not all_seasons and season_months is None:
-        raise ValueError("Either season_months or all_seasons=True is required.")
-    if all_seasons and season_months is not None:
-        raise ValueError("Pass season_months or all_seasons=True, not both.")
+    season_months = season_selection.resolve_months(
+        season_months, all_seasons=all_seasons
+    )
 
+    if all_seasons and require_full_event:
+        raise ValueError("require_full_event cannot be combined with all_seasons.")
+
+    windows = config.integration_windows(integration_hours)
     ds = fixed.ensure_tas_anom(ds)
     event_table = event_summary_table(ds)
     if season_months is not None:
@@ -133,9 +125,10 @@ def build_event_features(
         event_table,
         ds,
         fixed.active_window_names(feature_spec),
+        windows=windows,
     )
     peak_times = event_peak_values(event_table)
-    reducer = fixed.WindowReducer(ds)
+    reducer = fixed.WindowReducer(ds, windows=windows)
 
     out = xr.Dataset(coords={config.EVENT_DIM: event_table[config.EVENT_DIM]})
     copy_event_summary_features(out, event_table)
@@ -151,7 +144,9 @@ def build_event_features(
             operation=operation,
         ),
     )
-    fixed.add_integrated_dynamical_feature(out, row_dim=config.EVENT_DIM)
+    fixed.add_integrated_dynamical_feature(
+        out, row_dim=config.EVENT_DIM, windows=windows
+    )
     fixed.add_days_from_solstice(
         out,
         peak_times,
@@ -168,11 +163,14 @@ def build_event_features(
         require_full_event=require_full_event,
         dropped_boundary_events=dropped_boundary_events,
         feature_spec=feature_spec,
+        windows=windows,
     )
     return out
 
 
-def event_summary_table(ds: xr.Dataset, event_dim: str = config.EVENT_DIM) -> xr.Dataset:
+def event_summary_table(
+    ds: xr.Dataset, event_dim: str = config.EVENT_DIM
+) -> xr.Dataset:
     """Return variables that belong only to the event dimension."""
     names = [
         name
@@ -224,7 +222,9 @@ def validate_required_variables(
     if missing_event:
         missing.append("event-summary variables: " + ", ".join(missing_event))
     if missing:
-        raise ValueError("Input dataset is missing required " + "; ".join(missing) + ".")
+        raise ValueError(
+            "Input dataset is missing required " + "; ".join(missing) + "."
+        )
 
 
 def require_finite_peak_times(event_table: xr.Dataset) -> xr.Dataset:
@@ -240,6 +240,8 @@ def drop_boundary_events(
     event_table: xr.Dataset,
     ds: xr.Dataset,
     window_names: Sequence[str],
+    *,
+    windows: Mapping[str, tuple[int, int]] | None = None,
 ) -> tuple[xr.Dataset, int]:
     """Drop events whose active feature windows are outside the dataset time range."""
     time_values = np.asarray(ds[config.TIME_DIM].values, dtype="datetime64[ns]")
@@ -248,7 +250,9 @@ def drop_boundary_events(
         dtype="datetime64[ns]",
     )
 
-    keep = fixed.complete_anchor_mask(time_values, peak_times, window_names)
+    keep = fixed.complete_anchor_mask(
+        time_values, peak_times, window_names, windows=windows
+    )
 
     dropped = int((~keep).sum())
     out = event_table.isel({config.EVENT_DIM: np.flatnonzero(keep)})
@@ -320,7 +324,9 @@ def add_integral_features(
         if source_name in {"lwa_a_region", "lwa_c_region"}:
             out[feature_name].attrs["description"] = "LWA exposure over fixed window."
         if feature_name in SURFACE_FLUX_FEATURES:
-            out[feature_name].attrs["sign_convention"] = "native Stage-1/source signs retained"
+            out[feature_name].attrs["sign_convention"] = (
+                "native Stage-1/source signs retained"
+            )
 
 
 def add_mean_features(
@@ -384,7 +390,9 @@ def add_days_from_solstice(out: xr.Dataset, event_table: xr.Dataset) -> None:
     )
 
 
-def window_for_peak(ds: xr.Dataset, peak_time: np.datetime64, window_name: str) -> xr.Dataset:
+def window_for_peak(
+    ds: xr.Dataset, peak_time: np.datetime64, window_name: str
+) -> xr.Dataset:
     """Return an inclusive timestamp window for one event peak."""
     start_lag, end_lag = config.WINDOWS[window_name]
     start = peak_time + np.timedelta64(start_lag, "h")
@@ -412,7 +420,9 @@ def event_peak_values(event_table: xr.Dataset) -> np.ndarray:
     )
 
 
-def active_window_names(feature_spec: Mapping[str, Mapping[str, str]]) -> tuple[str, ...]:
+def active_window_names(
+    feature_spec: Mapping[str, Mapping[str, str]],
+) -> tuple[str, ...]:
     """Return active window names in config order."""
     return fixed.active_window_names(feature_spec)
 
@@ -446,6 +456,7 @@ def add_global_attrs(
     require_full_event: bool,
     dropped_boundary_events: int,
     feature_spec: Mapping[str, Mapping[str, str]],
+    windows: Mapping[str, tuple[int, int]] | None = None,
 ) -> None:
     """Attach feature-table provenance and method metadata."""
     attrs: dict[str, Any] = {
@@ -468,8 +479,14 @@ def add_global_attrs(
     }
     if season_months is not None:
         attrs["season_months"] = ",".join(str(month) for month in season_months)
-    for name, (start_lag, end_lag) in config.WINDOWS.items():
+    windows = config.WINDOWS if windows is None else windows
+    for name, (start_lag, end_lag) in windows.items():
         attrs[f"{name}_window_hours"] = f"{start_lag},{end_lag}"
+    attrs.update(
+        season_selection.selection_attrs(
+            season_months, anchor="peak_time", require_full_event=require_full_event
+        )
+    )
     out.attrs.update(attrs)
 
 
@@ -526,7 +543,9 @@ def _validate_season_months(months: Sequence[int]) -> None:
     invalid = [month for month in months if month < 1 or month > 12]
     if invalid:
         values = ", ".join(str(month) for month in invalid)
-        raise ValueError(f"--season-months values must be between 1 and 12; got {values}.")
+        raise ValueError(
+            f"--season-months values must be between 1 and 12; got {values}."
+        )
 
 
 def _display_path(path: Path) -> str:
@@ -551,6 +570,7 @@ def main() -> int:
             all_seasons=args.all_seasons,
             require_full_event=args.require_full_event,
             input_path=args.input_path,
+            integration_hours=args.integration_hours,
         )
         written = write_feature_outputs(
             features,

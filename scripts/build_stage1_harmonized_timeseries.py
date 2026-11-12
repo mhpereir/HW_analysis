@@ -130,6 +130,11 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--hourly-t2m-path",
+        type=Path,
+        help="Optional prepared regional hourly T2m cache; adds tas_region_hourly without reading raw grids.",
+    )
+    parser.add_argument(
         "--cloud-cover-source-layout",
         choices=data_io.CLOUD_COVER_LAYOUTS,
         default=data_io.CLOUD_COVER_LAYOUT_GLOBAL,
@@ -164,8 +169,7 @@ def parse_args() -> argparse.Namespace:
         parser.error(str(exc))
 
     if (
-        args.cloud_cover_source_layout
-        == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
+        args.cloud_cover_source_layout == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
         and not args.add_full_diagnostics
     ):
         parser.error(
@@ -173,8 +177,7 @@ def parse_args() -> argparse.Namespace:
             "--add-full-diagnostics."
         )
     if (
-        args.cloud_cover_source_layout
-        == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
+        args.cloud_cover_source_layout == data_io.CLOUD_COVER_LAYOUT_LEGACY_REGIONAL
         and args.cloud_cover_root is None
     ):
         parser.error(
@@ -310,7 +313,7 @@ def describe_event_ids(name: str, mask: xr.DataArray, event_id: xr.DataArray) ->
 def describe_analysis_dataset(ds: xr.Dataset) -> None:
     """Print a compact summary of the assembled hourly analysis dataset."""
     dims_str = ", ".join(f"{dim}={size}" for dim, size in ds.sizes.items())
-    vars_str = ", ".join(ds.data_vars) #type: ignore
+    vars_str = ", ".join(ds.data_vars)  # type: ignore
     print("Harmonized Stage-1 regional dataset:")
     print(f"  dims: {dims_str}")
     print(f"  vars: {vars_str}")
@@ -319,7 +322,7 @@ def describe_analysis_dataset(ds: xr.Dataset) -> None:
 def describe_event_summary_table(ds: xr.Dataset) -> None:
     """Print a compact summary of the event summary table."""
     dims_str = ", ".join(f"{dim}={size}" for dim, size in ds.sizes.items())
-    vars_str = ", ".join(ds.data_vars) #type: ignore
+    vars_str = ", ".join(ds.data_vars)  # type: ignore
     print("Event summary table:")
     print(f"  dims: {dims_str}")
     print(f"  vars: {vars_str}")
@@ -368,16 +371,28 @@ def require_dataset(value: Any) -> xr.Dataset:
 
 def full_diagnostic_datasets(datasets: dict[str, object]) -> dict[str, xr.Dataset]:
     """Return optional full-diagnostic datasets from the loaded input mapping."""
-    return {
-        key: require_dataset(datasets[key])
-        for key in FULL_DIAGNOSTIC_DATASET_KEYS
-    }
+    return {key: require_dataset(datasets[key]) for key in FULL_DIAGNOSTIC_DATASET_KEYS}
 
 
 def main() -> int:
     """Load the configured ERA5 products and print a summary."""
     args = parse_args()
+    regional_t2m = None
+    hourly_t2m_path = getattr(args, "hourly_t2m_path", None)
+    if hourly_t2m_path is not None:
+        from src.regional_temperature import sha256
+
+        hourly_t2m_path = hourly_t2m_path.expanduser().resolve()
+        with analysis_io.open_regional_hourly_t2m(
+            hourly_t2m_path, region=args.region
+        ) as regional:
+            regional_t2m = regional.load()
+        hourly_t2m_hash = sha256(hourly_t2m_path)
     datasets = load_era5_inputs(args)
+    heat_budget_dataset = require_dataset(datasets["heat_budget"])
+    harmonize.validate_production_hourly_coverage(
+        heat_budget_dataset, years=args.analysis_years
+    )
 
     print("Loaded ERA5 inputs:")
     for name, ds in datasets.items():
@@ -445,15 +460,12 @@ def main() -> int:
         lwa_c_products["lwa_c_event_id"],
     )
 
-    heat_budget_dataset = require_dataset(datasets["heat_budget"]) #ensuring correct type
     analysis_ds = harmonize.build_regional_analysis_dataset(
         heat_budget=heat_budget_dataset,
         hw_event_products=hw_products,
         lwa_event_products=[lwa_products, lwa_a_products, lwa_c_products],
         full_diagnostics=(
-            full_diagnostic_datasets(datasets)
-            if args.add_full_diagnostics
-            else None
+            full_diagnostic_datasets(datasets) if args.add_full_diagnostics else None
         ),
         region=args.region,
         attrs={
@@ -471,14 +483,10 @@ def main() -> int:
             "min_duration": min_duration,
             "add_full_diagnostics": args.add_full_diagnostics,
             "cloud_cover_source_layout": (
-                args.cloud_cover_source_layout
-                if args.add_full_diagnostics
-                else ""
+                args.cloud_cover_source_layout if args.add_full_diagnostics else ""
             ),
             "cloud_cover_root": (
-                str(args.cloud_cover_root)
-                if args.add_full_diagnostics
-                else ""
+                str(args.cloud_cover_root) if args.add_full_diagnostics else ""
             ),
             "temporary_legacy_cloud_cover_override": int(
                 args.add_full_diagnostics
@@ -487,6 +495,12 @@ def main() -> int:
             ),
         },
     )
+    if regional_t2m is not None:
+        analysis_ds = harmonize.add_regional_hourly_t2m(analysis_ds, regional_t2m)
+        analysis_ds.attrs.update(
+            hourly_t2m_source_path=str(hourly_t2m_path),
+            hourly_t2m_source_sha256=hourly_t2m_hash,
+        )
     describe_analysis_dataset(analysis_ds)
 
     analysis_ds = append_event_summary_table(

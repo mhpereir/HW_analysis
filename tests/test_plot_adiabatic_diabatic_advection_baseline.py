@@ -250,11 +250,21 @@ def test_main_forwards_arguments_and_closes_both_datasets(monkeypatch, tmp_path)
     baseline = Closable("baseline")
     events = Closable("events")
 
-    def fake_open_baseline(path):
+    def fake_open_baseline(path, **season_options):
+        assert season_options == {
+            "season_months": [6, 7, 8],
+            "all_seasons": False,
+            "require_full_event": False,
+        }
         assert path == baseline_path
         return baseline
 
-    def fake_open_events(path):
+    def fake_open_events(path, **season_options):
+        assert season_options == {
+            "season_months": [6, 7, 8],
+            "all_seasons": False,
+            "require_full_event": False,
+        }
         assert path == event_path
         return events
 

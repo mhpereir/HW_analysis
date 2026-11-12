@@ -17,15 +17,15 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.event_features import event_feature_config as config
 from scripts.event_features import fixed_window_features as fixed
-from src import analysis_io
+from src import analysis_io, season_selection
+from src.artifact_paths import artifact_root
 
 BASELINE_DIM = "baseline_day"
 REFERENCE_TIME_NAME = "reference_time"
 PIPELINE_STAGE = "stage_2_baseline_features"
 FEATURE_METHOD = "fixed_windows_relative_to_reference_time"
 DEFAULT_OUTPUT_PATH = (
-    REPO_ROOT
-    / "results"
+    artifact_root()
     / "stage2_baseline_features"
     / "non_event_day_features_fixed_windows.nc"
 )
@@ -40,6 +40,13 @@ def parse_args() -> argparse.Namespace:
     """Parse fixed-window baseline feature extraction CLI arguments."""
     parser = argparse.ArgumentParser(
         description="Build baseline-day fixed-window features from a Stage-1 dataset."
+    )
+    season_selection.add_season_arguments(parser, default_full_event=None)
+    parser.add_argument(
+        "--integration-hours",
+        type=int,
+        default=None,
+        help="Positive pre-reference heat-budget/LWA span in hours (default: 96).",
     )
     parser.add_argument(
         "--input-path",
@@ -69,26 +76,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip unavailable extended variables instead of failing.",
     )
-    season = parser.add_mutually_exclusive_group(required=True)
-    season.add_argument(
-        "--season-months",
-        type=int,
-        nargs="+",
-        default=None,
-        metavar="MONTH",
-        help="Calendar months to retain, e.g. 6 7 8.",
-    )
-    season.add_argument(
-        "--all-seasons",
-        action="store_true",
-        help="Use every selected-source non-event day in Stage 1.",
-    )
     parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Allow output files to replace existing files.",
     )
-    return parser.parse_args()
+    return season_selection.parse_args(parser)
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -110,13 +103,14 @@ def build_baseline_features(
     season_months: Sequence[int] | None = None,
     all_seasons: bool = False,
     input_path: str | Path | None = None,
+    integration_hours: int | None = None,
 ) -> xr.Dataset:
     """Return one fixed-window feature row per selected-source non-event day."""
-    if not all_seasons and season_months is None:
-        raise ValueError("Either season_months or all_seasons=True is required.")
-    if all_seasons and season_months is not None:
-        raise ValueError("Pass season_months or all_seasons=True, not both.")
+    season_months = season_selection.resolve_months(
+        season_months, all_seasons=all_seasons
+    )
 
+    windows = config.integration_windows(integration_hours)
     ds = fixed.ensure_tas_anom(ds)
     feature_spec = fixed.active_feature_spec(
         ds,
@@ -125,7 +119,7 @@ def build_baseline_features(
     )
     fixed.validate_required_time_variables(ds, feature_spec)
     event_id_source = selected_event_id_source(ds)
-    reducer = fixed.WindowReducer(ds)
+    reducer = fixed.WindowReducer(ds, windows=windows)
 
     reference_times, reference_event_ids, n_calendar_days = daily_reference_rows(
         ds,
@@ -138,7 +132,9 @@ def build_baseline_features(
         reference_times = reference_times[month_mask(reference_times, season_months)]
     n_selected_before_boundary = int(reference_times.size)
     if n_selected_before_boundary == 0:
-        raise ValueError("No selected-source non-event days remain after season selection.")
+        raise ValueError(
+            "No selected-source non-event days remain after season selection."
+        )
 
     window_names = fixed.active_window_names(feature_spec)
     keep = reducer.complete_anchor_mask(reference_times, window_names)
@@ -185,7 +181,7 @@ def build_baseline_features(
         feature_name_for_source=feature_name_for_source,
         sample_count_name_for_window=sample_count_name_for_window,
     )
-    fixed.add_integrated_dynamical_feature(out, row_dim=BASELINE_DIM)
+    fixed.add_integrated_dynamical_feature(out, row_dim=BASELINE_DIM, windows=windows)
     relabel_baseline_windows(out)
     fixed.add_days_from_solstice(
         out,
@@ -206,6 +202,7 @@ def build_baseline_features(
         n_selected_before_boundary=n_selected_before_boundary,
         dropped_boundary_days=dropped_boundary_days,
         feature_spec=feature_spec,
+        windows=windows,
     )
     return out
 
@@ -214,7 +211,9 @@ def selected_event_id_source(ds: xr.Dataset) -> str:
     """Return and validate the Stage-1 event-ID source defining baseline days."""
     source = ds.attrs.get("event_id_source")
     if not isinstance(source, str) or not source:
-        raise ValueError("Stage-1 dataset is missing required event_id_source metadata.")
+        raise ValueError(
+            "Stage-1 dataset is missing required event_id_source metadata."
+        )
     if source not in ds:
         raise ValueError(
             f"Stage-1 event_id_source {source!r} is not present in the dataset."
@@ -314,11 +313,13 @@ def add_global_attrs(
     n_selected_before_boundary: int,
     dropped_boundary_days: int,
     feature_spec: Mapping[str, Mapping[str, str]],
+    windows: Mapping[str, tuple[int, int]] | None = None,
 ) -> None:
     """Attach baseline-table provenance, population, and method metadata."""
     window_names = fixed.active_window_names(feature_spec)
-    adjacency_start = min(config.WINDOWS[name][0] for name in window_names)
-    adjacency_end = max(config.WINDOWS[name][1] for name in window_names)
+    windows = config.WINDOWS if windows is None else windows
+    adjacency_start = min(windows[name][0] for name in window_names)
+    adjacency_end = max(windows[name][1] for name in window_names)
     attrs: dict[str, Any] = {
         "pipeline_stage": PIPELINE_STAGE,
         "feature_method": FEATURE_METHOD,
@@ -352,8 +353,11 @@ def add_global_attrs(
     if season_months is not None:
         attrs["season_months"] = ",".join(str(month) for month in season_months)
     for name in window_names:
-        start_lag, end_lag = config.WINDOWS[name]
+        start_lag, end_lag = windows[name]
         attrs[f"{baseline_window_name(name)}_window_hours"] = f"{start_lag},{end_lag}"
+    attrs.update(
+        season_selection.selection_attrs(season_months, anchor="reference_time")
+    )
     out.attrs.update(attrs)
 
 
@@ -387,7 +391,9 @@ def _validate_season_months(months: Sequence[int]) -> None:
     invalid = [month for month in months if month < 1 or month > 12]
     if invalid:
         values = ", ".join(str(month) for month in invalid)
-        raise ValueError(f"--season-months values must be between 1 and 12; got {values}.")
+        raise ValueError(
+            f"--season-months values must be between 1 and 12; got {values}."
+        )
 
 
 def _display_path(path: Path) -> str:
@@ -411,6 +417,7 @@ def main() -> int:
             season_months=args.season_months,
             all_seasons=args.all_seasons,
             input_path=args.input_path,
+            integration_hours=args.integration_hours,
         )
         written = write_feature_outputs(
             features,

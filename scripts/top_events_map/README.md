@@ -28,14 +28,15 @@ or computes hourly-to-daily means.
 ## Venus example: the June 2021 event
 
 Run these commands inside an authorized PBS allocation, using `dev_env`.
-The wrapper below runs both steps automatically.
+The wrapper below runs both steps automatically. Set `HWA_ARTIFACT_ROOT` to
+the external artifact root before using these commands.
 
 ```bash
 python scripts/top_events_map/build_top_events_map.py \
-  --event-features-path /home/mhpereir/HW_analysis/results/stage2_event_features/runs/bf232281_20260820/hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc \
+  --event-features-path ${HWA_ARTIFACT_ROOT}/stage2_event_features/runs/bf232281_20260820/hw_event_features_fixed_windows_pnw_bartusek_tas_q90_1940_2024.nc \
   --region pnw_bartusek \
-  --daily-dir /home/mhpereir/HW_analysis/results/spatial_composites/daily \
-  --climatology-path /home/mhpereir/HW_analysis/results/spatial_composites/climatology/era5_daily_doy_climatology_t2m_z500_global_1940_2024.nc \
+  --daily-dir ${HWA_ARTIFACT_ROOT}/spatial_composites/daily \
+  --climatology-path ${HWA_ARTIFACT_ROOT}/spatial_composites/climatology/era5_daily_doy_climatology_t2m_z500_global_1940_2024.nc \
   --climatology-start-year 1940 --climatology-end-year 2024 \
   --peak-year 2021 --top-n 1 \
   --output-path /absolute/new-run/top_events_map.nc
@@ -63,11 +64,15 @@ identities and titles differ.
 
 `schedule_top_events_map.sh` requests one CPU, 8 GB and 20 minutes. It requires
 `PROJECT_ROOT`, `EXPECTED_COMMIT`, `EVENT_FEATURES_PATH`, `REGION`, `DAILY_DIR`,
-`CLIMATOLOGY_PATH`, `RUN_DIR`, and `LOG_DIR`. All paths should be absolute.
+`CLIMATOLOGY_PATH`, and `RUN_DIR` for a new product. Alternatively, provide
+`PREPARED_MAP_PATH` and `SOURCE_VALIDATION_PATH` with `RUN_DIR` to replot an
+accepted product. All prepared paths must be beneath `HWA_ARTIFACT_ROOT`.
+Logs use `HWA_LOG_ROOT` or an explicit `LOG_DIR` beneath it.
 `RUN_DIR` must be new. Optional settings are `TOP_N`, `RANK_METRIC`, `PEAK_YEAR`,
 `CLIMATOLOGY_START_YEAR`, `CLIMATOLOGY_END_YEAR`, `MAP_EXTENT` (space-separated
 west/east/south/north), `OUTLINE_REGIONS` (space-separated), `TEMPERATURE_LIMIT`,
-and `HEIGHT_CONTOUR_INTERVAL`. Defaults match the workflow contract.
+`HEIGHT_CONTOUR_INTERVAL`, and `PLOT_RANKS` (space-separated stored ranks).
+Defaults match the workflow contract.
 
 Before submission, record the task/run through command center and deploy the
 exact reviewed commit with authorization. Submit the tracked script from that
@@ -89,9 +94,13 @@ Failed staging directories are retained for diagnosis. Its independent log is
   manifest.json
 ```
 
-Scientific acceptance additionally requires a direct comparison with the three
-source daily fields and their matched climatology, and original-resolution
-inspection of the figure. Local synthetic tests do not accept a production run.
+Scientific acceptance of a new product additionally requires a direct
+comparison with the three source daily fields and their matched climatology,
+and original-resolution inspection of the figure. A replot retains the exact
+product and successful source audit, verifies their hash linkage and records
+the new plotting commit separately. It does not recalculate fields or change
+the historical event population. Local synthetic tests do not accept a
+production run.
 
 ## Local checks
 
@@ -101,3 +110,29 @@ python -m pytest -q tests/test_top_events_map.py
 bash -n scripts/top_events_map/schedule_top_events_map.sh
 python -m pytest -q
 ```
+
+## Reproduce a saved run with single-column typography
+
+The map is 6 by 8 inches with 18 pt labels and 14 pt legends/annotations.
+The horizontal colorbar, stacked legend and wrapped caption fit that canvas;
+PNG export preserves its size at 300 DPI.
+
+For an authorized submission from a clean pinned deployment:
+
+```bash
+export HWA_ARTIFACT_ROOT="$HOME/HW-analysis/artifacts"
+export HWA_LOG_ROOT="$HOME/HW-analysis/logs"
+export PREPARED_MAP_PATH="$HWA_ARTIFACT_ROOT/top_events_map/runs/c2387d4_20260910_pnw_bartusek_top10/top_events_map.nc"
+export SOURCE_VALIDATION_PATH="$(dirname "$PREPARED_MAP_PATH")/source_validation.json"
+export RUN_DIR="$HWA_ARTIFACT_ROOT/top_events_map/runs/<fresh-attempt>"
+export LOG_DIR="$HWA_LOG_ROOT/top_events_map/<fresh-attempt>"
+# Set PROJECT_ROOT and EXPECTED_COMMIT to the reviewed, clean deployment.
+qsub -v PROJECT_ROOT,EXPECTED_COMMIT,HWA_ARTIFACT_ROOT,HWA_LOG_ROOT,PREPARED_MAP_PATH,SOURCE_VALIDATION_PATH,RUN_DIR,LOG_DIR \
+  scripts/top_events_map/schedule_top_events_map.sh
+```
+
+For the smoke, additionally export `PLOT_RANKS=1` and include `PLOT_RANKS` in
+`qsub -v`. The scale still comes from the full saved product. Use a separate
+fresh run directory for the full ten-map reproduction. The new manifest
+identifies the reused scientific audit; the copied source report retains its
+original timestamp and validator commit.

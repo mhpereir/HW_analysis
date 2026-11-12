@@ -9,6 +9,7 @@ set -euo pipefail
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"
 OUTPUT_PATH="${OUTPUT_PATH:?OUTPUT_PATH is required}"
@@ -20,7 +21,11 @@ THRESHOLD_VARIABLE="${THRESHOLD_VARIABLE:-tas}"
 QUANTILE="${QUANTILE:-90}"
 TIME_START="${TIME_START:-1940}"
 TIME_END="${TIME_END:-2024}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
+
+# Runtime validation and logging.
+hwa_start_log "build_stage1_hourly_climatology"
+hwa_validate_artifact_paths INPUT_PATH OUTPUT_PATH
 
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
@@ -32,8 +37,6 @@ if [[ -e "${OUTPUT_PATH}" ]]; then
 fi
 
 mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_build_stage1_hourly_climatology.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1

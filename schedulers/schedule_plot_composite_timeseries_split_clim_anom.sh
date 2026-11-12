@@ -6,9 +6,12 @@
 #PBS -o /dev/null
 
 set -euo pipefail
+# Empty options use the shared Python defaults; explicit overrides are argv only.
+read -r -a season_args <<< "${HWA_SEASON_OPTIONS:-}"
 cd "${PBS_O_WORKDIR:?PBS_O_WORKDIR is required}"
 
 PROJECT_ROOT="${PROJECT_ROOT:?PROJECT_ROOT is required}"
+source "${PROJECT_ROOT}/config/artifact_paths.sh"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:?EXPECTED_COMMIT is required}"
 INPUT_PATH="${INPUT_PATH:?INPUT_PATH is required}"
 CLIMATOLOGY_PATH="${CLIMATOLOGY_PATH:?CLIMATOLOGY_PATH is required}"
@@ -25,7 +28,7 @@ SMOOTHING_WINDOW="${SMOOTHING_WINDOW:-24}"
 PLOT_LAYOUT="${PLOT_LAYOUT:-paper}"
 SPLIT_QUANTILE="${SPLIT_QUANTILE:-0.75}"
 SPLIT_YEAR="${SPLIT_YEAR:-1982}"
-LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"
+LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"
 OUTPUT_DIRECTORY="$(dirname "${OUTPUT_PATH}")"
 OUTPUT_FILENAME="$(basename "${OUTPUT_PATH}")"
 OUTPUT_STEM="${OUTPUT_FILENAME%.*}"
@@ -61,6 +64,10 @@ split_output_path() {
     "${OUTPUT_SUFFIX}"
 }
 
+# Runtime validation and logging.
+hwa_start_log "plot_composite_split_clim_anom"
+hwa_validate_artifact_paths INPUT_PATH CLIMATOLOGY_PATH OUTPUT_PATH OUTPUT_DIRECTORY
+
 actual_commit=$(git -C "${PROJECT_ROOT}" rev-parse HEAD)
 test "${actual_commit}" = "${EXPECTED_COMMIT}"
 test -z "$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=normal)"
@@ -73,8 +80,6 @@ for split_variable in "${split_variable_list[@]}" peak_time; do
 done
 
 mkdir -p "${LOG_DIR}" "$(dirname "${OUTPUT_PATH}")"
-LOGFILE="${LOG_DIR}/${PBS_JOBID}_plot_composite_split_clim_anom.log"
-exec > >(tee -a "${LOGFILE}") 2>&1
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
@@ -107,6 +112,7 @@ cd "${PROJECT_ROOT}"
 for split_variable in "${split_variable_list[@]}"; do
   echo "[info] split_variable=${split_variable}"
   /usr/bin/time -v python scripts/plot_composite_timeseries_split_clim_anom.py \
+    "${season_args[@]}" \
     --region "${REGION}" \
     --bottom-boundary "${BOTTOM_BOUNDARY}" \
     --top-boundary "${TOP_BOUNDARY}" \
@@ -121,8 +127,6 @@ for split_variable in "${split_variable_list[@]}"; do
     --smoothing-window "${SMOOTHING_WINDOW}" \
     --split-variable "${split_variable}" \
     --split-quantiles "${SPLIT_QUANTILE}" \
-    --season-months 6 7 8 \
-    --require-full-event \
     "${plot_layout_args[@]}"
   derived_output_path="$(split_output_path "${split_variable}")"
   test -s "${derived_output_path}"
@@ -131,6 +135,7 @@ done
 
 echo "[info] split_variable=peak_time"
 /usr/bin/time -v python scripts/plot_composite_timeseries_split_clim_anom.py \
+  "${season_args[@]}" \
   --region "${REGION}" \
   --bottom-boundary "${BOTTOM_BOUNDARY}" \
   --top-boundary "${TOP_BOUNDARY}" \
@@ -145,8 +150,6 @@ echo "[info] split_variable=peak_time"
   --smoothing-window "${SMOOTHING_WINDOW}" \
   --split-variable peak_time \
   --split-years "${SPLIT_YEAR}" \
-  --season-months 6 7 8 \
-  --require-full-event \
   "${plot_layout_args[@]}"
 derived_output_path="$(split_output_path peak_time)"
 test -s "${derived_output_path}"

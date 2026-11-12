@@ -8,13 +8,11 @@ from HW_analysis.scripts.event_features import (
 )
 
 
-def test_parse_args_requires_explicit_baseline_universe(monkeypatch):
+def test_parse_args_defaults_to_jja_endpoints(monkeypatch):
     monkeypatch.setattr("sys.argv", ["build_stage2_baseline_features.py"])
-
-    with pytest.raises(SystemExit) as excinfo:
-        build_baseline.parse_args()
-
-    assert excinfo.value.code == 2
+    args = build_baseline.parse_args()
+    assert args.season_months == [6, 7, 8]
+    assert not args.all_seasons
 
 
 def test_parse_args_has_no_require_full_event_option(monkeypatch):
@@ -94,14 +92,14 @@ def test_build_baseline_writes_reference_features_without_event_peak_analogues()
         out["I_dyn_pre"],
         out["I_adiabatic_pre"] + out["I_advection_pre"],
     )
-    assert out["I_dyn_pre"].attrs["formula"] == (
-        "I_adiabatic_pre + I_advection_pre"
-    )
+    assert out["I_dyn_pre"].attrs["formula"] == ("I_adiabatic_pre + I_advection_pre")
     assert out["I_dyn_pre"].attrs["units"] == "K"
     assert out["I_lwa_a_pre_reference"].min().item() == 485.0
     assert out["I_lwa_c_pre_reference"].min().item() == 582.0
     assert out["I_lwa_a_pre_reference"].attrs["window_name"] == "lwa_pre_reference"
-    assert out["n_samples_lwa_pre_reference"].attrs["window_name"] == "lwa_pre_reference"
+    assert (
+        out["n_samples_lwa_pre_reference"].attrs["window_name"] == "lwa_pre_reference"
+    )
     assert out["T_anom_mean_ant"].min().item() == 10.0
     assert out.attrs["pipeline_stage"] == "stage_2_baseline_features"
     assert out.attrs["feature_method"] == "fixed_windows_relative_to_reference_time"

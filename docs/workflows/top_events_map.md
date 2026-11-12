@@ -68,6 +68,31 @@ region; captions identify the climatology baseline and peak anchor. Region
 colors, theme, sizes, line widths, and export DPI use `src/plot_style.py`.
 Natural Earth map assets must already be available in the Venus environment.
 
+Maps use a 6-inch single-column canvas and the shared single-column font
+context: 18 pt titles, labels and ticks; 14 pt contour labels, legends and
+captions. A horizontal colorbar, stacked region legend and wrapped caption
+keep these artists inside the canvas. Export at 300 DPI without tight cropping
+so the saved PNG retains the exact 6-inch width. Other figure families keep
+their existing style. Neither the fields nor the color and contour scales
+change with the layout.
+
+For a typography-only reproduction, the PBS wrapper accepts
+`PREPARED_MAP_PATH` and `SOURCE_VALIDATION_PATH` instead of builder inputs.
+The latter must be the successful independent-source validation report whose
+product SHA-256 matches the prepared NetCDF. Copy both byte for byte into the
+new run and keep their original provenance. The new manifest separately
+records the product producer and the current plot producer. This mode reuses
+the earlier scientific validation; it does not claim a new raw-source audit
+or reselect the historical event population under newer seasonal defaults.
+The deferred seasonal-policy review for new map builds remains separate.
+
+Optional `--event-ranks` (`PLOT_RANKS` in PBS) renders selected stored ranks
+without reranking or subsetting the product used to determine the shared
+temperature scale. Use rank 1 for a short rendering smoke, then omit this
+option to reproduce all maps. In both modes prepared inputs and outputs obey
+the [external artifact-path contract](artifacts.md), and existing files are
+never replaced.
+
 Each CLI refuses existing output paths. The PBS wrapper requires a new run
 directory and publishes it only after the prepared product and all figures
 validate, retaining an immutable manifest with inputs, configuration, exact
@@ -85,6 +110,10 @@ map plus colorbar, both configured outlines, dates, units, contour signs, and
 shared style without requiring network access. Exercise the two CLIs together
 on tiny synthetic files, check PBS syntax and failure gates, and run the full
 repository test suite before handoff.
+Verify font-context restoration, exact exported width, artist bounds and
+unchanged input fields. For prepared-product reproduction, verify the retained
+source-report hash linkage, unchanged input checksums, stored event order and
+common color scale, decoded PNGs and original-resolution visual review.
 
 After authorized Git publication/deployment, use the tracked PBS entrypoint
 for a 2021 PNW smoke run. Independently compare the stored fields with direct

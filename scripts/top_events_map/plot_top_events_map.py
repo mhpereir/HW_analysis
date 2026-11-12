@@ -21,6 +21,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--input-path", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument(
+        "--event-ranks", type=int, nargs="+",
+        help="Render only these stored ranks, keeping the full-product color scale.",
+    )
+    parser.add_argument(
         "--outline-regions",
         nargs="+",
         choices=sorted(config.REGIONS),
@@ -44,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
         paths = top_events_map_plotting.write_top_event_maps(
             product.load(),
             args.output_dir,
+            event_ranks=args.event_ranks,
             outline_regions=args.outline_regions,
             temperature_limit=args.temperature_limit,
             height_contour_interval=args.height_contour_interval,

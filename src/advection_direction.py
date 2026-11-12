@@ -86,10 +86,7 @@ def add_face_advection_tendencies(
     )
 
     raw_total = sum(
-        (
-            heat_budget[source_face_variable(face)]
-            for face in faces
-        ),
+        (heat_budget[source_face_variable(face)] for face in faces),
         start=xr.zeros_like(heat_budget["advection_term"]),
     )
     _assert_allclose(
@@ -160,9 +157,7 @@ def grouped_advection_components(ds: xr.Dataset) -> xr.Dataset:
     required = tuple(stage1_face_variable(face) for face in REQUIRED_FACES)
     _require_variables(ds, required, dataset_name="face-contribution dataset")
 
-    zonal = (ds["advection_west"] + ds["advection_east"]).rename(
-        "advection_zonal"
-    )
+    zonal = (ds["advection_west"] + ds["advection_east"]).rename("advection_zonal")
     meridional = (ds["advection_south"] + ds["advection_north"]).rename(
         "advection_meridional"
     )
@@ -293,8 +288,7 @@ def complete_daily_face_means(
         raise ValueError(f"composite is missing lag coordinate {lag_dim!r}.")
 
     face_names = tuple(
-        stage1_face_variable(face)
-        for face in available_stage1_faces(composite)
+        stage1_face_variable(face) for face in available_stage1_faces(composite)
     )
     _require_variables(
         composite,
@@ -308,7 +302,9 @@ def complete_daily_face_means(
         raise TypeError(f"{lag_dim!r} must be numeric.")
     lag = lag.astype(float)
     if not np.all(np.isfinite(lag)) or not np.allclose(np.diff(lag), 1.0):
-        raise ValueError(f"{lag_dim!r} must be finite, strictly hourly, and contiguous.")
+        raise ValueError(
+            f"{lag_dim!r} must be finite, strictly hourly, and contiguous."
+        )
 
     first = int(lag[0])
     stop = int(lag[-1])

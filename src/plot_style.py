@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from contextlib import contextmanager
 from pathlib import Path
 
 import matplotlib.dates as mdates
@@ -10,11 +11,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from matplotlib.colors import Normalize
+from matplotlib.lines import Line2D
 from matplotlib.ticker import (
     AutoMinorLocator,
     Formatter,
+    MaxNLocator,
     MultipleLocator,
     NullFormatter,
+    ScalarFormatter,
     StrMethodFormatter,
 )
 
@@ -25,10 +29,14 @@ PRESENTATION_HEIGHT_IN = 7.5
 
 PAPER_FONT_SIZE_PT = 14
 LEGEND_FONT_SIZE_PT = 9
+SINGLE_COLUMN_FONT_SIZE_PT = 18
+SINGLE_COLUMN_LEGEND_FONT_SIZE_PT = 14
 LINE_WIDTH_PT = 1.25
 REFERENCE_LINE_WIDTH_PT = 0.9
 SCATTER_SIZE_PT2 = 16
 SCATTER_ALPHA = 0.35
+HEXBIN_GRIDSIZE = 35
+COUNT_COLOR_MAP = "viridis"
 DPI = 300
 AXIS_TICK_DECIMALS = 2
 AXIS_SCALE_LOW_THRESHOLD = 1e-2
@@ -42,6 +50,22 @@ SINGLE_PANEL_ASPECT = 0.6
 TWO_PANEL_STACK_ASPECT = 0.55
 TWO_PANEL_COLUMN_ASPECT = 1.5
 PRESENTATION_TWO_PANEL_WIDTH_SCALE = 1.25
+PRESENTATION_SCATTER_X_INTERVALS = 4
+PRESENTATION_EVENT_SIZE_PT2 = 40.0
+PRESENTATION_EVENT_ALPHA = 0.9
+BUDGET_REFERENCE_CAPTION = (
+    r"Lower-panel lines: $I_{dyn,net}+I_{diabatic}=I_{dT/dt}$ (K)"
+)
+ANOMALY_BUDGET_REFERENCE_CAPTION = (
+    r"Lower-panel lines: $I'_{dyn,net}+I'_{diabatic}=I'_{dT/dt}$ (K)"
+)
+HEAT_BUDGET_ANOMALY_LABELS = {
+    "I_advection_pre": r"$I'_{advective}$ (K)",
+    "I_adiabatic_pre": r"$I'_{adiabatic}$ (K)",
+    "I_dyn_pre": r"$I'_{dyn,net}$ (K)",
+    "I_dTdt_pre": r"$I'_{dT/dt}$ (K)",
+    "I_diabatic_pre": r"$I'_{diabatic}$ (K)",
+}
 THREE_PANEL_STACK_ASPECT = 0.62
 SQUARE_PANEL_ASPECT = 0.95
 
@@ -106,9 +130,25 @@ FACE_COLORS = {
     "bottom": "#D55E00",
 }
 
+HEATING_RANK_STYLES = {
+    "raw": {
+        "color": COLORS["storage"],
+        "linestyle": "-",
+        "marker": "o",
+        "label": "Raw rank",
+    },
+    "corrected": {
+        "color": COLORS["temperature_tendency"],
+        "linestyle": "--",
+        "marker": "s",
+        "label": "Climatology-corrected rank",
+    },
+}
+
 REGION_NAME_MAPPING = {
     "alaska": "Alaska",
     "central_china": "Central China",
+    "central_usa": "Central USA",
     "eastern_canada": "Eastern Canada",
     "gulf_usa": "Gulf USA",
     "pnw_bartusek": "Pacific Northwest (Bartusek)",
@@ -119,6 +159,7 @@ REGION_NAME_MAPPING = {
 REGION_COLORS = {
     "alaska": "#0072B2",
     "central_china": "#D55E00",
+    "central_usa": "#4D4D4D",
     "eastern_canada": "#009E73",
     "gulf_usa": "#CC79A7",
     "pnw_bartusek": "#E69F00",
@@ -202,6 +243,39 @@ def publication_figsize(
     return figure_width, figure_width * aspect
 
 
+@contextmanager
+def font_context(width: str = "full"):
+    """Scope typography to figure construction without affecting other layouts."""
+    sizes = {
+        "single": (SINGLE_COLUMN_FONT_SIZE_PT, SINGLE_COLUMN_LEGEND_FONT_SIZE_PT),
+        "full": (PAPER_FONT_SIZE_PT, LEGEND_FONT_SIZE_PT),
+    }
+    if width not in sizes:
+        raise ValueError("Font width must be 'single' or 'full'.")
+    paper_size, legend_size = sizes[width]
+    settings = dict.fromkeys(
+        (
+            "font.size",
+            "axes.labelsize",
+            "axes.titlesize",
+            "xtick.labelsize",
+            "ytick.labelsize",
+            "figure.titlesize",
+        ),
+        paper_size,
+    )
+    settings.update(
+        {"legend.fontsize": legend_size, "legend.title_fontsize": legend_size}
+    )
+    with plt.rc_context(settings):
+        yield
+
+
+def legend_font_size() -> float:
+    """Return the numeric legend size from the active shared font context."""
+    return float(plt.rcParams["legend.fontsize"])
+
+
 def two_panel_presentation_figsize() -> tuple[float, float]:
     """Return the widened two-row presentation canvas dimensions."""
     figure_width, figure_height = publication_figsize(
@@ -232,13 +306,110 @@ def format_time_axis(ax) -> None:
     ax.xaxis.set_minor_formatter(NullFormatter())
 
 
-def format_integer_axis(axis, *, spacing: int = 1) -> None:
-    """Format a numeric axis with integer labels at a fixed integer spacing."""
+def format_day_lag_axis(axis) -> None:
+    """Use daily minor ticks and prefer whole-day major ticks when possible."""
+    axis.set_major_locator(MaxNLocator(nbins="auto", integer=True))
+    axis.set_major_formatter(ScalarFormatter(useOffset=False))
+    axis.set_minor_locator(MultipleLocator(1))
+    use_default_numeric_formatter(axis)
+
+
+def format_integer_axis(
+    axis, *, spacing: int = 1, minor_spacing: int | None = None
+) -> None:
+    """Format integer labels, optionally fixing minor ticks independently."""
     if isinstance(spacing, bool) or not isinstance(spacing, int) or spacing < 1:
         raise ValueError("spacing must be a positive integer.")
+    if minor_spacing is not None and (
+        isinstance(minor_spacing, bool)
+        or not isinstance(minor_spacing, int)
+        or minor_spacing < 1
+    ):
+        raise ValueError("minor_spacing must be a positive integer.")
     axis.set_major_locator(MultipleLocator(spacing))
     axis.set_major_formatter(StrMethodFormatter("{x:.0f}"))
+    if minor_spacing is not None:
+        axis.set_minor_locator(MultipleLocator(minor_spacing))
     use_default_numeric_formatter(axis)
+
+
+def limit_major_ticks(axis, *, max_intervals: int, integer: bool = False) -> None:
+    """Limit numeric tick density without changing shared decimal formatting."""
+    if (
+        isinstance(max_intervals, bool)
+        or not isinstance(max_intervals, int)
+        or max_intervals < 1
+    ):
+        raise ValueError("max_intervals must be a positive integer.")
+    axis.set_major_locator(MaxNLocator(nbins=max_intervals, integer=integer))
+
+
+def event_severity_legend_handle(*, point_size: float, alpha: float) -> Line2D:
+    """Return a visible population key independent of the first event's color."""
+    return Line2D(
+        [],
+        [],
+        linestyle="none",
+        marker="o",
+        markersize=np.sqrt(point_size),
+        markerfacecolor=plt.get_cmap(EVENT_SEVERITY_COLOR_MAP)(0.5),
+        markeredgecolor=COLORS["benchmark"],
+        markeredgewidth=0.45,
+        alpha=alpha,
+        label="Events",
+    )
+
+
+def add_sum_reference_lines(ax, *, spacing: float = 5.0, max_lines: int = 17) -> None:
+    """Label visible x+y=c guides in K without changing limits or autoscaling.
+
+    Broad ranges use integer multiples of spacing to bound rendering cost and
+    avoid a dense background. This is a geometric guide, not a fitted model.
+    """
+    if not np.isfinite(spacing) or spacing <= 0:
+        raise ValueError("spacing must be finite and positive.")
+    if isinstance(max_lines, bool) or not isinstance(max_lines, int) or max_lines < 2:
+        raise ValueError("max_lines must be an integer of at least two.")
+    if ax.get_xscale() != "linear" or ax.get_yscale() != "linear":
+        raise ValueError("Sum reference guides require linear axes.")
+
+    xmin, xmax = sorted(ax.get_xlim())
+    ymin, ymax = sorted(ax.get_ylim())
+    lower, upper = xmin + ymin, xmax + ymax
+    step = spacing * max(1, int(np.ceil((upper - lower) / spacing / (max_lines - 1))))
+    first, last = int(np.ceil(lower / step)), int(np.floor(upper / step))
+    for index in range(first, last + 1):
+        level = index * step
+        lo, hi = max(xmin, level - ymax), min(xmax, level - ymin)
+        if max((hi - lo) / (xmax - xmin), (hi - lo) / (ymax - ymin)) < 0.1:
+            continue
+        xx = np.array([lo, hi])
+        ax.plot(
+            xx,
+            np.clip(level - xx, ymin, ymax),
+            scalex=False,
+            scaley=False,
+            color=COLORS["zero"],
+            linewidth=REFERENCE_LINE_WIDTH_PT,
+            linestyle=":",
+            alpha=0.55,
+            zorder=0,
+            label=f"reference {level:g} K",
+        )
+        xpos = (lo + hi) / 2
+        xleft, xright = ax.get_xlim()
+        fraction = (xpos - xleft) / (xright - xleft)
+        ax.text(
+            xpos,
+            level - xpos,
+            f"{level:g} K",
+            fontsize=legend_font_size() - 1,
+            color="0.35",
+            ha="right" if fraction > 0.9 else "left" if fraction < 0.1 else "center",
+            va="center",
+            clip_on=True,
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.75, "pad": 0.3},
+        )
 
 
 def style_axis(ax, *, grid: bool = True) -> None:
@@ -252,8 +423,8 @@ def style_axis(ax, *, grid: bool = True) -> None:
     ax.tick_params(axis="both", which="major", length=4, pad=3)
     ax.tick_params(axis="both", which="minor", length=2.5)
     ax.margins(x=0.015)
-    ax.yaxis.get_offset_text().set_fontsize(PAPER_FONT_SIZE_PT)
-    ax.xaxis.get_offset_text().set_fontsize(PAPER_FONT_SIZE_PT)
+    ax.yaxis.get_offset_text().set_fontsize(ax.yaxis.label.get_fontsize())
+    ax.xaxis.get_offset_text().set_fontsize(ax.xaxis.label.get_fontsize())
     sns.despine(ax=ax)
 
 
@@ -410,9 +581,11 @@ def apply_stacked_layout(fig, nrows: int, *, width: str = "single") -> None:
     fig.subplots_adjust(**STACKED_FIGURE_LAYOUTS[(width, nrows)])
 
 
-def save_figure(fig, path: str | Path) -> None:
+def save_figure(fig, path: str | Path, *, crop: bool = True) -> None:
+    """Export with shared formatting, optionally preserving the exact canvas."""
     format_numeric_axes(fig)
-    fig.savefig(path, dpi=DPI, bbox_inches="tight", pad_inches=0.04)
+    with plt.rc_context({"savefig.bbox": "tight" if crop else None}):
+        fig.savefig(path, dpi=DPI, pad_inches=0.04)
 
 
 def legend_kwargs(**overrides) -> dict:
@@ -424,7 +597,7 @@ def legend_kwargs(**overrides) -> dict:
         "handlelength": 2.2,
         "borderpad": 0.5,
         "labelspacing": 0.4,
-        "fontsize": LEGEND_FONT_SIZE_PT,
+        "fontsize": legend_font_size(),
     }
     kwargs.update(overrides)
     return kwargs

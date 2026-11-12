@@ -33,6 +33,20 @@ def plot_top_event_map(
     height_contour_interval: float = DEFAULT_HEIGHT_CONTOUR_INTERVAL,
 ) -> plt.Figure:
     """Return one map and one colorbar, using only a validated saved product."""
+    plot_style.apply_theme()
+    with plot_style.font_context("single"):
+        return _plot_top_event_map(
+            ds,
+            event_index=event_index,
+            outline_regions=outline_regions,
+            temperature_limit=temperature_limit,
+            height_contour_interval=height_contour_interval,
+        )
+
+
+def _plot_top_event_map(
+    ds, *, event_index, outline_regions, temperature_limit, height_contour_interval
+) -> plt.Figure:
     validate_top_event_maps(ds)
     if not 0 <= event_index < ds.sizes["event"]:
         raise ValueError("event_index is outside the prepared map product.")
@@ -63,10 +77,9 @@ def plot_top_event_map(
         if not np.isfinite(value) or value <= 0:
             raise ValueError(f"{name} must be finite and positive.")
     panel = ds.isel(event=event_index)
-    plot_style.apply_theme()
     data_crs = ccrs.PlateCarree()
-    fig = plt.figure(figsize=plot_style.publication_figsize("full", aspect=0.72))
-    ax = fig.add_axes((0.03, 0.18, 0.83, 0.71), projection=data_crs)
+    fig = plt.figure(figsize=plot_style.publication_figsize("single", aspect=4 / 3))
+    ax = fig.add_axes((0.04, 0.45, 0.92, 0.37), projection=data_crs)
     ax.set_extent(extent, crs=data_crs)
     mesh = ax.pcolormesh(
         ds.longitude,
@@ -104,7 +117,7 @@ def plot_top_event_map(
         ax.clabel(
             contours,
             fmt="%g",
-            fontsize=plot_style.LEGEND_FONT_SIZE_PT,
+            fontsize=plot_style.legend_font_size(),
             inline_spacing=3,
         )
     _decorate_map(ax, data_crs)
@@ -132,21 +145,23 @@ def plot_top_event_map(
         )
         ax.add_patch(outline)
         handles.append(outline)
-    color_axis = fig.add_axes((0.90, 0.24, 0.018, 0.58))
-    colorbar = fig.colorbar(mesh, cax=color_axis, extend="both")
+    color_axis = fig.add_axes((0.12, 0.365, 0.76, 0.022))
+    colorbar = fig.colorbar(mesh, cax=color_axis, extend="both", orientation="horizontal")
     colorbar.set_label("2 m temperature anomaly [K]")
+    plot_style.format_integer_axis(color_axis.xaxis)
+    plot_style.limit_major_ticks(color_axis.xaxis, max_intervals=6, integer=True)
     first_day, last_day = pd.to_datetime(panel.sample_date.values[[0, -1]])
     date_label = _date_range_label(first_day, last_day)
     rank = int(panel.selection_rank.item())
     ax.set_title(
-        f"{date_label}\n{plot_style.REGION_NAME_MAPPING.get(region, region)} - event rank {rank}",
+        f"{date_label}\n{plot_style.REGION_NAME_MAPPING.get(region, region)}\nEvent rank {rank}",
         pad=14,
     )
     fig.legend(
         handles=handles,
-        loc="lower center",
-        bbox_to_anchor=(0.46, 0.095),
-        ncol=min(2, len(handles)),
+        loc="center",
+        bbox_to_anchor=(0.5, 0.205),
+        ncol=1,
         **plot_style.legend_kwargs(),
     )
     peak = pd.Timestamp(panel.peak_time.item()).strftime("%d %b %Y %H:%M UTC")
@@ -154,13 +169,13 @@ def plot_top_event_map(
         f"{ds.attrs['climatology_start_year']}-{ds.attrs['climatology_end_year']}"
     )
     fig.text(
-        0.46,
-        0.055,
-        f"3-day means relative to {baseline} daily climatology\n"
-        f"Z500 anomaly contours [m], spacing {height_contour_interval:g} m; peak {peak}",
+        0.5,
+        0.035,
+        f"3-day means relative to\n{baseline} daily climatology\n"
+        f"Z500 anomaly contours [m], spacing {height_contour_interval:g} m\nPeak: {peak}",
         ha="center",
-        va="center",
-        fontsize=plot_style.LEGEND_FONT_SIZE_PT,
+        va="bottom",
+        fontsize=plot_style.legend_font_size(),
     )
     return fig
 
@@ -204,29 +219,38 @@ def map_filename(ds: xr.Dataset, event_index: int) -> str:
 def write_top_event_maps(
     ds: xr.Dataset,
     output_dir: str | Path,
+    *,
+    event_ranks: Sequence[int] | None = None,
     **plot_options,
 ) -> list[Path]:
     """Render all selected events with shared scaling and no file replacement."""
     validate_top_event_maps(ds)
     root = Path(output_dir).expanduser().resolve()
-    paths = [root / map_filename(ds, index) for index in range(ds.sizes["event"])]
+    indices = event_indices_for_ranks(ds, event_ranks)
+    paths = [root / map_filename(ds, index) for index in indices]
     for path in paths:
         if path.exists():
             raise FileExistsError(f"Figure exists: {path}")
     root.mkdir(parents=True, exist_ok=True)
-    for index, path in enumerate(paths):
+    for index, path in zip(indices, paths, strict=True):
         fig = plot_top_event_map(ds, event_index=index, **plot_options)
         temporary_path = path.with_name(f".{path.stem}.{uuid4().hex}.partial.png")
         try:
-            fig.savefig(
-                temporary_path,
-                dpi=plot_style.DPI,
-                bbox_inches="tight",
-                pad_inches=0.04,
-                facecolor="white",
-            )
+            plot_style.save_figure(fig, temporary_path, crop=False)
             os.link(temporary_path, path)
         finally:
             plt.close(fig)
             temporary_path.unlink(missing_ok=True)
     return paths
+
+
+def event_indices_for_ranks(ds: xr.Dataset, event_ranks: Sequence[int] | None) -> list[int]:
+    """Select stored ranks in product order without changing the scale population."""
+    available = ds.selection_rank.values.tolist()
+    if event_ranks is None:
+        return list(range(len(available)))
+    if not event_ranks or len(set(event_ranks)) != len(event_ranks):
+        raise ValueError("Event ranks must be nonempty and unique.")
+    if not set(event_ranks).issubset(available):
+        raise ValueError("Requested event ranks are absent from the prepared product.")
+    return [index for index, rank in enumerate(available) if rank in event_ranks]

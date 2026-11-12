@@ -27,15 +27,17 @@ from uuid import uuid4
 import numpy as np
 import xarray as xr
 
+from . import regional_temperature, season_selection
+from .artifact_paths import artifact_root
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HARMONIZED_TIMESERIES_PATH = (
-    REPO_ROOT
-    / "results"
+    artifact_root()
     / "stage1"
     / "harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
 )
-DEFAULT_STAGE1_OUTPUT_DIR = REPO_ROOT / "results" / "stage1"
-DEFAULT_STAGE1_CLIMATOLOGY_OUTPUT_DIR = REPO_ROOT / "results" / "stage1_climatology"
+DEFAULT_STAGE1_OUTPUT_DIR = artifact_root() / "stage1"
+DEFAULT_STAGE1_CLIMATOLOGY_OUTPUT_DIR = artifact_root() / "stage1_climatology"
 EXPECTED_PIPELINE_STAGE = "stage_1_harmonized_regional_timeseries"
 EXPECTED_CLIMATOLOGY_PIPELINE_STAGE = "stage_1_regional_hourly_climatology"
 CURRENT_STAGE1_CONTRACT_VERSION = 2
@@ -78,6 +80,37 @@ REQUIRED_STAGE1_V2_VARIABLES: frozenset[str] = frozenset(
 )
 
 
+def open_stage2_features(
+    path: str | Path,
+    *,
+    expected_stage: str | tuple[str, ...] | None = None,
+    **season_options: Any,
+) -> xr.Dataset:
+    """Open a Stage-2 table and guard its seasonal population before use."""
+    ds = xr.open_dataset(
+        Path(path).expanduser().resolve(), engine="h5netcdf", decode_timedelta=True
+    )
+    try:
+        allowed_stages = (
+            (expected_stage,) if isinstance(expected_stage, str) else expected_stage
+        )
+        stage = ds.attrs.get("pipeline_stage")
+        if allowed_stages is not None and stage not in allowed_stages:
+            raise ValueError(f"Expected pipeline_stage={expected_stage!r}.")
+        if stage in {
+            "stage_2_event_component_anomalies",
+            "stage_2_baseline_component_anomalies",
+        }:
+            from .stage2_component_anomalies import validate_component_anomalies
+
+            validate_component_anomalies(ds)
+        season_selection.validate_stage2_season(ds, **season_options)
+    except Exception:
+        ds.close()
+        raise
+    return ds
+
+
 def default_harmonized_timeseries_path(
     *,
     region: str,
@@ -109,10 +142,7 @@ def default_harmonized_timeseries_path(
         str(start_year),
         str(end_year),
     )
-    filename = (
-        "harmonized_regional_timeseries_"
-        f"{'_'.join(run_tokens)}.nc"
-    )
+    filename = f"harmonized_regional_timeseries_{'_'.join(run_tokens)}.nc"
     return DEFAULT_STAGE1_OUTPUT_DIR / filename
 
 
@@ -149,6 +179,46 @@ def save_harmonized_timeseries(
     return output_path
 
 
+def open_regional_hourly_t2m(
+    path: str | Path, *, region: str | None = None
+) -> xr.Dataset:
+    """Open a complete prepared hourly regional ERA5 product."""
+    ds = xr.open_dataset(
+        Path(path).expanduser(), engine="h5netcdf", decode_timedelta=True
+    )
+    try:
+        regional_temperature.validate_product(ds, region=region)
+    except Exception:
+        ds.close()
+        raise
+    return ds
+
+
+def save_regional_hourly_t2m(ds: xr.Dataset, path: str | Path) -> Path:
+    """Validate a round trip before exclusive, atomic publication."""
+    regional_temperature.validate_product(ds)
+    output = Path(path).expanduser().absolute()
+    if output.exists() or output.is_symlink():
+        raise FileExistsError(f"Output already exists: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_name(f".{output.name}.{uuid4().hex}.partial")
+    try:
+        _prepare_for_netcdf(ds).to_netcdf(
+            temporary,
+            engine="h5netcdf",
+            encoding={"tas_region": {"dtype": "float64", "zlib": True, "complevel": 4}},
+        )
+        with open_regional_hourly_t2m(temporary, region=ds.attrs["region"]) as reopened:
+            np.testing.assert_array_equal(
+                reopened.tas_region.values, ds.tas_region.values
+            )
+            np.testing.assert_array_equal(reopened.time.values, ds.time.values)
+        os.link(temporary, output)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return output
+
+
 def open_harmonized_timeseries(
     path: str | Path = DEFAULT_HARMONIZED_TIMESERIES_PATH,
     *,
@@ -161,7 +231,11 @@ def open_harmonized_timeseries(
         kwargs["chunks"] = dict(chunks)
 
     ds = xr.open_dataset(input_path, **kwargs)
-    _validate_harmonized_timeseries(ds)
+    try:
+        _validate_harmonized_timeseries(ds)
+    except Exception:
+        ds.close()
+        raise
     return ds
 
 
@@ -211,8 +285,12 @@ def _validate_harmonized_timeseries(ds: xr.Dataset) -> None:
     missing = sorted(REQUIRED_HARMONIZED_VARIABLES.difference(ds.data_vars))
     if missing:
         raise ValueError(
-            "Harmonized dataset is missing required variables: "
-            f"{', '.join(missing)}."
+            f"Harmonized dataset is missing required variables: {', '.join(missing)}."
+        )
+
+    if "tas_region_hourly" in ds:
+        regional_temperature.validate_hourly_variable(
+            ds.tas_region_hourly, region=str(ds.attrs.get("region"))
         )
 
     contract_version = int(ds.attrs.get("stage1_contract_version", 1))
@@ -298,14 +376,57 @@ def open_top_event_maps(path: str | Path) -> xr.Dataset:
     return ds
 
 
-def _write_netcdf_atomically(ds: xr.Dataset, output_path: Path) -> None:
+def save_diurnal_composite(ds: xr.Dataset, path: str | Path) -> Path:
+    """Save plotted hourly statistics to a new, atomically published NetCDF."""
+    if not {"hw_class", "local_hour", "quantile"}.issubset(ds.dims):
+        raise ValueError(
+            "Diurnal composite requires hw_class, local_hour and quantile dimensions."
+        )
+    output_path = Path(path).expanduser().absolute()
+    if output_path.exists() or output_path.is_symlink():
+        raise FileExistsError(f"Output already exists: {output_path}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_netcdf_atomically(_prepare_for_netcdf(ds), output_path, overwrite=False)
+    return output_path
+
+
+def save_integration_window_ranks(ds: xr.Dataset, output_path: str | Path) -> Path:
+    """Publish one validated rank comparison without replacing existing data."""
+    from src.integration_window_analysis import validate_heating_comparison
+
+    validate_heating_comparison(ds)
+    path = Path(output_path)
+    if path.exists():
+        raise FileExistsError(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_netcdf_atomically(_prepare_for_netcdf(ds), path)
+    return path
+
+
+def open_integration_window_ranks(path: str | Path) -> xr.Dataset:
+    """Open and validate a prepared heating-rank comparison."""
+    from src.integration_window_analysis import validate_heating_comparison
+
+    ds = xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True)
+    try:
+        validate_heating_comparison(ds)
+    except Exception:
+        ds.close()
+        raise
+    return ds
+
+
+def _write_netcdf_atomically(
+    ds: xr.Dataset, output_path: Path, *, overwrite: bool = True
+) -> None:
     """Write beside the destination and publish only a complete NetCDF file."""
-    temporary_path = output_path.with_name(
-        f".{output_path.name}.{uuid4().hex}.partial"
-    )
+    temporary_path = output_path.with_name(f".{output_path.name}.{uuid4().hex}.partial")
     try:
         ds.to_netcdf(temporary_path, engine="h5netcdf")
-        os.replace(temporary_path, output_path)
+        if overwrite:
+            os.replace(temporary_path, output_path)
+        else:
+            os.link(temporary_path, output_path)
     finally:
         temporary_path.unlink(missing_ok=True)
 
@@ -368,3 +489,29 @@ def _filename_token(value: object) -> str:
     for old, new in (("/", "-"), ("\\", "-"), (" ", "-")):
         token = token.replace(old, new)
     return token
+
+
+def save_component_anomalies(ds: xr.Dataset, output_path: str | Path) -> Path:
+    """Atomically save a new validated component-anomaly feature table."""
+    from src.stage2_component_anomalies import validate_component_anomalies
+
+    validate_component_anomalies(ds)
+    path = Path(output_path).expanduser().resolve()
+    if path.exists():
+        raise FileExistsError(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_netcdf_atomically(_prepare_for_netcdf(ds), path)
+    return path
+
+
+def open_component_anomalies(path: str | Path) -> xr.Dataset:
+    """Open and validate one component-anomaly table."""
+    from src.stage2_component_anomalies import validate_component_anomalies
+
+    ds = xr.open_dataset(path, engine="h5netcdf", decode_timedelta=True)
+    try:
+        validate_component_anomalies(ds)
+    except Exception:
+        ds.close()
+        raise
+    return ds

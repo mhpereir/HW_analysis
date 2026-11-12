@@ -19,6 +19,7 @@ from src import (
     composites,
     data_io,
     plot_paths,
+    season_selection,
     selectors,
 )
 
@@ -32,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot peak-aligned face and grouped advection tendencies."
     )
+    season_selection.add_season_arguments(parser, default_full_event=True)
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(
         "--output-path",
@@ -46,24 +48,17 @@ def parse_args() -> argparse.Namespace:
         help="Number of complete days on each side of event peak time.",
     )
     parser.add_argument(
-        "--season-months",
+        "--smoothing-window",
         type=int,
-        nargs="+",
-        default=None,
-        metavar="MONTH",
-        help="Optional calendar months to retain, e.g. 6 7 8.",
-    )
-    parser.add_argument(
-        "--require-full-event",
-        action="store_true",
-        help="Require complete event intervals within --season-months.",
+        default=advection_direction_plotting.DEFAULT_SMOOTHING_WINDOW,
+        help="Hourly running-mean window for the smoothed figure.",
     )
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Allow replacement of an existing standalone exploration PNG.",
+        help="Allow replacement of both standalone exploration PNGs.",
     )
-    args = parser.parse_args()
+    args = season_selection.parse_args(parser)
     try:
         return finalize_args(args)
     except ValueError as exc:
@@ -76,6 +71,8 @@ def finalize_args(args: argparse.Namespace) -> argparse.Namespace:
         raise ValueError("--start-year must be less than or equal to --end-year.")
     if args.window_days < 1:
         raise ValueError("--window-days must be >= 1.")
+    if args.smoothing_window < 1:
+        raise ValueError("--smoothing-window must be >= 1.")
     if args.require_full_event and args.season_months is None:
         raise ValueError("--require-full-event requires --season-months.")
     if args.season_months is not None:
@@ -83,8 +80,7 @@ def finalize_args(args: argparse.Namespace) -> argparse.Namespace:
         if invalid:
             values = ", ".join(str(month) for month in invalid)
             raise ValueError(
-                "--season-months values must be between 1 and 12; "
-                f"got {values}."
+                f"--season-months values must be between 1 and 12; got {values}."
             )
 
     args.bottom_boundary = data_io.normalize_heat_budget_bottom_boundary(
@@ -170,24 +166,33 @@ def build_composite(ds, args: argparse.Namespace):
 
 
 def main() -> int:
-    """Build and write the standalone advection-direction figure."""
+    """Build and write raw and smoothed advection-direction figures."""
     args = parse_args()
-    if args.output_path.exists() and not args.overwrite:
+    smoothed_path = advection_direction_plotting.smoothed_output_path(args.output_path)
+    existing = [path for path in (args.output_path, smoothed_path) if path.exists()]
+    if existing and not args.overwrite:
+        paths = ", ".join(str(path) for path in existing)
         raise FileExistsError(
-            f"Exploration plot already exists: {args.output_path}. "
-            "Pass --overwrite to replace it."
+            f"Exploration plot output already exists: {paths}. "
+            "Pass --overwrite to replace both outputs."
         )
 
     ds = analysis_io.open_harmonized_timeseries(args.input_path)
     try:
         composite = build_composite(ds, args)
-        path = advection_direction_plotting.write_advection_direction_exploration_plot(
-            composite,
-            args.output_path,
+        written = (
+            advection_direction_plotting.write_advection_direction_exploration_outputs(
+                composite,
+                args.output_path,
+                smoothed_output_path=smoothed_path,
+                smoothing_window=args.smoothing_window,
+            )
         )
     finally:
         ds.close()
-    print(f"Wrote advection-direction exploration plot: {path}")
+    print("Wrote advection-direction exploration plots:")
+    for path in written:
+        print(f"  {path}")
     return 0
 
 

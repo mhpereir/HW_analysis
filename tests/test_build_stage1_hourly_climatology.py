@@ -28,8 +28,7 @@ def test_finalize_args_builds_standard_input_and_output_paths():
         "pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc"
     )
     assert out.output_path.name == (
-        "regional_hourly_climatology_"
-        "pnw_bartusek_surface_700hPa_1940_2024.nc"
+        "regional_hourly_climatology_pnw_bartusek_surface_700hPa_1940_2024.nc"
     )
 
 

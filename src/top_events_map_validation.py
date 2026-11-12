@@ -16,6 +16,21 @@ from . import config
 ABSOLUTE_TOLERANCE = 1e-10
 
 
+def validate_saved_source_report(product_path: str | Path, report_path: str | Path) -> dict:
+    """Verify that a retained successful source audit covers these exact bytes.
+
+    This validates reuse of a previous audit, not present-day raw-source files.
+    """
+    from .top_events_map import sha256_file
+
+    report = json.loads(Path(report_path).read_text())
+    if report.get("status") != "passed":
+        raise ValueError("Saved source validation did not pass.")
+    if report.get("product_sha256") != sha256_file(product_path):
+        raise ValueError("Saved source validation product checksum does not match.")
+    return report
+
+
 def validate_against_sources(product: xr.Dataset) -> dict:
     """Independently rank events and directly sum the three daily source fields.
 

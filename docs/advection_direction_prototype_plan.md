@@ -41,8 +41,14 @@ be hidden inside one combined scheduler job.
 
 The earlier combined production scheduler, combined smoke scheduler, and shell
 pipeline runner have therefore been removed. The retained
-`schedulers/schedule_plot_advection_direction_exploration.sh` is plot-only: it
-consumes an existing enhanced Stage-1 product and writes a new figure.
+`schedulers/schedule_plot_advection_direction_exploration.sh` is plot-only. It
+requires explicit `REGION`, `INPUT_PATH`, and `OUTPUT_PATH` values and accepts
+an optional external `LOG_DIR`. The input must be a validated Stage-1 version 2
+product containing the normalized face tendencies. The scheduler retains the
+surface-to-700-hPa, TAS q90, 1940-2024, complete-JJA-event, and seven-day
+composite configuration while allowing the region and artifact namespace to
+change. It stages the PNG beside its final destination and refuses to overwrite
+an existing output.
 
 If the base or enhanced Stage-1 products need to be rebuilt, add or use a
 tracked scheduler for that one builder only, submit it independently, validate
@@ -369,18 +375,17 @@ Only after prototype approval:
 Generated paths:
 
 ```text
-results/stage1/advection_direction_exploration/
-  base_stage1/
-    harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc
-  harmonized_regional_timeseries_pnw_bartusek_surface_700hPa_tas_q90_1940_2024.nc
+results/stage1/runs/<accepted-run>/
+  harmonized_regional_timeseries_<region>_surface_700hPa_tas_q90_1940_2024.nc
 
 results/plots_advection_direction_exploration/
-  region_pnw_bartusek/
+  region_<region>/
     boundary_surface_700hPa/
       time_range_1940_2024/
         advection_face_contributions.png
         advection_face_contributions_three_panel.png
         advection_face_contributions_two_panel.png
+        advection_face_contributions_two_panel_smoothed.png
 ```
 
 The original `advection_face_contributions.png` is retained as the reviewed
@@ -393,6 +398,11 @@ retained as the reviewed three-panel intermediate.
 
 Each product and figure will record the region, pressure boundaries, event
 definition, years, season filter, lag window, input paths, and source commit.
+The two-panel plotting entrypoints retain the unsmoothed output and additionally
+write a sibling `_smoothed.png` figure using a centered, complete-window
+24-hour running mean by default. This is a display-only transform of the
+post-composite signed face tendencies; grouped curves are recomputed from the
+smoothed faces.
 
 ## Compatibility Requirements
 
@@ -419,7 +429,10 @@ Local validation in `dev_env`:
 - metadata and unit validation;
 - plotting tests for the two-panel order, absence of ratio and glyph panels,
   data-relative legend headroom, the five-column grouped legend, unit-only
-  y-axis labels, one-day integer x-axis ticks, and non-empty output; and
+  y-axis labels, one-day integer x-axis ticks, and non-empty output;
+- dual-output tests for unchanged raw values, centered complete-window
+  smoothing, exact grouped identities after smoothing, matched-population
+  independence, title labeling, and no-overwrite preflight; and
 - the full repository test suite.
 
 Venus validation through OpenPBS:

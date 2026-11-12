@@ -70,7 +70,9 @@ def test_threshold_to_time_projects_dayofyear_threshold_to_time_axis():
 
     assert out.dims == ("time",)
     np.testing.assert_allclose(out.values, [10.0, 20.0, 10.0])
-    np.testing.assert_array_equal(out["time"].values, time.values.astype("datetime64[ns]"))
+    np.testing.assert_array_equal(
+        out["time"].values, time.values.astype("datetime64[ns]")
+    )
     assert out.name == "threshold"
     assert out.attrs["projected_to_time"] is True
 
@@ -306,7 +308,7 @@ def test_compute_region_mean_rejects_dataset_inputs():
     ds = xr.Dataset({"tas": _sample_field()})
 
     with pytest.raises(TypeError, match="xarray.DataArray"):
-        preprocess.compute_region_mean(ds, "pnw_bartusek") # type: ignore[arg-type]
+        preprocess.compute_region_mean(ds, "pnw_bartusek")  # type: ignore[arg-type]
 
 
 def test_compute_region_weighted_quantiles_reduces_lat_lon():
@@ -326,7 +328,9 @@ def test_compute_region_weighted_quantiles_reduces_lat_lon():
 
 def test_compute_region_weighted_quantiles_rejects_invalid_quantile():
     with pytest.raises(ValueError, match=r"\[0, 1\]"):
-        preprocess.compute_region_weighted_quantiles(_sample_field(), "pnw_bartusek", 1.5)
+        preprocess.compute_region_weighted_quantiles(
+            _sample_field(), "pnw_bartusek", 1.5
+        )
 
 
 def test_compute_region_area_is_positive_for_selected_grid():

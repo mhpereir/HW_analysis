@@ -41,8 +41,8 @@ def test_scheduler_uses_bounded_serial_resources_and_isolated_logs(scheduler):
 
     assert "#PBS -l select=1:ncpus=1:mem=4gb" in text
     assert "#PBS -l walltime=00:15:00" in text
-    assert 'LOG_DIR="${LOG_DIR:-${PROJECT_ROOT}/logs}"' in text
-    assert 'LOGFILE="${LOG_DIR}/${PBS_JOBID}_' in text
+    assert 'LOG_DIR="${LOG_DIR:-${HWA_LOG_ROOT}}"' in text
+    assert 'hwa_start_log "plot_' in text
     assert "export OMP_NUM_THREADS=1" in text
     assert "export MKL_NUM_THREADS=1" in text
     assert "export OPENBLAS_NUM_THREADS=1" in text
@@ -61,6 +61,74 @@ def test_event_scheduler_requires_explicit_non_overwriting_paths():
     assert '--input-path "${EVENT_INPUT_PATH}"' in text
     assert '--output-path "${OUTPUT_PATH}"' in text
     assert 'test -s "${OUTPUT_PATH}"' in text
+
+
+def test_presentation_smoke_is_pinned_and_runs_export_regressions():
+    scheduler = REPO_ROOT / "schedulers" / "schedule_presentation_feature_smoke.sh"
+    test_scheduler_is_commit_pinned_warning_free_and_syntax_valid(scheduler)
+    text = scheduler.read_text()
+    assert "#PBS -l select=1:ncpus=1:mem=4gb" in text
+    assert "#PBS -l walltime=00:10:00" in text
+    assert "-m pytest -q -W error" in text
+    assert 'hwa_start_log "presentation_feature_smoke"' in text
+    for name in (
+        "test_artifact_paths.py",
+        "test_stage2_schedulers.py",
+        "test_spatial_composite_shell_scripts.py",
+        "test_plot_style.py",
+        "test_presentation_budget_comparisons.py",
+        "test_selectors.py",
+        "test_plot_adiabatic_advection_comparison.py",
+        "test_plot_adiabatic_advection_comparison_baseline.py",
+    ):
+        assert f"tests/{name}" in text
+
+
+@pytest.mark.parametrize("scheduler", PRESENTATION_SCHEDULERS)
+@pytest.mark.parametrize("layout", ["full", "presentation"])
+@pytest.mark.parametrize("override", [False, True])
+def test_scheduler_marker_defaults_and_overrides_match_layout(
+    scheduler, layout, override, tmp_path
+):
+    # Evaluate only local variable declarations, stopping before Git, files,
+    # environments or job execution. No scheduler or production input is used.
+    declarations = scheduler.read_text().split(
+        "\n# Runtime validation and logging.", 1
+    )[0]
+    env = {
+        "HOME": str(Path.home()),
+        "PBS_O_WORKDIR": str(tmp_path),
+        "PROJECT_ROOT": str(REPO_ROOT),
+        "EXPECTED_COMMIT": "synthetic-not-a-deployment",
+        "EVENT_INPUT_PATH": "events.nc",
+        "BASELINE_INPUT_PATH": "baseline.nc",
+        "OUTPUT_PATH": "plot.png",
+        "LAYOUT": layout,
+    }
+    prefix = "" if scheduler == SCHEDULERS["event"] else "EVENT_"
+    if override:
+        env[f"{prefix}POINT_SIZE"] = "17.0"
+        env[f"{prefix}ALPHA"] = "0.4"
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            declarations
+            + f'\nprintf "%s %s" "${{{prefix}POINT_SIZE}}" "${{{prefix}ALPHA}}"',
+        ],
+        env=env,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    expected = (
+        "17.0 0.4"
+        if override
+        else "40.0 0.9"
+        if layout == "presentation"
+        else "24.0 0.7"
+    )
+    assert result.stdout == expected
 
 
 @pytest.mark.parametrize("scheduler", PRESENTATION_SCHEDULERS)

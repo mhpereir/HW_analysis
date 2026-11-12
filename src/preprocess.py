@@ -57,11 +57,15 @@ def threshold_to_time(
     )
 
     time_values = time.values
-    time_index = xr.DataArray(time_values, dims=(time_dim,), coords={time_dim: time_values})
+    time_index = xr.DataArray(
+        time_values, dims=(time_dim,), coords={time_dim: time_values}
+    )
     target_dayofyear = time_index.dt.dayofyear
 
     if threshold.dims == (dayofyear_dim,):
-        expanded = threshold.reindex({dayofyear_dim: np.unique(target_dayofyear.values)})
+        expanded = threshold.reindex(
+            {dayofyear_dim: np.unique(target_dayofyear.values)}
+        )
         out = expanded.sel({dayofyear_dim: target_dayofyear})
     else:
         target_year = time_index.dt.year
@@ -138,7 +142,9 @@ def compute_region_mean(
         lat_bounds, lon_bounds = config.REGIONS[region]
     except KeyError as exc:
         available = ", ".join(sorted(config.REGIONS))
-        raise ValueError(f"Unknown region {region!r}. Available regions: {available}") from exc
+        raise ValueError(
+            f"Unknown region {region!r}. Available regions: {available}"
+        ) from exc
 
     da_region = _select_region(da, region, lat_dim=lat_dim, lon_dim=lon_dim)
 
@@ -170,7 +176,9 @@ def compute_region_weighted_quantiles(
 ) -> xr.DataArray:
     """Compute cosine-latitude weighted regional quantiles over lat/lon."""
     if not isinstance(da, xr.DataArray):
-        raise TypeError("compute_region_weighted_quantiles expects an xarray.DataArray.")
+        raise TypeError(
+            "compute_region_weighted_quantiles expects an xarray.DataArray."
+        )
 
     da_region = _select_region(da, region, lat_dim=lat_dim, lon_dim=lon_dim)
     q = np.atleast_1d(np.asarray(quantiles, dtype=float))
@@ -250,7 +258,9 @@ def _select_region(
         lat_bounds, lon_bounds = config.REGIONS[region]
     except KeyError as exc:
         available = ", ".join(sorted(config.REGIONS))
-        raise ValueError(f"Unknown region {region!r}. Available regions: {available}") from exc
+        raise ValueError(
+            f"Unknown region {region!r}. Available regions: {available}"
+        ) from exc
 
     da = _ensure_minus180_to_180_longitudes(da, lon_dim=lon_dim)
     da_region = da.sel(
@@ -283,7 +293,9 @@ def _coordinate_edges(values: np.ndarray) -> np.ndarray:
     """Infer one-dimensional cell edges from coordinate centers."""
     centers = np.sort(np.asarray(values, dtype=float))
     if centers.ndim != 1 or centers.size < 2:
-        raise ValueError("At least two coordinate values are required to infer cell area.")
+        raise ValueError(
+            "At least two coordinate values are required to infer cell area."
+        )
 
     mids = 0.5 * (centers[:-1] + centers[1:])
     first = centers[0] - (mids[0] - centers[0])
@@ -313,7 +325,9 @@ def _validate_threshold_to_time_inputs(
 ) -> None:
     """Validate threshold projection inputs."""
     if not isinstance(threshold, xr.DataArray):
-        raise TypeError("threshold_to_time expects threshold to be an xarray.DataArray.")
+        raise TypeError(
+            "threshold_to_time expects threshold to be an xarray.DataArray."
+        )
 
     if not isinstance(time, xr.DataArray):
         raise TypeError("threshold_to_time expects time to be an xarray.DataArray.")
