@@ -175,14 +175,15 @@ def _plot_top_event_map(
         color_axis.tick_params(
             axis="x", which=which, width=plt.rcParams[f"xtick.{which}.width"] / 2
         )
-    legend = ax.legend(
-        handles=handles,
-        loc="lower center",
-        bbox_to_anchor=(0.5, 0.02),
-        ncol=2,
-        **plot_style.legend_kwargs(),
-    )
-    legend.get_frame().set_linewidth(legend.get_frame().get_linewidth() / 2)
+    if len(handles) > 1:
+        legend = ax.legend(
+            handles=handles,
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.02),
+            ncol=2,
+            **plot_style.legend_kwargs(),
+        )
+        legend.get_frame().set_linewidth(legend.get_frame().get_linewidth() / 2)
     # Retain every contour line; hide only labels that would be cut by the
     # geographic frame. Non-inline labels leave no gaps when omitted.
     fig.canvas.draw()

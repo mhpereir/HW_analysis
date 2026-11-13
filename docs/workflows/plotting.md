@@ -60,6 +60,7 @@ font). The map/colorbar gap is approximately 0.242 inches, half the previous gap
 have no title/footer, and use half the preceding map stroke widths.
 They preserve the exact canvas on export and keep the prepared scientific
 fields, contour intervals and full-product temperature scale unchanged.
+For a single selected region, top-event maps omit the region legend.
 
 `save_figure()` normally crops unused margins. Use `crop=False` with a layout
 that fits all artists inside the canvas when an exact publication aspect is

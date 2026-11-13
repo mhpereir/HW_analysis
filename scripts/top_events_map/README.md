@@ -119,6 +119,10 @@ colorbar is approximately 0.242 inches below the map (half the prior gap).
 The PNW Hotz et al. / PNW Bartusek et al. legend has two columns in one row
 inside the lower map. PNG export preserves its size at 300 DPI.
 
+For a Bartusek-only version, pass `--outline-regions pnw_bartusek` or set
+`OUTLINE_REGIONS=pnw_bartusek` for PBS. Selecting one outline automatically
+omits the region legend. Use a fresh output directory for this variant.
+
 For an authorized submission from a clean pinned deployment:
 
 ```bash

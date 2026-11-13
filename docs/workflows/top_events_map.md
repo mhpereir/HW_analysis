@@ -82,6 +82,10 @@ relocated legend. Export at 300 DPI without tight cropping
 so the saved PNG retains the exact 6-inch width. Other figure families keep
 their existing style. Neither the fields nor the color and contour scales
 change with the layout.
+The existing `--outline-regions pnw_bartusek` option (`OUTLINE_REGIONS=pnw_bartusek`
+in PBS) produces a Bartusek-only variant. A single outline omits the region
+legend; multiple outlines retain the inset legend. Save variants in separate
+output directories to preserve the accepted default two-region maps.
 Contour labels use a white halo for contrast and omit labels that would cross
 the map frame; the underlying contour lines remain continuous and unchanged.
 

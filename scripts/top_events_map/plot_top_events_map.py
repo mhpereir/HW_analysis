@@ -28,7 +28,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--outline-regions",
         nargs="+",
         choices=sorted(config.REGIONS),
-        help="Default: both PNW regions for a PNW event; otherwise the event region.",
+        help=("Default: both PNW regions for a PNW event; otherwise the event region. "
+              "A single outline omits the region legend."),
     )
     parser.add_argument(
         "--temperature-limit", type=float, help="Symmetric T2m anomaly limit [K]."
