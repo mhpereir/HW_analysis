@@ -63,15 +63,19 @@ single-panel Plate Carree map PNG per event. The rectangular geographic domain
 keeps the displayed field inside the prepared grid. Filenames include region,
 rank, event ID, and peak date. All figures from one product share a symmetric zero-centered
 temperature scale. Z500 contours use m, negative dashed and nonnegative solid,
-with a default 50 m interval. Titles identify the averaging dates and event
-region; captions identify the climatology baseline and peak anchor. Region
+with a default 50 m interval. Dates, event rank, baseline and peak anchor
+remain in the product, filenames and run manifest; maps have no title or
+footer text. Region
 colors, theme, sizes, line widths, and export DPI use `src/plot_style.py`.
 Natural Earth map assets must already be available in the Venus environment.
 
-Maps use a 6-inch single-column canvas and the shared single-column font
-context: 18 pt titles, labels and ticks; 14 pt contour labels, legends and
-captions. A horizontal colorbar, stacked region legend and wrapped caption
-keep these artists inside the canvas. Export at 300 DPI without tight cropping
+Maps use a 6-by-5.5-inch single-column canvas and the shared single-column
+font context: 18 pt labels and ticks; 14 pt contour labels and legends. A
+horizontal colorbar and stacked region legend fit below the map. PNW legend
+labels are "PNW Hotz et al." and "PNW Bartusek et al.". Contours, coastlines,
+borders, gridlines, region outlines, white halos, frames and tick strokes are
+half as thick as the preceding 4cd25a3 rendering. The map retains its physical
+size; removing the title/footer also removes their unused canvas space. Export at 300 DPI without tight cropping
 so the saved PNG retains the exact 6-inch width. Other figure families keep
 their existing style. Neither the fields nor the color and contour scales
 change with the layout.
@@ -108,7 +112,8 @@ Local synthetic tests must independently verify ranking and year selection,
 three-day arithmetic, exact month/day matching across leap and year boundaries,
 geopotential conversion, missing-date/nonfinite/unit/grid rejection, metadata
 and NetCDF round-trip, and refusal to overwrite outputs. Plot tests verify one
-map plus colorbar, both configured outlines, dates, units, contour signs, and
+map plus colorbar, both configured outlines, short legend labels, absence of
+title/footer text, units, reduced line widths, contour signs, and
 shared style without requiring network access. Exercise the two CLIs together
 on tiny synthetic files, check PBS syntax and failure gates, and run the full
 repository test suite before handoff.

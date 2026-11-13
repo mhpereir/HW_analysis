@@ -113,8 +113,9 @@ python -m pytest -q
 
 ## Reproduce a saved run with single-column typography
 
-The map is 6 by 8 inches with 18 pt labels and 14 pt legends/annotations.
-The horizontal colorbar, stacked legend and wrapped caption fit that canvas;
+The map is 6 by 5.5 inches with 18 pt labels and 14 pt legends/contour labels.
+Titles and footers are omitted, and line widths are halved. The horizontal
+colorbar and stacked PNW Hotz et al. / PNW Bartusek et al. legend fit the canvas;
 PNG export preserves its size at 300 DPI.
 
 For an authorized submission from a clean pinned deployment:

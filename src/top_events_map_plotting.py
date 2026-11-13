@@ -22,6 +22,7 @@ from .top_events_map import region_bounds, validate_top_event_maps
 
 PNW_REGIONS = ("pnw_hotz", "pnw_bartusek")
 DEFAULT_HEIGHT_CONTOUR_INTERVAL = 50.0
+MAP_FIGURE_ASPECT = 11 / 12
 
 
 def plot_top_event_map(
@@ -78,8 +79,10 @@ def _plot_top_event_map(
             raise ValueError(f"{name} must be finite and positive.")
     panel = ds.isel(event=event_index)
     data_crs = ccrs.PlateCarree()
-    fig = plt.figure(figsize=plot_style.publication_figsize("single", aspect=4 / 3))
-    ax = fig.add_axes((0.04, 0.45, 0.92, 0.37), projection=data_crs)
+    fig = plt.figure(
+        figsize=plot_style.publication_figsize("single", aspect=MAP_FIGURE_ASPECT)
+    )
+    ax = fig.add_axes((0.04, 0.42, 0.92, 0.54), projection=data_crs)
     ax.set_extent(extent, crs=data_crs)
     mesh = ax.pcolormesh(
         ds.longitude,
@@ -111,7 +114,7 @@ def _plot_top_event_map(
             heights,
             levels=levels,
             colors="#222222",
-            linewidths=plot_style.LINE_WIDTH_PT,
+            linewidths=plot_style.LINE_WIDTH_PT / 2,
             linestyles=["dashed" if value < 0 else "solid" for value in levels],
             transform=data_crs,
         )
@@ -123,7 +126,7 @@ def _plot_top_event_map(
         )
         for label in contour_labels:
             label.set_path_effects([
-                path_effects.Stroke(linewidth=2, foreground="white"),
+                path_effects.Stroke(linewidth=1, foreground="white"),
                 path_effects.Normal(),
             ])
     _decorate_map(ax, data_crs)
@@ -136,53 +139,43 @@ def _plot_top_event_map(
             north - south,
             fill=False,
             edgecolor=plot_style.REGION_COLORS.get(name, "#444444"),
-            linewidth=2 * plot_style.LINE_WIDTH_PT,
+            linewidth=plot_style.LINE_WIDTH_PT,
             transform=data_crs,
             zorder=6,
-            label=plot_style.REGION_NAME_MAPPING.get(name, name),
+            label=plot_style.REGION_CITATION_LABELS.get(
+                name, plot_style.REGION_NAME_MAPPING.get(name, name)
+            ),
         )
         outline.set_path_effects(
             [
                 path_effects.Stroke(
-                    linewidth=3 * plot_style.LINE_WIDTH_PT, foreground="white"
+                    linewidth=1.5 * plot_style.LINE_WIDTH_PT, foreground="white"
                 ),
                 path_effects.Normal(),
             ]
         )
         ax.add_patch(outline)
         handles.append(outline)
-    color_axis = fig.add_axes((0.12, 0.365, 0.76, 0.022))
+    color_axis = fig.add_axes((0.12, 0.30, 0.76, 0.032))
     colorbar = fig.colorbar(mesh, cax=color_axis, extend="both", orientation="horizontal")
     colorbar.set_label("2 m temperature anomaly [K]")
     plot_style.format_integer_axis(color_axis.xaxis)
     plot_style.limit_major_ticks(color_axis.xaxis, max_intervals=8, integer=True)
-    first_day, last_day = pd.to_datetime(panel.sample_date.values[[0, -1]])
-    date_label = _date_range_label(first_day, last_day)
-    rank = int(panel.selection_rank.item())
-    ax.set_title(
-        f"{date_label}\n{plot_style.REGION_NAME_MAPPING.get(region, region)}\nEvent rank {rank}",
-        pad=14,
-    )
-    fig.legend(
+    for axis in (ax, color_axis):
+        for spine in axis.spines.values():
+            spine.set_linewidth(spine.get_linewidth() / 2)
+    for which in ("major", "minor"):
+        color_axis.tick_params(
+            axis="x", which=which, width=plt.rcParams[f"xtick.{which}.width"] / 2
+        )
+    legend = fig.legend(
         handles=handles,
         loc="center",
-        bbox_to_anchor=(0.5, 0.205),
+        bbox_to_anchor=(0.5, 0.075),
         ncol=1,
         **plot_style.legend_kwargs(),
     )
-    peak = pd.Timestamp(panel.peak_time.item()).strftime("%d %b %Y %H:%M UTC")
-    baseline = (
-        f"{ds.attrs['climatology_start_year']}-{ds.attrs['climatology_end_year']}"
-    )
-    fig.text(
-        0.5,
-        0.035,
-        f"3-day means relative to\n{baseline} daily climatology\n"
-        f"Z500 anomaly contours [m], spacing {height_contour_interval:g} m\nPeak: {peak}",
-        ha="center",
-        va="bottom",
-        fontsize=plot_style.legend_font_size(),
-    )
+    legend.get_frame().set_linewidth(legend.get_frame().get_linewidth() / 2)
     # Retain every contour line; hide only labels that would be cut by the
     # geographic frame. Non-inline labels leave no gaps when omitted.
     fig.canvas.draw()
@@ -197,29 +190,21 @@ def _plot_top_event_map(
 
 def _decorate_map(ax, data_crs: ccrs.PlateCarree) -> None:
     ax.coastlines(
-        resolution="50m", color="#222222", linewidth=plot_style.REFERENCE_LINE_WIDTH_PT
+        resolution="50m", color="#222222", linewidth=plot_style.REFERENCE_LINE_WIDTH_PT / 2
     )
     ax.add_feature(
         cfeature.BORDERS.with_scale("50m"),
         edgecolor="#666666",
-        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT / 2,
+        linewidth=plot_style.REFERENCE_LINE_WIDTH_PT / 4,
     )
     ax.gridlines(
         crs=data_crs,
         draw_labels=False,
-        linewidth=0.4,
+        linewidth=0.2,
         color="#666666",
         alpha=0.3,
         linestyle=":",
     )
-
-
-def _date_range_label(start: pd.Timestamp, end: pd.Timestamp) -> str:
-    if (start.year, start.month) == (end.year, end.month):
-        return f"{start.day}-{end.day} {end.strftime('%B %Y')}"
-    if start.year == end.year:
-        return f"{start.day} {start.strftime('%b')} - {end.day} {end.strftime('%b %Y')}"
-    return f"{start.strftime('%d %b %Y')} - {end.strftime('%d %b %Y')}"
 
 
 def map_filename(ds: xr.Dataset, event_index: int) -> str:

@@ -309,7 +309,7 @@ def test_product_round_trip_and_no_overwrite(tmp_path):
         maps.validate_top_event_maps(product)
 
 
-def test_single_panel_plot_shows_dates_units_contour_signs_and_both_regions(
+def test_single_panel_plot_shows_units_thin_contours_and_short_region_labels(
     tmp_path, monkeypatch
 ):
     features, kwargs = _inputs(tmp_path)
@@ -323,14 +323,15 @@ def test_single_panel_plot_shows_dates_units_contour_signs_and_both_regions(
     try:
         assert len(fig.axes) == 2  # one map plus its colorbar
         ax = fig.axes[0]
-        assert "28-30 June 2021" in ax.get_title()
-        assert "Bartusek" in ax.get_title()
+        assert ax.get_title() == ""
+        assert not fig.texts
         assert fig.axes[1].get_xlabel() == "2 m temperature anomaly [K]"
-        np.testing.assert_array_equal(fig.get_size_inches(), [6, 8])
-        assert ax.title.get_fontsize() == 18
+        np.testing.assert_array_equal(fig.get_size_inches(), [6, 5.5])
         assert fig.axes[1].xaxis.label.get_fontsize() == 18
         assert all(text.get_fontsize() == 14 for text in fig.legends[0].get_texts())
-        assert fig.texts[0].get_fontsize() == 14
+        assert [text.get_text() for text in fig.legends[0].get_texts()] == [
+            "PNW Hotz et al.", "PNW Bartusek et al."
+        ]
         assert plt.rcParams["axes.labelsize"] == plot_style.PAPER_FONT_SIZE_PT
         assert len(ax.patches) == 2
         for patch, region in zip(ax.patches, plotting.PNW_REGIONS, strict=True):
@@ -339,20 +340,22 @@ def test_single_panel_plot_shows_dates_units_contour_signs_and_both_regions(
             assert patch.get_width() == east - west
             assert patch.get_height() == north - south
             assert patch.get_edgecolor() == to_rgba(plot_style.REGION_COLORS[region])
+            assert patch.get_linewidth() == plot_style.LINE_WIDTH_PT
         contour = next(
             item for item in ax.collections if isinstance(item, GeoContourSet)
+        )
+        np.testing.assert_array_equal(
+            contour.get_linewidths(), plot_style.LINE_WIDTH_PT / 2
         )
         for level, (_, dashes) in zip(
             contour.levels, contour.get_linestyles(), strict=True
         ):
             assert (dashes is not None) == (level < 0)
-        assert "1940-2024" in fig.texts[0].get_text()
-        assert "Z500 anomaly contours [m]" in fig.texts[0].get_text()
         assert plt.rcParams["savefig.dpi"] == plot_style.DPI
         output = tmp_path / "single-column.png"
         plot_style.save_figure(fig, output, crop=False)
         with Image.open(output) as saved:
-            assert saved.size == (1800, 2400)
+            assert saved.size == (1800, 1650)
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
         frame = ax.get_window_extent(renderer)
@@ -362,7 +365,7 @@ def test_single_panel_plot_shows_dates_units_contour_signs_and_both_regions(
                 assert frame.contains(box.x0, box.y0)
                 assert frame.contains(box.x1, box.y1)
                 assert label.get_fontsize() == 14
-        for artist in [ax.title, fig.axes[1].xaxis.label, fig.legends[0], *fig.texts]:
+        for artist in [fig.axes[1].xaxis.label, fig.legends[0]]:
             bounds = artist.get_window_extent(renderer)
             assert bounds.x0 >= 0 and bounds.y0 >= 0
             assert bounds.x1 <= fig.bbox.width and bounds.y1 <= fig.bbox.height
@@ -370,7 +373,7 @@ def test_single_panel_plot_shows_dates_units_contour_signs_and_both_regions(
         try:
             full_ax.set_title("Subsequent full-width plot")
             assert full_ax.title.get_fontsize() == 14
-            assert ax.title.get_fontsize() == 18
+            assert fig.axes[1].xaxis.label.get_fontsize() == 18
         finally:
             plt.close(full_fig)
         xr.testing.assert_identical(ds, original)

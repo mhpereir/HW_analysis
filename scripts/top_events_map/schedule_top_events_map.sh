@@ -137,10 +137,11 @@ from PIL import Image
 
 from src import analysis_io, plot_style
 from src.top_events_map import sha256_file
-from src.top_events_map_plotting import event_indices_for_ranks, map_filename
+from src.top_events_map_plotting import MAP_FIGURE_ASPECT, event_indices_for_ranks, map_filename
 from src.top_events_map_validation import validate_saved_source_report
 
 staging, destination, logfile = map(Path, sys.argv[1:])
+figure_size = plot_style.publication_figsize("single", aspect=MAP_FIGURE_ASPECT)
 with analysis_io.open_top_event_maps(staging / "top_events_map.nc") as ds:
     prepared_path = os.environ["PREPARED_MAP_PATH"]
     if prepared_path:
@@ -157,7 +158,7 @@ with analysis_io.open_top_event_maps(staging / "top_events_map.nc") as ds:
     for path in figures:
         with Image.open(path) as image:
             image.load()
-            assert image.size == (1800, 2400)
+            assert image.size == tuple(round(size * plot_style.DPI) for size in figure_size)
             assert np.asarray(image.convert("RGB")).std() > 1, f"Blank figure: {path}"
     artifacts = [staging / "top_events_map.nc", staging / "source_validation.json", *figures]
     manifest = {
@@ -170,8 +171,8 @@ with analysis_io.open_top_event_maps(staging / "top_events_map.nc") as ds:
         "source_validation_reused": bool(prepared_path),
         "rendered_ranks": ds.selection_rank.values[indices].tolist(),
         "rendered_event_ids": ds.event_id.values[indices].tolist(),
-        "typography": {"width_inches": plot_style.SINGLE_COLUMN_WIDTH_IN,
-                       "height_inches": 8,
+        "typography": {"width_inches": figure_size[0],
+                       "height_inches": figure_size[1],
                        "label_font_pt": plot_style.SINGLE_COLUMN_FONT_SIZE_PT,
                        "legend_font_pt": plot_style.SINGLE_COLUMN_LEGEND_FONT_SIZE_PT},
         "resolved_temperature_limit_K": float(os.environ.get("TEMPERATURE_LIMIT") or max(1.0, np.ceil(abs(ds.t2m_anomaly).max().item()))),

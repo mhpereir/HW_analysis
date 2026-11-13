@@ -156,6 +156,11 @@ REGION_NAME_MAPPING = {
     "western_eu": "Western Europe",
 }
 
+REGION_CITATION_LABELS = {
+    "pnw_bartusek": "PNW Bartusek et al.",
+    "pnw_hotz": "PNW Hotz et al.",
+}
+
 REGION_COLORS = {
     "alaska": "#0072B2",
     "central_china": "#D55E00",
