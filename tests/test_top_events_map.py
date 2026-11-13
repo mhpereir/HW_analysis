@@ -326,11 +326,14 @@ def test_single_panel_plot_shows_units_thin_contours_and_short_region_labels(
         assert ax.get_title() == ""
         assert not fig.texts
         assert fig.axes[1].get_xlabel() == "2 m temperature anomaly [K]"
-        np.testing.assert_array_equal(fig.get_size_inches(), [6, 5.5])
+        np.testing.assert_array_equal(fig.get_size_inches(), [6, 4.5])
         assert fig.axes[1].xaxis.label.get_fontsize() == 18
-        assert all(text.get_fontsize() == 14 for text in fig.legends[0].get_texts())
-        assert [text.get_text() for text in fig.legends[0].get_texts()] == [
-            "PNW Hotz et al.", "PNW Bartusek et al."
+        legend = ax.get_legend()
+        assert not fig.legends
+        assert all(text.get_fontsize() == 14 for text in legend.get_texts())
+        assert [text.get_text() for text in legend.get_texts()] == [
+            "PNW Hotz et al.",
+            "PNW Bartusek et al.",
         ]
         assert plt.rcParams["axes.labelsize"] == plot_style.PAPER_FONT_SIZE_PT
         assert len(ax.patches) == 2
@@ -355,17 +358,25 @@ def test_single_panel_plot_shows_units_thin_contours_and_short_region_labels(
         output = tmp_path / "single-column.png"
         plot_style.save_figure(fig, output, crop=False)
         with Image.open(output) as saved:
-            assert saved.size == (1800, 1650)
+            assert saved.size == (1800, 1350)
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
         frame = ax.get_window_extent(renderer)
+        legend_box = legend.get_window_extent(renderer)
+        assert frame.contains(legend_box.x0, legend_box.y0)
+        assert frame.contains(legend_box.x1, legend_box.y1)
+        legend_labels = [text.get_window_extent(renderer) for text in legend.get_texts()]
+        assert legend_labels[0].y0 == pytest.approx(legend_labels[1].y0)
+        assert legend_labels[0].x1 < legend_labels[1].x0
+        gap_inches = (frame.y0 - fig.axes[1].get_window_extent(renderer).y1) / fig.dpi
+        assert gap_inches == pytest.approx(0.242)
         for label in contour.labelTexts:
             if label.get_visible():
                 box = label.get_window_extent(renderer)
                 assert frame.contains(box.x0, box.y0)
                 assert frame.contains(box.x1, box.y1)
-                assert label.get_fontsize() == 14
-        for artist in [fig.axes[1].xaxis.label, fig.legends[0]]:
+                assert label.get_fontsize() == 10.5
+        for artist in [fig.axes[1].xaxis.label, legend]:
             bounds = artist.get_window_extent(renderer)
             assert bounds.x0 >= 0 and bounds.y0 >= 0
             assert bounds.x1 <= fig.bbox.width and bounds.y1 <= fig.bbox.height

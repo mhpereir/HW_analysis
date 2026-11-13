@@ -69,13 +69,16 @@ footer text. Region
 colors, theme, sizes, line widths, and export DPI use `src/plot_style.py`.
 Natural Earth map assets must already be available in the Venus environment.
 
-Maps use a 6-by-5.5-inch single-column canvas and the shared single-column
-font context: 18 pt labels and ticks; 14 pt contour labels and legends. A
-horizontal colorbar and stacked region legend fit below the map. PNW legend
+Maps use a 6-by-4.5-inch single-column canvas and the shared single-column
+font context: 18 pt labels and ticks; 14 pt legends; 10.5 pt contour labels
+(0.75 times the legend font). A horizontal colorbar sits approximately
+0.242 inches below the map, half the preceding gap. The two-column, one-row
+region legend sits inside the lower map. PNW legend
 labels are "PNW Hotz et al." and "PNW Bartusek et al.". Contours, coastlines,
 borders, gridlines, region outlines, white halos, frames and tick strokes are
 half as thick as the preceding 4cd25a3 rendering. The map retains its physical
-size; removing the title/footer also removes their unused canvas space. Export at 300 DPI without tight cropping
+size; the canvas excludes unused space left by the removed title/footer and
+relocated legend. Export at 300 DPI without tight cropping
 so the saved PNG retains the exact 6-inch width. Other figure families keep
 their existing style. Neither the fields nor the color and contour scales
 change with the layout.
@@ -113,7 +116,8 @@ three-day arithmetic, exact month/day matching across leap and year boundaries,
 geopotential conversion, missing-date/nonfinite/unit/grid rejection, metadata
 and NetCDF round-trip, and refusal to overwrite outputs. Plot tests verify one
 map plus colorbar, both configured outlines, short legend labels, absence of
-title/footer text, units, reduced line widths, contour signs, and
+title/footer text, units, reduced line widths, contour signs, smaller contour
+labels, an inside-map single-row legend, compact colorbar spacing, and
 shared style without requiring network access. Exercise the two CLIs together
 on tiny synthetic files, check PBS syntax and failure gates, and run the full
 repository test suite before handoff.

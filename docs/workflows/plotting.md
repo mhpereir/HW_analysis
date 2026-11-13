@@ -53,8 +53,10 @@ wrapped legends, and adaptive whole-day major ticks with daily minor ticks.
 Retain its data, smoothing, units and two-panel order. The separate top-event
 and matched face-advection renderers retain their full-width layout and fonts.
 
-Top-event spatial maps use the single-column font context on a 6-by-5.5-inch
-canvas with a horizontal colorbar and stacked short-name region legend. They
+Top-event spatial maps use the single-column font context on a 6-by-4.5-inch
+canvas with a horizontal colorbar and a two-column, one-row region legend
+inside the lower map. Contour labels are 10.5 pt (0.75 times the 14 pt legend
+font). The map/colorbar gap is approximately 0.242 inches, half the previous gap. They
 have no title/footer, and use half the preceding map stroke widths.
 They preserve the exact canvas on export and keep the prepared scientific
 fields, contour intervals and full-product temperature scale unchanged.

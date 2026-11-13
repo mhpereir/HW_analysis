@@ -137,7 +137,10 @@ from PIL import Image
 
 from src import analysis_io, plot_style
 from src.top_events_map import sha256_file
-from src.top_events_map_plotting import MAP_FIGURE_ASPECT, event_indices_for_ranks, map_filename
+from src.top_events_map_plotting import (
+    CONTOUR_LABEL_SCALE, MAP_COLORBAR_GAP_IN, MAP_FIGURE_ASPECT,
+    event_indices_for_ranks, map_filename,
+)
 from src.top_events_map_validation import validate_saved_source_report
 
 staging, destination, logfile = map(Path, sys.argv[1:])
@@ -174,7 +177,10 @@ with analysis_io.open_top_event_maps(staging / "top_events_map.nc") as ds:
         "typography": {"width_inches": figure_size[0],
                        "height_inches": figure_size[1],
                        "label_font_pt": plot_style.SINGLE_COLUMN_FONT_SIZE_PT,
-                       "legend_font_pt": plot_style.SINGLE_COLUMN_LEGEND_FONT_SIZE_PT},
+                       "legend_font_pt": plot_style.SINGLE_COLUMN_LEGEND_FONT_SIZE_PT,
+                       "contour_label_font_pt": CONTOUR_LABEL_SCALE * plot_style.SINGLE_COLUMN_LEGEND_FONT_SIZE_PT},
+        "layout": {"legend": "inside_lower_map", "legend_columns": 2,
+                   "map_colorbar_gap_inches": MAP_COLORBAR_GAP_IN},
         "resolved_temperature_limit_K": float(os.environ.get("TEMPERATURE_LIMIT") or max(1.0, np.ceil(abs(ds.t2m_anomaly).max().item()))),
         "resolved_height_contour_interval_m": float(os.environ.get("HEIGHT_CONTOUR_INTERVAL", "50")),
         "project_root": os.environ["PROJECT_ROOT"],

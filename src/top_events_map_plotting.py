@@ -22,7 +22,9 @@ from .top_events_map import region_bounds, validate_top_event_maps
 
 PNW_REGIONS = ("pnw_hotz", "pnw_bartusek")
 DEFAULT_HEIGHT_CONTOUR_INTERVAL = 50.0
-MAP_FIGURE_ASPECT = 11 / 12
+MAP_FIGURE_ASPECT = 3 / 4
+CONTOUR_LABEL_SCALE = 0.75
+MAP_COLORBAR_GAP_IN = 0.242
 
 
 def plot_top_event_map(
@@ -82,7 +84,7 @@ def _plot_top_event_map(
     fig = plt.figure(
         figsize=plot_style.publication_figsize("single", aspect=MAP_FIGURE_ASPECT)
     )
-    ax = fig.add_axes((0.04, 0.42, 0.92, 0.54), projection=data_crs)
+    ax = fig.add_axes((0.04, 0.29, 0.92, 0.66), projection=data_crs)
     ax.set_extent(extent, crs=data_crs)
     mesh = ax.pcolormesh(
         ds.longitude,
@@ -121,7 +123,7 @@ def _plot_top_event_map(
         contour_labels = ax.clabel(
             contours,
             fmt="%g",
-            fontsize=plot_style.legend_font_size(),
+            fontsize=CONTOUR_LABEL_SCALE * plot_style.legend_font_size(),
             inline=False,
         )
         for label in contour_labels:
@@ -156,7 +158,12 @@ def _plot_top_event_map(
         )
         ax.add_patch(outline)
         handles.append(outline)
-    color_axis = fig.add_axes((0.12, 0.30, 0.76, 0.032))
+    figure_height = fig.get_figheight()
+    colorbar_height = 0.176 / figure_height
+    colorbar_top = ax.get_position().y0 - MAP_COLORBAR_GAP_IN / figure_height
+    color_axis = fig.add_axes(
+        (0.12, colorbar_top - colorbar_height, 0.76, colorbar_height)
+    )
     colorbar = fig.colorbar(mesh, cax=color_axis, extend="both", orientation="horizontal")
     colorbar.set_label("2 m temperature anomaly [K]")
     plot_style.format_integer_axis(color_axis.xaxis)
@@ -168,11 +175,11 @@ def _plot_top_event_map(
         color_axis.tick_params(
             axis="x", which=which, width=plt.rcParams[f"xtick.{which}.width"] / 2
         )
-    legend = fig.legend(
+    legend = ax.legend(
         handles=handles,
-        loc="center",
-        bbox_to_anchor=(0.5, 0.075),
-        ncol=1,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.02),
+        ncol=2,
         **plot_style.legend_kwargs(),
     )
     legend.get_frame().set_linewidth(legend.get_frame().get_linewidth() / 2)

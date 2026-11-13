@@ -58,7 +58,7 @@ Older Stage-2 files lack a `region` attribute. In that case `--region` is an
 explicit provenance declaration, recorded as such. If region metadata exists,
 it must agree with the argument. The raw spatial maps for two populations
 with the same peak day and baseline are identical; their regional event
-identities and titles differ.
+identities and filenames differ.
 
 ## Dedicated PBS entrypoint
 
@@ -113,10 +113,11 @@ python -m pytest -q
 
 ## Reproduce a saved run with single-column typography
 
-The map is 6 by 5.5 inches with 18 pt labels and 14 pt legends/contour labels.
+The map is 6 by 4.5 inches with 18 pt labels, 14 pt legends and 10.5 pt contour labels.
 Titles and footers are omitted, and line widths are halved. The horizontal
-colorbar and stacked PNW Hotz et al. / PNW Bartusek et al. legend fit the canvas;
-PNG export preserves its size at 300 DPI.
+colorbar is approximately 0.242 inches below the map (half the prior gap).
+The PNW Hotz et al. / PNW Bartusek et al. legend has two columns in one row
+inside the lower map. PNG export preserves its size at 300 DPI.
 
 For an authorized submission from a clean pinned deployment:
 
