@@ -1037,9 +1037,9 @@ def test_top_event_jja_legends_preserve_curves_and_display_signs(
     window["T_mean"].attrs["units"] = "K"
     window["volume"].attrs["units"] = "m2 Pa"
     for name in ("lwa_a_region", "lwa_c_region"):
-        window[name].attrs["units"] = "m hPa"
-    window["cloud_cover"].attrs["units"] = "1"
-    window["soil_moisture"].attrs["units"] = "m3 m-3"
+        window[name].attrs.pop("units")  # Accepted historical inputs omit these.
+    window["cloud_cover"].attrs["units"] = "(0 - 1)"
+    window["soil_moisture"].attrs["units"] = "m**3 m**-3"
     annotated = window.copy(deep=True)
     for name in annotated:
         annotated[name].attrs["climatology_jja_mean"] = -0.125
@@ -1078,6 +1078,14 @@ def test_top_event_jja_legends_preserve_curves_and_display_signs(
         assert any("JJA clim. = 1.23e-05 K hr-1" in label for label in labels)
         assert any("JJA clim. = 2.45e+07 m hPa" in label for label in labels)
         if extended:
+            assert (
+                "JJA clim. = -0.125 fraction"
+                in new.axes[3].get_legend().get_texts()[0].get_text()
+            )
+            assert (
+                "JJA clim. = -0.125 m3 m-3"
+                in new.axes[5].get_legend().get_texts()[0].get_text()
+            )
             assert (
                 "JJA clim. = 0.125 K hr-1"
                 in new.axes[9].get_legend().get_texts()[0].get_text()

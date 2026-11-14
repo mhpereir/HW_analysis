@@ -86,6 +86,24 @@ VARIABLE_NAME_MAPPING = {
     "cloud_cover": "Cloud Cover",
 }
 
+# Display units for the regional temporal diagnostics. Older accepted Stage-1
+# files omit LWA units and use source-specific spelling for soil/cloud units.
+VARIABLE_UNIT_MAPPING = {
+    "T_mean": "K",
+    "volume": "m2 Pa",
+    "dTdt": "K hr-1",
+    "advection": "K hr-1",
+    "adiabatic": "K hr-1",
+    "diabatic": "K hr-1",
+    "lwa_a_region": "m hPa",
+    "lwa_c_region": "m hPa",
+    "nslr_heating_rate_approx": "K hr-1",
+    "nssr_heating_rate_approx": "K hr-1",
+    "sshf_heating_rate_approx": "K hr-1",
+    "soil_moisture": "m3 m-3",
+    "cloud_cover": "fraction",
+}
+
 VARIABLE_COLORS = {
     "T_mean": "#E60000",
     "volume": "#0072B2",

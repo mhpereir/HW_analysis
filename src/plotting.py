@@ -114,7 +114,7 @@ def _top_event_variable_label(ds: xr.Dataset, name: str) -> str:
     if not _is_climatological_anomaly(ds) or mean is None:
         return label
     value = float(mean) * _display_scale(name)
-    units = ds[name].attrs.get("units", "")
+    units = plot_style.VARIABLE_UNIT_MAPPING[name]
     # Independent notation avoids coupling absolute values to the anomaly-axis
     # exponent. Keep small nonzero tendencies visible instead of rounding to 0.
     return f"{label}\nJJA clim. = {value:.3g} {units}".rstrip()

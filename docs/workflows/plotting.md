@@ -530,6 +530,9 @@ previous labels and permits companions without complete JJA coverage.
 Carry these scalars only as metadata in the ephemeral anomaly view, in native
 units and signs. Apply the same display transformation as the curves when
 formatting legend values, including the sensible-heating sign reversal.
+Use the shared display-unit labels, including `m hPa` for LWA even when an
+older companion omits that variable's unit metadata. Do not change input
+metadata or convert the numerical values to a different unit system.
 Values use their own scientific notation when needed, independently of any
 axis exponent. The legend values are absolute; the axes, event traces, and
 all-event mean/IQR remain timestamp-matched anomalies. Do not draw an absolute
