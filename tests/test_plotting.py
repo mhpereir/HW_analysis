@@ -1043,8 +1043,12 @@ def test_top_event_jja_legends_preserve_curves_and_display_signs(
     annotated = window.copy(deep=True)
     for name in annotated:
         annotated[name].attrs["climatology_jja_mean"] = -0.125
-    annotated["lwa_a_region"].attrs["climatology_jja_mean"] = 2.45e7
-    annotated["dTdt"].attrs["climatology_jja_mean"] = 1.23e-5
+    annotated["lwa_a_region"].attrs["climatology_jja_mean"] = 2.52e7
+    annotated["dTdt"].attrs["climatology_jja_mean"] = -1.23e-5
+    annotated["advection"].attrs["climatology_jja_mean"] = -0.0651
+    annotated["adiabatic"].attrs["climatology_jja_mean"] = 0.00149
+    annotated["cloud_cover"].attrs["climatology_jja_mean"] = 0.517
+    annotated["soil_moisture"].attrs["climatology_jja_mean"] = 0.218
     original = annotated.copy(deep=True)
     if smoothed:
         window = plotting.smooth_composite_for_display(
@@ -1075,19 +1079,27 @@ def test_top_event_jja_legends_preserve_curves_and_display_signs(
                         old_line.get_label() + "\nJJA clim. = "
                     )
                     labels.append(new_line.get_label())
-        assert any("JJA clim. = 1.23e-05 K hr-1" in label for label in labels)
-        assert any("JJA clim. = 2.45e+07 m hPa" in label for label in labels)
+        assert any("JJA clim. = 0.000 K hr-1" in label for label in labels)
+        assert any("JJA clim. = -0.065 K hr-1" in label for label in labels)
+        assert any("JJA clim. = 0.001 K hr-1" in label for label in labels)
+        assert any("JJA clim. = 2.5e+07 m hPa" in label for label in labels)
+        if extended or layout == "presentation":
+            new.canvas.draw()
+            renderer = new.canvas.get_renderer()
+            for ax in new.axes[1::2]:
+                bounds = ax.get_legend().get_window_extent(renderer)
+                assert 0 <= ax.bbox.x1 - bounds.x1 < 0.02 * ax.bbox.width
         if extended:
             assert (
-                "JJA clim. = -0.125 fraction"
+                "JJA clim. = 0.52 fraction"
                 in new.axes[3].get_legend().get_texts()[0].get_text()
             )
             assert (
-                "JJA clim. = -0.125 m3 m-3"
+                "JJA clim. = 0.22 m3 m-3"
                 in new.axes[5].get_legend().get_texts()[0].get_text()
             )
             assert (
-                "JJA clim. = 0.125 K hr-1"
+                "JJA clim. = 0.12 K hr-1"
                 in new.axes[9].get_legend().get_texts()[0].get_text()
             )
         if not smoothed:

@@ -115,9 +115,20 @@ def _top_event_variable_label(ds: xr.Dataset, name: str) -> str:
         return label
     value = float(mean) * _display_scale(name)
     units = plot_style.VARIABLE_UNIT_MAPPING[name]
-    # Independent notation avoids coupling absolute values to the anomaly-axis
-    # exponent. Keep small nonzero tendencies visible instead of rounding to 0.
-    return f"{label}\nJJA clim. = {value:.3g} {units}".rstrip()
+    precision = plot_style.TOP_EVENT_CLIMATOLOGY_VALUE_FORMATS.get(name, ".3g")
+    formatted = format(value, precision)
+    if float(formatted) == 0.0:
+        formatted = format(0.0, precision)
+    return f"{label}\nJJA clim. = {formatted} {units}".rstrip()
+
+
+def _align_top_event_right_legends(axes: Sequence[Axes], ds: xr.Dataset) -> None:
+    """Keep anomaly legends on the same side as their panel column."""
+    if _is_climatological_anomaly(ds):
+        for ax in axes:
+            legend = ax.get_legend()
+            if legend is not None:
+                legend.set_loc("upper right")
 
 
 def plot_composite_timeseries(
@@ -725,6 +736,7 @@ def _plot_extended_top_event_timeseries(
         reference_composite=reference_composite,
     )
 
+    _align_top_event_right_legends(right, event_window)
     _mark_top_event_times(axes.ravel(), event)
     _set_top_event_title(fig, event_window, event)
     left[-1].set_xlabel("Lag from event peak (days)")
@@ -807,6 +819,7 @@ def _plot_presentation_top_event_timeseries(
             reference_composite=reference_composite,
         )
 
+    _align_top_event_right_legends(right, event_window)
     _mark_top_event_times(axes.ravel(), event)
     _set_top_event_title(fig, event_window, event)
     left[-1].set_xlabel("Lag from event peak (days)")

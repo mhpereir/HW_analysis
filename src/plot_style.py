@@ -104,6 +104,22 @@ VARIABLE_UNIT_MAPPING = {
     "cloud_cover": "fraction",
 }
 
+# Precision for absolute summer means in top-event anomaly legends only.
+TOP_EVENT_CLIMATOLOGY_VALUE_FORMATS = {
+    "dTdt": ".3f",
+    "advection": ".3f",
+    "adiabatic": ".3f",
+    "diabatic": ".3f",
+    "lwa_a_region": ".1e",
+    "lwa_c_region": ".1e",
+    "cloud_cover": ".2g",
+    "soil_moisture": ".2g",
+    "nslr_heating_rate_approx": ".2g",
+    "nssr_heating_rate_approx": ".2g",
+    "sshf_heating_rate_approx": ".2g",
+    "slhf_heating_rate_approx": ".2g",
+}
+
 VARIABLE_COLORS = {
     "T_mean": "#E60000",
     "volume": "#0072B2",
