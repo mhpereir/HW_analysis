@@ -219,6 +219,38 @@ def apply_regional_hourly_climatology(
     return out
 
 
+def jja_climatological_means(
+    climatology: xr.Dataset,
+    *,
+    variables: Sequence[str],
+) -> dict[str, float]:
+    """Summarize complete JJA calendar-hour means in native units and signs.
+
+    Every hour receives equal weight, independent of event membership and the
+    number of source years contributing to an individual calendar-hour mean.
+    """
+    names = tuple(variables)
+    validate_regional_hourly_climatology(climatology, required_variables=names)
+    expected = pd.date_range(
+        f"{REFERENCE_YEAR}-06-01", f"{REFERENCE_YEAR}-09-01", freq="h", inclusive="left"
+    )
+    index = pd.DatetimeIndex(climatology[CLIMATOLOGY_DIM].values)
+    summer_index = index[index.month.isin((6, 7, 8))]
+    if not summer_index.equals(expected):
+        raise ValueError(
+            "JJA climatology legends require all 2,208 June-August calendar hours; "
+            "use --no-climatology-legend to omit this summary."
+        )
+    summer = climatology.sel({CLIMATOLOGY_DIM: expected})
+    means = {}
+    for name in names:
+        values = np.asarray(summer[name].values, dtype=np.float64)
+        if not np.isfinite(values).all():
+            raise ValueError(f"JJA climatological means for {name!r} must be finite.")
+        means[name] = float(values.mean())
+    return means
+
+
 def validate_climatology_source_compatibility(
     source: xr.Dataset,
     climatology: xr.Dataset,

@@ -1021,6 +1021,89 @@ def test_plot_top_event_timeseries_extended_layout_uses_optional_panels():
         plt.close(fig)
 
 
+@pytest.mark.parametrize(
+    "layout,extended", [("paper", False), ("paper", True), ("presentation", False)]
+)
+@pytest.mark.parametrize("smoothed", [False, True])
+def test_top_event_jja_legends_preserve_curves_and_display_signs(
+    layout, extended, smoothed
+):
+    window = _make_top_event_window()
+    reference = _make_composite()
+    window.attrs["data_representation"] = "climatological_anomaly"
+    reference.attrs.update(window.attrs)
+    for name in window:
+        window[name].attrs["units"] = "K hr-1"
+    window["T_mean"].attrs["units"] = "K"
+    window["volume"].attrs["units"] = "m2 Pa"
+    for name in ("lwa_a_region", "lwa_c_region"):
+        window[name].attrs["units"] = "m hPa"
+    window["cloud_cover"].attrs["units"] = "1"
+    window["soil_moisture"].attrs["units"] = "m3 m-3"
+    annotated = window.copy(deep=True)
+    for name in annotated:
+        annotated[name].attrs["climatology_jja_mean"] = -0.125
+    annotated["lwa_a_region"].attrs["climatology_jja_mean"] = 2.45e7
+    annotated["dTdt"].attrs["climatology_jja_mean"] = 1.23e-5
+    original = annotated.copy(deep=True)
+    if smoothed:
+        window = plotting.smooth_composite_for_display(
+            window, variables=tuple(window), smoothing_window=3, lag_dim="time"
+        )
+        annotated = plotting.smooth_composite_for_display(
+            annotated, variables=tuple(annotated), smoothing_window=3, lag_dim="time"
+        )
+    kwargs = {
+        "reference_composite": reference,
+        "layout": layout,
+        "plot_extended_variables": extended,
+    }
+    old = plotting.plot_top_event_timeseries(window, _make_top_event(), **kwargs)
+    new = plotting.plot_top_event_timeseries(annotated, _make_top_event(), **kwargs)
+    try:
+        labels = []
+        for old_ax, new_ax in zip(old.axes, new.axes, strict=True):
+            assert len(old_ax.lines) == len(new_ax.lines)
+            np.testing.assert_allclose(old_ax.get_ylim(), new_ax.get_ylim())
+            for old_line, new_line in zip(old_ax.lines, new_ax.lines, strict=True):
+                np.testing.assert_allclose(old_line.get_xdata(), new_line.get_xdata())
+                np.testing.assert_allclose(old_line.get_ydata(), new_line.get_ydata())
+                if old_line.get_label().startswith("_"):
+                    assert old_line.get_label() == new_line.get_label()
+                else:
+                    assert new_line.get_label().startswith(
+                        old_line.get_label() + "\nJJA clim. = "
+                    )
+                    labels.append(new_line.get_label())
+        assert any("JJA clim. = 1.23e-05 K hr-1" in label for label in labels)
+        assert any("JJA clim. = 2.45e+07 m hPa" in label for label in labels)
+        if extended:
+            assert (
+                "JJA clim. = 0.125 K hr-1"
+                in new.axes[9].get_legend().get_texts()[0].get_text()
+            )
+        if not smoothed:
+            xr.testing.assert_identical(annotated, original)
+    finally:
+        plt.close(old)
+        plt.close(new)
+
+
+def test_absolute_top_event_legends_ignore_anomaly_climatology_metadata():
+    window = _make_top_event_window()
+    for name in window:
+        window[name].attrs["climatology_jja_mean"] = 10.0
+    fig = plotting.plot_top_event_timeseries(
+        window, _make_top_event(), plot_extended_variables=True
+    )
+    try:
+        assert not any(
+            "JJA clim." in line.get_label() for ax in fig.axes for line in ax.lines
+        )
+    finally:
+        plt.close(fig)
+
+
 def test_extended_top_event_anomaly_uses_delta_labels_and_baseline_title():
     event_window = _make_top_event_window()
     composite = _make_composite()

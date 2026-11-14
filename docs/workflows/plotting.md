@@ -509,6 +509,41 @@ standard event window, while short windows retain distinct major labels.
 Before production acceptance, render representative presentation and extended
 paper figures through Venus PBS and inspect the saved axes at original resolution.
 
+### Top-event anomaly climatology legends
+
+`scripts/plot_top_events_clim_anom.py` adds an absolute JJA climatological
+mean to each variable's legend by default, in compact, extended, and
+presentation layouts. The label `JJA clim. = ...` gives context for the
+quantity's typical summer magnitude and sign. It is not an event-conditioned
+mean, the all-event reference curve, or the climatology of the displayed event
+window. A positive anomaly alone does not imply a positive absolute quantity.
+
+Compute the arithmetic mean of the same companion climatology's 2,208
+June-August calendar-hour means, with equal weight for every hour. Include
+heatwave days, as in the companion's baseline, and use its recorded reference
+years. Require complete JJA hourly coverage and finite means for every plotted
+variable; do not silently summarize a partial summer. The summary is fixed
+across events and raw/smoothed versions. It remains explicitly JJA when an
+alternative event season is selected. `--no-climatology-legend` restores the
+previous labels and permits companions without complete JJA coverage.
+
+Carry these scalars only as metadata in the ephemeral anomaly view, in native
+units and signs. Apply the same display transformation as the curves when
+formatting legend values, including the sensible-heating sign reversal.
+Values use their own scientific notation when needed, independently of any
+axis exponent. The legend values are absolute; the axes, event traces, and
+all-event mean/IQR remain timestamp-matched anomalies. Do not draw an absolute
+climatological mean as a horizontal line on an anomaly axis.
+
+No saved Stage-1 or climatology product changes are needed. Preserve event
+selection, ranking, reference population, smoothing, line data, axis limits,
+colors, fonts, and output names. Other plot families and absolute top-event
+figures retain their existing legends. Validate the seasonal reduction,
+complete-coverage checks, units/signs, metadata survival through smoothing,
+unchanged curves and inputs, and all three layouts locally. Before production
+acceptance, render representative raw and smoothed extended/presentation
+figures through Venus PBS into a fresh namespace and inspect their legends.
+
 ### Composite labels and surface-flux signs
 
 The all-event and split-event climatological-anomaly composite figures use the

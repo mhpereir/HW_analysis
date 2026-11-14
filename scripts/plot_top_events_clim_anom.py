@@ -31,6 +31,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Regional hourly climatology companion NetCDF path.",
     )
+    parser.add_argument(
+        "--climatology-legend",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include absolute JJA climatological means in variable legends (default: on).",
+    )
     absolute_plot.add_top_event_plot_arguments(parser)
     parsed = season_selection.parse_args(parser)
     args = plot_paths.finalize_stage1_plot_paths(
@@ -79,6 +85,10 @@ def main() -> int:
             variables=variables,
         )
         anomaly_source.attrs["climatology_path"] = str(args.climatology_path)
+        if args.climatology_legend:
+            means = climatology.jja_climatological_means(climate, variables=variables)
+            for name, value in means.items():
+                anomaly_source[name].attrs["climatology_jja_mean"] = value
         written = absolute_plot.write_top_event_plots(
             anomaly_source,
             selected_events,

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 import xarray as xr
 from HW_analysis.scripts import plot_top_events_clim_anom as anomaly_plot
 from HW_analysis.src.artifact_paths import artifact_root
@@ -58,19 +59,22 @@ def test_parse_args_builds_isolated_anomaly_presentation_path(monkeypatch):
     assert args.layout == "presentation"
 
 
+@pytest.mark.parametrize("show_climatology", [True, False])
 def test_main_ranks_absolute_events_and_anomalizes_before_plotting(
     monkeypatch,
     tmp_path,
+    show_climatology,
 ):
     stage1 = xr.Dataset()
     climate = xr.Dataset()
     selected_events = xr.Dataset()
     anomaly_source = xr.Dataset(
+        {name: 0.0 for name in anomaly_plot.absolute_plot.EXTENDED_TOP_EVENT_VARIABLES},
         attrs={
             "data_representation": "climatological_anomaly",
             "climatology_start_year": 1940,
             "climatology_end_year": 2024,
-        }
+        },
     )
     captured = {}
     output_dir = tmp_path / "top-events-anomaly"
@@ -89,6 +93,7 @@ def test_main_ranks_absolute_events_and_anomalizes_before_plotting(
             "--top-n",
             "2",
             "--plot-extended-variables",
+            *([] if show_climatology else ["--no-climatology-legend"]),
         ),
     )
     monkeypatch.setattr(
@@ -124,6 +129,15 @@ def test_main_ranks_absolute_events_and_anomalizes_before_plotting(
         captured["plot_kwargs"] = kwargs
         return [output_dir / "raw.png", output_dir / "smoothed.png"]
 
+    def fake_means(baseline, *, variables):
+        assert show_climatology
+        assert baseline is climate
+        assert variables == anomaly_plot.absolute_plot.EXTENDED_TOP_EVENT_VARIABLES
+        return {name: -0.125 for name in variables}
+
+    monkeypatch.setattr(
+        anomaly_plot.climatology, "jja_climatological_means", fake_means
+    )
     monkeypatch.setattr(
         anomaly_plot.absolute_plot, "select_top_tas_events", fake_select
     )
@@ -151,6 +165,11 @@ def test_main_ranks_absolute_events_and_anomalizes_before_plotting(
     assert captured["plot_kwargs"]["event_table"] is stage1
     assert captured["plot_kwargs"]["filename_tag"] == "clim_anom"
     assert anomaly_source.attrs["climatology_path"] == str(climatology_path.resolve())
+    for name in captured["variables"]:
+        if show_climatology:
+            assert anomaly_source[name].attrs["climatology_jja_mean"] == -0.125
+        else:
+            assert "climatology_jja_mean" not in anomaly_source[name].attrs
 
 
 def test_anomaly_workflow_refuses_existing_output_directory(tmp_path):

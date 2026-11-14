@@ -107,6 +107,19 @@ def _display_scale(name: str) -> float:
     return 1.0
 
 
+def _top_event_variable_label(ds: xr.Dataset, name: str) -> str:
+    """Add an absolute JJA mean to an anomaly trace's legend when supplied."""
+    label = _variable_label(name)
+    mean = ds[name].attrs.get("climatology_jja_mean")
+    if not _is_climatological_anomaly(ds) or mean is None:
+        return label
+    value = float(mean) * _display_scale(name)
+    units = ds[name].attrs.get("units", "")
+    # Independent notation avoids coupling absolute values to the anomaly-axis
+    # exponent. Keep small nonzero tendencies visible instead of rounding to 0.
+    return f"{label}\nJJA clim. = {value:.3g} {units}".rstrip()
+
+
 def plot_composite_timeseries(
     composite: xr.Dataset,
     *,
@@ -1126,7 +1139,7 @@ def _plot_top_event_temperature_volume_panel(
         event_window,
         "T_mean",
         color=VARIABLE_COLORS["T_mean"],
-        label=_variable_label("T_mean"),
+        label=_top_event_variable_label(event_window, "T_mean"),
         linestyle="--",
     )
     if reference_composite is not None:
@@ -1149,7 +1162,7 @@ def _plot_top_event_temperature_volume_panel(
         event_window,
         "volume",
         color=VARIABLE_COLORS["volume"],
-        label=_variable_label("volume"),
+        label=_top_event_variable_label(event_window, "volume"),
         linestyle="--",
     )
     if reference_composite is not None:
@@ -1325,6 +1338,7 @@ def _plot_top_event_single_variable_panel(
         event_window,
         name,
         color=color,
+        label=_top_event_variable_label(event_window, name),
         linestyle="--",
         scale=scale,
     )
@@ -1363,6 +1377,7 @@ def _plot_top_event_multi_variable_panel(
             event_window,
             name,
             color=color,
+            label=_top_event_variable_label(event_window, name),
             linestyle="--",
             scale=scale,
         )
@@ -1471,6 +1486,7 @@ def _plot_top_event_tendency_panel(
             event_window,
             name,
             color=color,
+            label=_top_event_variable_label(event_window, name),
             linestyle="--",
         )
         if reference_composite is not None:
@@ -1547,6 +1563,7 @@ def _plot_top_event_lwa_panel(
             event_window,
             name,
             color=color,
+            label=_top_event_variable_label(event_window, name),
             linestyle="--",
         )
         if reference_composite is not None:

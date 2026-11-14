@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 import xarray as xr
 from HW_analysis.src import climatology
@@ -205,3 +206,39 @@ def _source_dataset(times, *, values) -> xr.Dataset:
             "heat_budget_top_boundary": "700hPa",
         },
     )
+
+
+def _summer_climatology() -> xr.Dataset:
+    time = pd.date_range("2000-05-01", "2000-10-01", freq="h", inclusive="left")
+    # The large non-JJA values must not affect the summer summary. June has
+    # fewer days, so averaging monthly means would also give a wrong answer.
+    values = np.where(time.month.isin((6, 7, 8)), time.month - 5 + time.hour, 1000.0)
+    source = _source_dataset(time, values=values)
+    return climatology.build_regional_hourly_climatology(source, variables=("T_mean",))
+
+
+def test_jja_climatological_mean_weights_calendar_hours_not_months_or_counts():
+    climate = _summer_climatology()
+    climate["T_mean_count"][:] = np.arange(climate.sizes["climatology_time"]) + 1
+    before = climate.copy(deep=True)
+
+    means = climatology.jja_climatological_means(climate, variables=("T_mean",))
+
+    assert means["T_mean"] == pytest.approx((30 + 2 * 31 + 3 * 31) / 92 + 11.5)
+    xr.testing.assert_identical(climate, before)
+
+
+def test_jja_climatological_mean_rejects_missing_summer_hour():
+    climate = _summer_climatology().drop_sel(climatology_time="2000-07-01T12:00")
+
+    with pytest.raises(ValueError, match="all 2,208"):
+        climatology.jja_climatological_means(climate, variables=("T_mean",))
+
+
+@pytest.mark.parametrize("value", [np.nan, np.inf])
+def test_jja_climatological_mean_rejects_nonfinite_summer_values(value):
+    climate = _summer_climatology()
+    climate["T_mean"].loc[{"climatology_time": "2000-07-01T12:00"}] = value
+
+    with pytest.raises(ValueError, match="must be finite"):
+        climatology.jja_climatological_means(climate, variables=("T_mean",))
