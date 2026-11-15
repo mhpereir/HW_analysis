@@ -736,6 +736,19 @@ def _plot_extended_top_event_timeseries(
         reference_composite=reference_composite,
     )
 
+    if _is_climatological_anomaly(event_window):
+        for ax, name in (
+            (left[1], "dTdt"),
+            (left[2], "advection"),
+            (left[3], "adiabatic"),
+            (right[3], "nslr_heating_rate_approx"),
+        ):
+            if event_window[name].attrs.get("climatology_jja_mean") is not None:
+                lower, upper = ax.get_ylim()
+                ax.set_ylim(
+                    lower,
+                    upper + plot_style.TOP_EVENT_CLIMATOLOGY_HEADROOM * (upper - lower),
+                )
     _align_top_event_right_legends(right, event_window)
     _mark_top_event_times(axes.ravel(), event)
     _set_top_event_title(fig, event_window, event)

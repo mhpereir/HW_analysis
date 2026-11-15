@@ -119,6 +119,7 @@ TOP_EVENT_CLIMATOLOGY_VALUE_FORMATS = {
     "sshf_heating_rate_approx": ".2g",
     "slhf_heating_rate_approx": ".2g",
 }
+TOP_EVENT_CLIMATOLOGY_HEADROOM = 0.20
 
 VARIABLE_COLORS = {
     "T_mean": "#E60000",

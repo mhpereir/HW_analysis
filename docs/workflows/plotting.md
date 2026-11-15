@@ -542,12 +542,18 @@ retain three significant figures. Rounded zero values must not carry a minus
 sign. In the extended and presentation anomaly layouts, place right-column
 variable legends at the upper right; retain left-column and reference legend
 positions. The compact layout has no right column and keeps its positions.
+In the extended 5x2 anomaly layout, reserve extra space above the data in
+left-column panels 2-4 (tendency, advection, adiabatic heating) and right-column
+panel 4 (radiative heating) when their climatology legends are present. Raise
+the upper y-limit by 20% of the autoscaled y-span, keeping the lower limit
+fixed. Apply this to hourly and smoothed figures; other panels and layouts
+retain their limits. Disabling climatology legends restores the usual limits.
 The legend values are absolute; the axes, event traces, and
 all-event mean/IQR remain timestamp-matched anomalies. Do not draw an absolute
 climatological mean as a horizontal line on an anomaly axis.
 
 No saved Stage-1 or climatology product changes are needed. Preserve event
-selection, ranking, reference population, smoothing, line data, axis limits,
+selection, ranking, reference population, smoothing, line data,
 colors, fonts, and output names. Other plot families and absolute top-event
 figures retain their existing legends. Validate the seasonal reduction,
 complete-coverage checks, units/signs, metadata survival through smoothing,
