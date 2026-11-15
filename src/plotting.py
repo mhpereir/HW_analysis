@@ -741,7 +741,9 @@ def _plot_extended_top_event_timeseries(
             (left[1], "dTdt"),
             (left[2], "advection"),
             (left[3], "adiabatic"),
+            (left[4], "diabatic"),
             (right[3], "nslr_heating_rate_approx"),
+            (right[4], "sshf_heating_rate_approx"),
         ):
             if event_window[name].attrs.get("climatology_jja_mean") is not None:
                 lower, upper = ax.get_ylim()

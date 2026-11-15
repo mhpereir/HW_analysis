@@ -1069,7 +1069,7 @@ def test_top_event_jja_legends_preserve_curves_and_display_signs(
         for index, (old_ax, new_ax) in enumerate(zip(old.axes, new.axes, strict=True)):
             assert len(old_ax.lines) == len(new_ax.lines)
             lower, upper = old_ax.get_ylim()
-            if extended and index in (2, 4, 6, 7):
+            if extended and index in (2, 4, 6, 7, 8, 9):
                 upper += 0.20 * (upper - lower)
             np.testing.assert_allclose((lower, upper), new_ax.get_ylim())
             for old_line, new_line in zip(old_ax.lines, new_ax.lines, strict=True):
