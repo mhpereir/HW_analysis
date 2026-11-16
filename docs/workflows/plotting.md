@@ -59,8 +59,9 @@ and smoothing metadata, and distinct filenames. Use a solid black All faces
 curve at twice the component line width, with three-column grouped legends
 to accommodate the larger text. Individual face legends remain one row.
 The anomaly first-panel legend includes each face's absolute JJA climatological
-mean below its name, under a shared `JJA clim.` heading, in native `K hr-1`
-with three decimal places. Use the supplied hourly climatology and the shared
+mean below its name in native `K hr-1`, with two decimal places and no legend
+heading. Identify the JJA reference in the figure caption. Use the supplied
+hourly climatology and the shared
 equal-calendar-hour JJA reduction (all 2,208 June-August hours), independent of
 event selection. Attach the scalars as `climatology_jja_mean` variable metadata
 to the prepared composite; retain them through display smoothing. These values

@@ -459,9 +459,9 @@ def _plot_face_timeseries(
         label = face.capitalize()
         mean = ds[name].attrs.get("climatology_jja_mean")
         if anomaly and mean is not None:
-            formatted = format(float(mean), ".3f")
+            formatted = format(float(mean), ".2f")
             if float(formatted) == 0.0:
-                formatted = "0.000"
+                formatted = "0.00"
             label += f"\n{formatted} K hr-1"
             has_climatology = True
         ax.plot(
@@ -479,8 +479,6 @@ def _plot_face_timeseries(
     ax.legend(
         ncol=5 if anomaly else 3,
         loc="upper center",
-        title="JJA clim." if has_climatology else None,
-        title_fontsize=plot_style.legend_font_size(),
         columnspacing=1.0 if has_climatology else 2.0,
         **plot_style.legend_kwargs(),
     )

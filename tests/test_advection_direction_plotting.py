@@ -106,14 +106,13 @@ def test_anomaly_paper_format_preserves_components_and_fits_export(
             assert ax.yaxis.label.get_fontsize() == 18
             assert all(t.get_fontsize() == 14 for t in ax.get_legend().get_texts())
         face_legend = fig.axes[0].get_legend()
-        assert face_legend.get_title().get_text() == "JJA clim."
-        assert face_legend.get_title().get_fontsize() == 14
+        assert not face_legend.get_title().get_text()
         assert [t.get_text() for t in face_legend.get_texts()] == [
-            "West\n0.010 K hr-1",
-            "East\n-0.065 K hr-1",
-            "South\n0.100 K hr-1",
-            "North\n-0.200 K hr-1",
-            "Top\n0.000 K hr-1",
+            "West\n0.01 K hr-1",
+            "East\n-0.07 K hr-1",
+            "South\n0.10 K hr-1",
+            "North\n-0.20 K hr-1",
+            "Top\n0.00 K hr-1",
         ]
         assert [t.get_text() for t in fig.axes[1].get_legend().get_texts()] == list(
             advection_direction_plotting.GROUP_LABELS.values()
