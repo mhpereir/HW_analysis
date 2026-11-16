@@ -37,6 +37,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-path", type=Path, default=None)
     parser.add_argument("--window-days", type=int, default=7)
     parser.add_argument(
+        "--climatology-legend",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include absolute JJA climatological means in the face legend.",
+    )
+    parser.add_argument(
         "--smoothing-window",
         type=int,
         default=advection_direction_plotting.DEFAULT_SMOOTHING_WINDOW,
@@ -113,6 +119,12 @@ def main() -> int:
         )
         composite.attrs.update(anomaly_source.attrs)
         composite.attrs["climatology_path"] = str(args.climatology_path)
+        if args.climatology_legend:
+            means = climatology.jja_climatological_means(
+                climate, variables=variables[1:]
+            )
+            for name, value in means.items():
+                composite[name].attrs["climatology_jja_mean"] = value
         written = (
             advection_direction_plotting.write_advection_direction_exploration_outputs(
                 composite,

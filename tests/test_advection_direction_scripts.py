@@ -2,6 +2,9 @@ from argparse import Namespace
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
+import pandas as pd
+import pytest
 import xarray as xr
 from HW_analysis.scripts import (
     build_stage1_advection_exploration as build_script,
@@ -15,7 +18,7 @@ from HW_analysis.scripts import (
 from HW_analysis.scripts import (
     plot_advection_direction_exploration_matched_clim_anom as matched_script,
 )
-from HW_analysis.src import advection_direction_plotting
+from HW_analysis.src import advection_direction_plotting, climatology
 
 STAGE1_CLI_ARGS = [
     "--region",
@@ -145,7 +148,10 @@ def test_absolute_plot_main_routes_raw_and_smoothed_outputs(monkeypatch, tmp_pat
     }
 
 
-def test_anomaly_plot_main_routes_raw_and_smoothed_outputs(monkeypatch, tmp_path):
+@pytest.mark.parametrize("climatology_legend", [True, False])
+def test_anomaly_plot_main_routes_raw_and_smoothed_outputs(
+    monkeypatch, tmp_path, climatology_legend
+):
     output = tmp_path / "anomaly.png"
     args = Namespace(
         input_path=tmp_path / "stage1.nc",
@@ -155,11 +161,31 @@ def test_anomaly_plot_main_routes_raw_and_smoothed_outputs(monkeypatch, tmp_path
         smoothing_window=24,
         season_months=None,
         require_full_event=False,
+        climatology_legend=climatology_legend,
     )
     stage1 = _face_source()
     climate = xr.Dataset()
+    means = {
+        name: (index - 2) / 100
+        for index, name in enumerate(stage1)
+        if name != "advection"
+    }
+    if climatology_legend:
+        time = pd.date_range("2000-05-01", "2000-10-01", freq="h", inclusive="left")
+        climate = climatology.build_regional_hourly_climatology(
+            xr.Dataset(
+                {
+                    name: ("time", np.where(time.month.isin((6, 7, 8)), value, 1000.0))
+                    for name, value in means.items()
+                },
+                coords={"time": time},
+            ),
+            variables=tuple(means),
+        )
+    climate_before = climate.copy(deep=True)
+    stage1_before = stage1.copy(deep=True)
     anomaly_source = stage1.copy(deep=True)
-    composite = xr.Dataset()
+    composite = stage1.rename(time="lag_hour").copy(deep=True)
     captured = {}
 
     monkeypatch.setattr(anomaly_script, "parse_args", lambda: args)
@@ -201,6 +227,24 @@ def test_anomaly_plot_main_routes_raw_and_smoothed_outputs(monkeypatch, tmp_path
         "smoothed_output_path": output.with_name("anomaly_smoothed.png"),
         "smoothing_window": 24,
     }
+    for name, value in means.items():
+        if climatology_legend:
+            assert composite[name].attrs["climatology_jja_mean"] == pytest.approx(value)
+        else:
+            assert "climatology_jja_mean" not in composite[name].attrs
+    assert "climatology_jja_mean" not in composite.advection.attrs
+    xr.testing.assert_identical(climate, climate_before)
+    xr.testing.assert_identical(stage1, stage1_before)
+
+
+@pytest.mark.parametrize(
+    "extra_args,expected", [([], True), (["--no-climatology-legend"], False)]
+)
+def test_anomaly_climatology_legend_cli(monkeypatch, extra_args, expected):
+    monkeypatch.setattr(
+        "sys.argv", [anomaly_script.__file__, *STAGE1_CLI_ARGS, *extra_args]
+    )
+    assert anomaly_script.parse_args().climatology_legend is expected
 
 
 def test_matched_plot_main_routes_raw_and_smoothed_outputs(monkeypatch, tmp_path):

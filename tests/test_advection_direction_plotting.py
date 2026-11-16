@@ -82,6 +82,11 @@ def test_anomaly_paper_format_preserves_components_and_fits_export(
 ):
     composite = _make_composite()
     composite.attrs["data_representation"] = "climatological_anomaly"
+    means = dict(
+        zip(advection_direction.REQUIRED_FACES, [0.01, -0.065, 0.1, -0.2, -0.00001])
+    )
+    for face, value in means.items():
+        composite[f"advection_{face}"].attrs["climatology_jja_mean"] = value
     if smoothing_window is not None:
         composite = (
             advection_direction_plotting._smooth_advection_composite_for_display(
@@ -100,6 +105,20 @@ def test_anomaly_paper_format_preserves_components_and_fits_export(
             assert ax.get_ylabel() == "Δ [K hr-1]"
             assert ax.yaxis.label.get_fontsize() == 18
             assert all(t.get_fontsize() == 14 for t in ax.get_legend().get_texts())
+        face_legend = fig.axes[0].get_legend()
+        assert face_legend.get_title().get_text() == "JJA clim."
+        assert face_legend.get_title().get_fontsize() == 14
+        assert [t.get_text() for t in face_legend.get_texts()] == [
+            "West\n0.010 K hr-1",
+            "East\n-0.065 K hr-1",
+            "South\n0.100 K hr-1",
+            "North\n-0.200 K hr-1",
+            "Top\n0.000 K hr-1",
+        ]
+        assert [t.get_text() for t in fig.axes[1].get_legend().get_texts()] == list(
+            advection_direction_plotting.GROUP_LABELS.values()
+        )
+        assert not fig.axes[1].get_legend().get_title().get_text()
         for face, line in zip(advection_direction.REQUIRED_FACES, fig.axes[0].lines):
             np.testing.assert_array_equal(
                 line.get_ydata(), composite[f"advection_{face}"].values
@@ -118,6 +137,9 @@ def test_anomaly_paper_format_preserves_components_and_fits_export(
         fig.set_dpi(style.DPI)
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
+        face_bounds = face_legend.get_window_extent(renderer)
+        assert fig.axes[0].bbox.contains(face_bounds.x0, face_bounds.y0)
+        assert fig.axes[0].bbox.contains(face_bounds.x1, face_bounds.y1)
         for ax in fig.axes:
             for artist in [ax.title, ax.xaxis.label, ax.yaxis.label, ax.get_legend()]:
                 bounds = artist.get_window_extent(renderer)

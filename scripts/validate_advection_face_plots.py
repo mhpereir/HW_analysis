@@ -196,6 +196,7 @@ def audit_region(region, inputs, output):
         for name in variables:
             assert source[name].attrs["units"] == "K hr-1"
         checks = {}
+        jja_means = {}
         for representation, all_module, top_module, argv in (
             ("absolute", absolute, top_absolute, flags),
             ("clim_anom", anomaly, top_anomaly, climate_flags),
@@ -228,6 +229,22 @@ def audit_region(region, inputs, output):
                 {name: values[order] for name, values in window.items()},
                 output / f"top_{representation}",
             )
+            if representation == "clim_anom":
+                summer = np.isin(climate.month.values, [6, 7, 8])
+                assert summer.sum() == 2208
+                smoothed = renderer._smooth_advection_composite_for_display(
+                    all_reference, smoothing_window=24
+                )
+                for name in variables[1:]:
+                    expected_mean = float(np.mean(climate[name].values[summer]))
+                    for dataset in (all_reference, smoothed):
+                        np.testing.assert_allclose(
+                            dataset[name].attrs["climatology_jja_mean"],
+                            expected_mean,
+                            rtol=1e-12,
+                            atol=1e-14,
+                        )
+                    jja_means[name] = expected_mean
         (negative, positive), (prepared,) = capture_cli(
             matched,
             [
@@ -301,6 +318,7 @@ def audit_region(region, inputs, output):
             "matched_pairs": prepared.match.pair_count,
             "matched_event_ids": pair_ids,
             "max_absolute_errors": checks,
+            "jja_climatological_face_means": jja_means,
             "checks_passed": True,
         }
 

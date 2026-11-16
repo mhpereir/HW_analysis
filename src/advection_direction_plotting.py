@@ -453,20 +453,36 @@ def _plot_face_timeseries(
     *,
     anomaly: bool,
 ) -> None:
+    has_climatology = False
     for face in advection_direction.available_stage1_faces(ds):
         name = advection_direction.stage1_face_variable(face)
+        label = face.capitalize()
+        mean = ds[name].attrs.get("climatology_jja_mean")
+        if anomaly and mean is not None:
+            formatted = format(float(mean), ".3f")
+            if float(formatted) == 0.0:
+                formatted = "0.000"
+            label += f"\n{formatted} K hr-1"
+            has_climatology = True
         ax.plot(
             lag_days,
             ds[name].values,
             color=plot_style.FACE_COLORS[face],
-            label=face.capitalize(),
+            label=label,
         )
     plot_style.zero_line(ax)
     ax.set_ylabel("Δ [K hr-1]" if anomaly else "K hr-1")
     ax.set_title("Signed face contributions")
-    _add_upper_axis_headroom(ax)
+    _add_upper_axis_headroom(
+        ax, fraction=0.65 if has_climatology else LEGEND_HEADROOM_FRACTION
+    )
     ax.legend(
-        ncol=5 if anomaly else 3, loc="upper center", **plot_style.legend_kwargs()
+        ncol=5 if anomaly else 3,
+        loc="upper center",
+        title="JJA clim." if has_climatology else None,
+        title_fontsize=plot_style.legend_font_size(),
+        columnspacing=1.0 if has_climatology else 2.0,
+        **plot_style.legend_kwargs(),
     )
 
 
