@@ -2,6 +2,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 import xarray as xr
 from HW_analysis.src import advection_direction, advection_direction_plotting
 
@@ -75,13 +76,55 @@ def test_add_upper_axis_headroom_expands_only_upper_limit():
         plt.close(fig)
 
 
-def test_climatological_anomaly_title_is_explicit():
+@pytest.mark.parametrize("smoothing_window", [None, 24])
+def test_anomaly_paper_format_preserves_components_and_fits_export(
+    tmp_path, smoothing_window
+):
     composite = _make_composite()
     composite.attrs["data_representation"] = "climatological_anomaly"
+    if smoothing_window is not None:
+        composite = (
+            advection_direction_plotting._smooth_advection_composite_for_display(
+                composite, smoothing_window=smoothing_window
+            )
+        )
+    before = composite.copy(deep=True)
+    expected = advection_direction.grouped_advection_components(composite)
+    style = advection_direction_plotting.plot_style
 
     fig = advection_direction_plotting.plot_advection_direction_exploration(composite)
     try:
-        assert "Climatological-anomaly composite" in fig._suptitle.get_text()
+        assert fig._suptitle is None
+        np.testing.assert_allclose(fig.get_size_inches(), [12, 6.6])
+        for ax in fig.axes:
+            assert ax.get_ylabel() == "Δ [K hr-1]"
+            assert ax.yaxis.label.get_fontsize() == 18
+            assert all(t.get_fontsize() == 14 for t in ax.get_legend().get_texts())
+        for face, line in zip(advection_direction.REQUIRED_FACES, fig.axes[0].lines):
+            np.testing.assert_array_equal(
+                line.get_ydata(), composite[f"advection_{face}"].values
+            )
+        for name, line in zip(
+            advection_direction_plotting.GROUP_NAMES, fig.axes[1].lines
+        ):
+            np.testing.assert_array_equal(line.get_ydata(), expected[name].values)
+        total = next(
+            line for line in fig.axes[1].lines if line.get_label() == "All faces"
+        )
+        assert total.get_linestyle() == "-"
+        assert total.get_color() == "black"
+        assert total.get_linewidth() == 2 * style.LINE_WIDTH_PT
+        style.save_figure(fig, tmp_path / "anomaly.png")
+        fig.set_dpi(style.DPI)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        for ax in fig.axes:
+            for artist in [ax.title, ax.xaxis.label, ax.yaxis.label, ax.get_legend()]:
+                bounds = artist.get_window_extent(renderer)
+                assert fig.bbox.contains(bounds.x0, bounds.y0)
+                assert fig.bbox.contains(bounds.x1, bounds.y1)
+        xr.testing.assert_identical(composite, before)
+        assert plt.rcParams["axes.labelsize"] == 14
     finally:
         plt.close(fig)
 
@@ -90,7 +133,7 @@ def test_single_column_title_and_legends_fit_after_export(tmp_path):
     composite = _make_composite()
     composite.attrs.update(
         region="pnw_bartusek",
-        data_representation="climatological_anomaly",
+        data_representation="absolute",
         n_events=250,
         pre_days=7,
         post_days=7,

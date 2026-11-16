@@ -80,13 +80,18 @@ def plot_advection_direction_exploration(
         compat="override",
     )
     diagnostics.attrs.update(composite.attrs)
+    anomaly = composite.attrs.get("data_representation") == "climatological_anomaly"
 
     fig, axes = plt.subplots(
         nrows=2,
         ncols=1,
         figsize=plot_style.publication_figsize(
-            "single",
-            aspect=plot_style.TWO_PANEL_COLUMN_ASPECT,
+            "full" if anomaly else "single",
+            aspect=(
+                plot_style.TWO_PANEL_STACK_ASPECT
+                if anomaly
+                else plot_style.TWO_PANEL_COLUMN_ASPECT
+            ),
         ),
         sharex=True,
         constrained_layout=True,
@@ -94,8 +99,8 @@ def plot_advection_direction_exploration(
     face_ax, grouped_ax = axes
 
     lag_days = np.asarray(diagnostics["lag_hour"].values, dtype=float) / 24.0
-    _plot_face_timeseries(face_ax, diagnostics, lag_days)
-    _plot_grouped_timeseries(grouped_ax, diagnostics, lag_days)
+    _plot_face_timeseries(face_ax, diagnostics, lag_days, anomaly=anomaly)
+    _plot_grouped_timeseries(grouped_ax, diagnostics, lag_days, anomaly=anomaly)
 
     for ax in axes:
         ax.axvline(
@@ -106,13 +111,16 @@ def plot_advection_direction_exploration(
             zorder=1,
         )
         plot_style.style_axis(ax)
-        plot_style.format_integer_axis(ax.xaxis, minor_spacing=1)
-        plot_style.limit_major_ticks(ax.xaxis, max_intervals=6, integer=True)
+        if anomaly:
+            plot_style.format_integer_axis(ax.xaxis, spacing=1)
+        else:
+            plot_style.format_integer_axis(ax.xaxis, minor_spacing=1)
+            plot_style.limit_major_ticks(ax.xaxis, max_intervals=6, integer=True)
         ax.set_xlim(float(lag_days.min()), float(lag_days.max()))
     grouped_ax.set_xlabel("Days relative to event peak")
 
-    title = _figure_title(composite)
-    fig.suptitle(title)
+    if not anomaly:
+        fig.suptitle(_figure_title(composite))
     return fig
 
 
@@ -442,6 +450,8 @@ def _plot_face_timeseries(
     ax,
     ds: xr.Dataset,
     lag_days: np.ndarray,
+    *,
+    anomaly: bool,
 ) -> None:
     for face in advection_direction.available_stage1_faces(ds):
         name = advection_direction.stage1_face_variable(face)
@@ -452,16 +462,20 @@ def _plot_face_timeseries(
             label=face.capitalize(),
         )
     plot_style.zero_line(ax)
-    ax.set_ylabel("K hr-1")
+    ax.set_ylabel("Δ [K hr-1]" if anomaly else "K hr-1")
     ax.set_title("Signed face contributions")
     _add_upper_axis_headroom(ax)
-    ax.legend(ncol=3, loc="upper center", **plot_style.legend_kwargs())
+    ax.legend(
+        ncol=5 if anomaly else 3, loc="upper center", **plot_style.legend_kwargs()
+    )
 
 
 def _plot_grouped_timeseries(
     ax,
     ds: xr.Dataset,
     lag_days: np.ndarray,
+    *,
+    anomaly: bool,
 ) -> None:
     for name in (
         "advection_zonal",
@@ -470,18 +484,26 @@ def _plot_grouped_timeseries(
         "advection_vertical",
         "advection_face_total",
     ):
+        emphasize_total = anomaly and name == "advection_face_total"
         ax.plot(
             lag_days,
             ds[name].values,
-            color=GROUP_COLORS[name],
-            label=SINGLE_COLUMN_GROUP_LABELS[name],
-            linestyle="--" if name == "advection_face_total" else "-",
+            color="black" if emphasize_total else GROUP_COLORS[name],
+            label=(GROUP_LABELS if anomaly else SINGLE_COLUMN_GROUP_LABELS)[name],
+            linestyle="--" if name == "advection_face_total" and not anomaly else "-",
+            linewidth=(
+                plot_style.ADVECTION_TOTAL_LINE_WIDTH_PT
+                if emphasize_total
+                else plot_style.LINE_WIDTH_PT
+            ),
         )
     plot_style.zero_line(ax)
-    ax.set_ylabel("K hr-1")
+    ax.set_ylabel("Δ [K hr-1]" if anomaly else "K hr-1")
     ax.set_title("Grouped advective contributions")
     _add_upper_axis_headroom(ax, fraction=0.5)
-    ax.legend(ncol=2, loc="upper center", **plot_style.legend_kwargs())
+    ax.legend(
+        ncol=3 if anomaly else 2, loc="upper center", **plot_style.legend_kwargs()
+    )
 
 
 def _plot_matched_face_timeseries(

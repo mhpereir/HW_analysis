@@ -47,11 +47,22 @@ in succession and verify fonts before and after export, unchanged data and
 global-style restoration. Review representative single-column outputs for
 clipping and overlap, and a two-column temporal composite for unchanged style.
 
-The standalone all-event face-advection comparison is a single-column figure:
-use the 6-by-9-inch two-panel column canvas, the single-column font context,
-wrapped legends, and adaptive whole-day major ticks with daily minor ticks.
-Retain its data, smoothing, units and two-panel order. The separate top-event
-and matched face-advection renderers retain their full-width layout and fonts.
+The standalone absolute all-event face-advection comparison uses the
+6-by-9-inch two-panel column canvas, the single-column font context, wrapped
+legends, and adaptive whole-day major ticks with daily minor ticks.
+Its climatological-anomaly counterpart retains the historical two-column
+12-by-6.6-inch canvas and two vertically stacked panels, with 18 pt labels,
+ticks and panel titles and 14 pt legends from the same scoped font context.
+Both anomaly y-axis labels read `Δ [K hr-1]`. Omit the overall anomaly figure
+title in hourly and smoothed outputs; retain the panel titles, representation
+and smoothing metadata, and distinct filenames. Use a solid black All faces
+curve at twice the component line width, with three-column grouped legends
+to accommodate the larger text. Individual face legends remain one row.
+Keep daily major/minor ticks for the wide anomaly view. Preserve all component
+values, grouping, event populations and smoothing. The absolute, top-event and
+matched renderers retain their existing layouts, titles and line conventions.
+Verify the scoped fonts, exported artist bounds, unchanged curves and source
+metadata, and the solid total in raw and smoothed anomaly figures.
 
 `save_figure()` normally crops unused margins. Use `crop=False` with a layout
 that fits all artists inside the canvas when an exact publication aspect is
@@ -274,7 +285,8 @@ and population size. PNG and PDF outputs must not overwrite earlier figures.
   a second `_smoothed.png` figure. The second figure uses the shared centered
   display-only running mean, defaults to 24 hourly samples, requires complete
   windows at the lag boundaries, and identifies the smoothing window in its
-  title. Smooth signed face tendencies before deriving grouped curves. For the
+  metadata (also in the title where retained). Smooth signed face tendencies
+  before deriving grouped curves. For the
   matched figure, smooth each sign population independently. Do not alter event
   membership, climatology subtraction, matching, or source composites.
 - The raw and climatological-anomaly top-event face-advection entrypoints rank
