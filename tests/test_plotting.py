@@ -327,7 +327,12 @@ def test_extended_layout_preserves_separated_panels_without_removed_inputs(
                     for line in ax.lines
                 )
         if anomaly:
-            _assert_extended_anomaly_axis_labels(fig)
+            _assert_extended_anomaly_axis_labels(
+                fig,
+                temperature_label=(
+                    r"Δ$\langle T \rangle$ [K]" if family == "top" else "ΔT_mean [K]"
+                ),
+            )
             assert fig.axes[3].get_ylim()[0] < 0
         else:
             np.testing.assert_allclose(fig.axes[3].get_ylim(), (0, 1))
@@ -1065,6 +1070,7 @@ def test_top_event_jja_legends_preserve_curves_and_display_signs(
     old = plotting.plot_top_event_timeseries(window, _make_top_event(), **kwargs)
     new = plotting.plot_top_event_timeseries(annotated, _make_top_event(), **kwargs)
     try:
+        assert (new._suptitle is None) == (layout == "paper")
         labels = []
         for index, (old_ax, new_ax) in enumerate(zip(old.axes, new.axes, strict=True)):
             assert len(old_ax.lines) == len(new_ax.lines)
@@ -1120,6 +1126,7 @@ def test_absolute_top_event_legends_ignore_anomaly_climatology_metadata():
         window, _make_top_event(), plot_extended_variables=True
     )
     try:
+        assert fig.axes[0].get_ylabel() == r"$\langle T \rangle$ [K]"
         assert not any(
             "JJA clim." in line.get_label() for ax in fig.axes for line in ax.lines
         )
@@ -1127,7 +1134,7 @@ def test_absolute_top_event_legends_ignore_anomaly_climatology_metadata():
         plt.close(fig)
 
 
-def test_extended_top_event_anomaly_uses_delta_labels_and_baseline_title():
+def test_extended_top_event_anomaly_uses_delta_labels_without_suptitle():
     event_window = _make_top_event_window()
     composite = _make_composite()
     anomaly_attrs = {
@@ -1145,11 +1152,10 @@ def test_extended_top_event_anomaly_uses_delta_labels_and_baseline_title():
         plot_extended_variables=True,
     )
     try:
-        _assert_extended_anomaly_axis_labels(fig)
-        title = fig._suptitle.get_text()
-        assert "climatological-anomaly" in title
-        assert "1940-2024 baseline" in title
-        assert "absolute peak tas=305.00" in title
+        _assert_extended_anomaly_axis_labels(
+            fig, temperature_label=r"Δ$\langle T \rangle$ [K]"
+        )
+        assert fig._suptitle is None
         assert fig.axes[3].get_ylim() != (0.0, 1.0)
     finally:
         plt.close(fig)
@@ -1199,11 +1205,16 @@ def test_plot_top_event_timeseries_presentation_uses_requested_six_panel_layout(
         plt.close(fig)
 
 
-def test_presentation_top_event_anomaly_uses_delta_axis_labels():
+def test_presentation_top_event_anomaly_uses_delta_axis_labels_and_baseline_title():
     event_window = _make_top_event_window()
     composite = _make_composite()
-    event_window.attrs["data_representation"] = "climatological_anomaly"
-    composite.attrs["data_representation"] = "climatological_anomaly"
+    anomaly_attrs = {
+        "data_representation": "climatological_anomaly",
+        "climatology_start_year": 1940,
+        "climatology_end_year": 2024,
+    }
+    event_window.attrs.update(anomaly_attrs)
+    composite.attrs.update(anomaly_attrs)
 
     fig = plotting.plot_top_event_timeseries(
         event_window,
@@ -1220,6 +1231,10 @@ def test_presentation_top_event_anomaly_uses_delta_axis_labels():
             "Δ [K hr-1]",
             "Δ [K hr-1]",
         ]
+        title = fig._suptitle.get_text()
+        assert "climatological-anomaly" in title
+        assert "1940-2024 baseline" in title
+        assert "absolute peak tas=305.00" in title
     finally:
         plt.close(fig)
 
@@ -1419,10 +1434,12 @@ def _assert_all_spines_visible(fig) -> None:
     assert all(spine.get_visible() for ax in fig.axes for spine in ax.spines.values())
 
 
-def _assert_extended_anomaly_axis_labels(fig) -> None:
+def _assert_extended_anomaly_axis_labels(
+    fig, *, temperature_label: str = "ΔT_mean [K]"
+) -> None:
     """Require concise delta notation on every extended anomaly axis."""
     assert [ax.get_ylabel() for ax in fig.axes] == [
-        "ΔT_mean [K]",
+        temperature_label,
         "ΔLWA [m hPa]",
         "Δ [K hr-1]",
         "Δcloud cover fraction",

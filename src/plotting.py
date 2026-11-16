@@ -442,7 +442,6 @@ def plot_top_event_timeseries(
     )
 
     _mark_top_event_times(axes, event)
-    _set_top_event_title(fig, event_window, event)
     ax3.set_xlabel("Lag from event peak (days)")
     _style_axes(axes)
     _format_day_lag_xaxis(fig)
@@ -669,7 +668,7 @@ def _plot_extended_top_event_timeseries(
         event_window,
         event,
         "T_mean",
-        ylabel="T_mean [K]",
+        ylabel=f"{_variable_label('T_mean')} [K]",
         reference_composite=reference_composite,
         zero_reference=_is_climatological_anomaly(event_window),
     )
@@ -753,7 +752,6 @@ def _plot_extended_top_event_timeseries(
                 )
     _align_top_event_right_legends(right, event_window)
     _mark_top_event_times(axes.ravel(), event)
-    _set_top_event_title(fig, event_window, event)
     left[-1].set_xlabel("Lag from event peak (days)")
     right[-1].set_xlabel("Lag from event peak (days)")
     _style_axes(axes.ravel())

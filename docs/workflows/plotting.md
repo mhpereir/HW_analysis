@@ -511,6 +511,16 @@ paper figures through Venus PBS and inspect the saved axes at original resolutio
 
 ### Top-event anomaly climatology legends
 
+The first panel of extended 5x2 top-event figures uses the shared
+$\langle T\rangle$ symbol in its y-axis label: $\Delta\langle T\rangle$ [K] for
+climatological anomalies and $\langle T\rangle$ [K] for absolute values. Use
+the same notation as the variable legend instead of the internal `T_mean`
+name. This label change preserves the data, axis limits and other layouts.
+Paper top-event figures, both compact and extended, omit the overall figure
+title in hourly and smoothed outputs, for absolute and anomaly views.
+Presentation figures retain their event and baseline title. Event selection,
+ranking, metadata and output filenames remain unchanged.
+
 `scripts/plot_top_events_clim_anom.py` adds an absolute JJA climatological
 mean to each variable's legend by default, in compact, extended, and
 presentation layouts. The label `JJA clim. = ...` gives context for the
