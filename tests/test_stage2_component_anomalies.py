@@ -331,12 +331,14 @@ def test_anomaly_figures_use_correct_points_labels_and_colorbar(
             assert axes[0].xaxis.get_major_formatter()(1.0) == "1.00"
         assert plt.rcParams["axes.labelsize"] == 14
         if presentation:
-            assert all(ax.title.get_fontsize() == 18 for ax in axes)
+            assert all(ax.get_title() == "" for ax in axes)
             assert all(t.get_fontsize() == 14 for t in axes[0].get_legend().get_texts())
             fig.canvas.draw()
             renderer = fig.canvas.get_renderer()
             for ax in fig.axes:
                 for artist in [ax.title, ax.xaxis.label, ax.yaxis.label]:
+                    if not artist.get_text():
+                        continue
                     box = artist.get_window_extent(renderer)
                     assert box.x0 >= fig.bbox.x0
                     assert box.x1 <= fig.bbox.x1

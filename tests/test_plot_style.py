@@ -100,7 +100,10 @@ def test_event_legend_handle_preserves_marker_size_and_opacity():
 
 @pytest.mark.parametrize("invert", [False, True])
 @pytest.mark.parametrize("scale", [1.0, 1e5])
-def test_sum_reference_guides_are_bounded_clipped_and_preserve_axes(invert, scale):
+@pytest.mark.parametrize("label_at_edge", [False, True])
+def test_sum_reference_guides_are_bounded_clipped_and_preserve_axes(
+    invert, scale, label_at_edge
+):
     fig, ax = plot_style.plt.subplots()
     try:
         xlim = np.array([-28.0, 10.0]) * scale
@@ -113,7 +116,7 @@ def test_sum_reference_guides_are_bounded_clipped_and_preserve_axes(invert, scal
             ax.get_autoscalex_on(),
             ax.get_autoscaley_on(),
         )
-        plot_style.add_sum_reference_lines(ax)
+        plot_style.add_sum_reference_lines(ax, label_at_edge=label_at_edge)
         assert (
             ax.get_xlim(),
             ax.get_ylim(),
@@ -134,6 +137,18 @@ def test_sum_reference_guides_are_bounded_clipped_and_preserve_axes(invert, scal
         assert {text.get_text() for text in ax.texts} == {
             line.get_label().removeprefix("reference ") for line in ax.lines
         }
+        if label_at_edge:
+            fig.canvas.draw()
+            for text in ax.texts:
+                x, y = text.xy
+                assert x + y == pytest.approx(float(text.get_text().split()[0]))
+                position = ax.transAxes.inverted().transform(
+                    ax.transData.transform((x, y))
+                )
+                assert np.isclose(position[0], 1) or np.isclose(position[1], 0)
+                box = text.get_window_extent(fig.canvas.get_renderer())
+                assert box.x0 >= ax.bbox.x0 and box.x1 <= ax.bbox.x1
+                assert box.y0 >= ax.bbox.y0 and box.y1 <= ax.bbox.y1
     finally:
         plot_style.plt.close(fig)
 

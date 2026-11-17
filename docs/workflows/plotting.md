@@ -261,11 +261,15 @@ unchanged. Absolute inputs retain their existing rendering.
 
 The two-panel component-anomaly `presentation` layout is the paper version.
 Retain its 7.5-by-9-inch portrait canvas and scoped single-column typography
-(18 pt labels, ticks and panel titles; 14 pt legends). Wrap the panel titles
-to fit the larger fonts. Omit the figure suptitle, population-count heading
+(18 pt labels and ticks; 14 pt legends). Omit both panel titles,
+the figure suptitle, population-count heading
 and supplemental footer; the manuscript caption supplies sample counts,
 region, integration window, climatological reference and the diagonal-line
-budget identity. Keep the primed axis labels and diagonal sum lines. Format
+budget identity. Keep the primed axis labels and diagonal sum lines. Position
+the lower-panel sum-line labels just inside their bottom/right boundary
+intersections, with a six-point inset and alignment that keeps the labels
+inside the axes. The shared guide helper retains centered labels by default
+for other layouts. Format
 both panel y-axes and the vertical severity colorbar with one decimal place,
 including after PNG/PDF export; x-axis ticks retain two decimals. This is a
 rendering-only change: preserve all points, severity normalization, limits,

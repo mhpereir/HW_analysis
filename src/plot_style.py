@@ -396,11 +396,14 @@ def event_severity_legend_handle(*, point_size: float, alpha: float) -> Line2D:
     )
 
 
-def add_sum_reference_lines(ax, *, spacing: float = 5.0, max_lines: int = 17) -> None:
+def add_sum_reference_lines(
+    ax, *, spacing: float = 5.0, max_lines: int = 17, label_at_edge: bool = False
+) -> None:
     """Label visible x+y=c guides in K without changing limits or autoscaling.
 
     Broad ranges use integer multiples of spacing to bound rendering cost and
-    avoid a dense background. This is a geometric guide, not a fitted model.
+    avoid a dense background. Edge labels sit inside the bottom/right border.
+    This is a geometric guide, not a fitted model.
     """
     if not np.isfinite(spacing) or spacing <= 0:
         raise ValueError("spacing must be finite and positive.")
@@ -435,17 +438,62 @@ def add_sum_reference_lines(ax, *, spacing: float = 5.0, max_lines: int = 17) ->
         xpos = (lo + hi) / 2
         xleft, xright = ax.get_xlim()
         fraction = (xpos - xleft) / (xright - xleft)
-        ax.text(
-            xpos,
-            level - xpos,
-            f"{level:g} K",
-            fontsize=legend_font_size() - 1,
-            color="0.35",
-            ha="right" if fraction > 0.9 else "left" if fraction < 0.1 else "center",
-            va="center",
-            clip_on=True,
-            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.75, "pad": 0.3},
-        )
+        text_kwargs = {
+            "fontsize": legend_font_size() - 1,
+            "color": "0.35",
+            "clip_on": True,
+            "bbox": {
+                "facecolor": "white",
+                "edgecolor": "none",
+                "alpha": 0.75,
+                "pad": 0.3,
+            },
+        }
+        if label_at_edge:
+            endpoints = np.column_stack((xx, level - xx))
+            axes_points = ax.transAxes.inverted().transform(
+                ax.transData.transform(endpoints)
+            )
+            edge = np.argmin(np.minimum(axes_points[:, 1], 1 - axes_points[:, 0]))
+            right = np.isclose(axes_points[edge, 0], 1)
+            fraction = axes_points[edge, 0]
+            height = axes_points[edge, 1]
+            va = (
+                "bottom"
+                if not right or height < 0.1
+                else "top"
+                if height > 0.9
+                else "center"
+            )
+            dy = 6 if va == "bottom" else -6 if va == "top" else 0
+            ax.annotate(
+                f"{level:g} K",
+                xy=endpoints[edge],
+                xytext=(-6 if right else 0, dy),
+                textcoords="offset points",
+                ha=(
+                    "right"
+                    if right or fraction > 0.88
+                    else "left"
+                    if fraction < 0.12
+                    else "center"
+                ),
+                va=va,
+                **text_kwargs,
+            )
+        else:
+            ax.text(
+                xpos,
+                level - xpos,
+                f"{level:g} K",
+                ha="right"
+                if fraction > 0.9
+                else "left"
+                if fraction < 0.1
+                else "center",
+                va="center",
+                **text_kwargs,
+            )
 
 
 def style_axis(ax, *, grid: bool = True) -> None:

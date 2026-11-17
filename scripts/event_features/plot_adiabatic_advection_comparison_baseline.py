@@ -494,11 +494,8 @@ def plot_presentation_tendency_scatter(
         show_counts=False,
     )
     add_one_to_negative_one_line_from_panel(axes[0])
-    axes[0].set_title(
-        "Advection vs Adiabatic\nHeating Anomalies"
-        if anomaly
-        else "Advection vs Adiabatic Heating"
-    )
+    if not anomaly:
+        axes[0].set_title("Advection vs Adiabatic Heating")
     axes[0].set_ylabel(variable_label(ADVECTION_VARIABLE, anomaly=anomaly))
     axes[0].set_xlabel(variable_label(X_VARIABLE, anomaly=anomaly))
 
@@ -518,11 +515,8 @@ def plot_presentation_tendency_scatter(
         show_legend=False,
         show_counts=False,
     )
-    axes[1].set_title(
-        "Diabatic Residual Anomaly\n" + r"vs $I'_{dyn,net}$"
-        if anomaly
-        else r"Diabatic Residual vs $I_{dyn,net}$"
-    )
+    if not anomaly:
+        axes[1].set_title(r"Diabatic Residual vs $I_{dyn,net}$")
     axes[1].set_ylabel(variable_label(DIABATIC_VARIABLE, anomaly=anomaly))
     axes[1].set_xlabel(variable_label(DYNAMICAL_VARIABLE, anomaly=anomaly))
 
@@ -535,7 +529,7 @@ def plot_presentation_tendency_scatter(
 
     colorbar = fig.colorbar(event_mappable, ax=axes, shrink=0.92)
     colorbar.set_label(variable_label(color_variable))
-    plot_style.add_sum_reference_lines(axes[1])
+    plot_style.add_sum_reference_lines(axes[1], label_at_edge=anomaly)
     if anomaly:
         for ax in (*axes, colorbar.ax):
             plot_style.set_tick_decimals(ax.yaxis, 1)
