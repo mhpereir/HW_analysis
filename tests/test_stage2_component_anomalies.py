@@ -204,6 +204,8 @@ def test_reference_and_anomaly_season_guards_reject_false_cohorts(
         )
     if problem == "endpoint_events":
         events.attrs["require_full_event"] = 0
+        if derived:
+            match = "Contradictory Stage-2"
     elif problem == "all_seasons":
         baseline.attrs["all_seasons"] = 1
     elif problem == "crossing_event":
@@ -399,6 +401,32 @@ def test_comparison_cli_reads_saved_anomalies_with_explicit_full_event_cohort(
     monkeypatch.setattr("sys.argv", [*argv, "--require-full-event"])
     assert comparison_cli.main() == 0
     assert output.stat().st_size > 1000
+
+
+def test_saved_endpoint_anomalies_preserve_boundary_crossing_event(source, tmp_path):
+    climate, events, baseline = inputs(source)
+    ae, ab = build_component_anomaly_pair(source, climate, events, baseline)
+    ae.attrs.update(require_full_event=0, season_selection_rule="anchor_month")
+    ae["start_time"].values[0] = np.datetime64("2019-05-31", "ns")
+    ae["peak_time"].values[0] = np.datetime64("2019-06-01", "ns")
+    ae["end_time"].values[0] = np.datetime64("2019-06-02", "ns")
+    original = ae.copy(deep=True)
+    event_path = analysis_io.save_component_anomalies(ae, tmp_path / "events.nc")
+    with comparison_cli.open_event_features(event_path) as saved:
+        xr.testing.assert_identical(saved, original)
+        fig = plot_tendency_scatter(ab, saved, layout="presentation")
+        try:
+            np.testing.assert_allclose(
+                fig.axes[0].collections[1].get_offsets(),
+                np.column_stack([ae.I_adiabatic_anom_pre, ae.I_advection_anom_pre]),
+            )
+        finally:
+            plt.close(fig)
+    with pytest.raises(ValueError, match="membership differs"):
+        comparison_cli.open_event_features(event_path, require_full_event=True)
+    ae["peak_time"].values[0] = np.datetime64("2019-05-31", "ns")
+    with pytest.raises(ValueError, match="outside declared season"):
+        validate_component_anomalies(ae)
 
 
 def test_runner_checks_reference_hashes_and_refuses_overwrite(tmp_path):

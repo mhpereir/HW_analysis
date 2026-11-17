@@ -93,6 +93,15 @@ and the reference period, and interpret diagonal sum lines as anomalous total
 heating. Reject mixed absolute/anomaly inputs or incompatible anomaly pairs.
 The plotter consumes saved products, not hourly source data.
 
+Saved anomaly readers validate the population declared by the product: either
+complete JJA events or peak-in-JJA events. The accepted eight-region 48/96-hour
+campaign uses the latter. Validate its metadata and actual peak timestamps
+without requiring all event intervals to remain in JJA or dropping rows.
+The plotting CLI still requires its requested seasonal rule to match the
+saved table. The window-sensitivity builder and its full-JJA reference
+requirement remain unchanged; this reader compatibility does not authorize
+rebuilding or relabeling either accepted population.
+
 For the two-panel paper presentation, use the typography and caption rules in
 [the plotting workflow](../workflows/plotting.md). The figure omits its overall
 title and supplemental footer; place the reference period, population counts,

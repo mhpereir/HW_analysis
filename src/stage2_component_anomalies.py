@@ -222,7 +222,7 @@ def build_component_anomaly_pair(
 
 
 def validate_component_anomalies(table: xr.Dataset) -> None:
-    """Validate the saved anomaly-only budget contract and its closure."""
+    """Validate the saved anomaly budget, declared seasonal rule and closure."""
     marker = table.attrs.get("pipeline_stage")
     if marker not in {
         "stage_2_event_component_anomalies",
@@ -236,7 +236,7 @@ def validate_component_anomalies(table: xr.Dataset) -> None:
         raise ValueError(
             "Missing component-anomaly representation or contract version."
         )
-    season_selection.validate_stage2_season(table, require_full_event=True)
+    season_selection.validate_stage2_season(table, require_full_event=None)
     if any(name in table for name in RAW_TO_ANOMALY):
         raise ValueError("Anomaly products must not contain raw budget features.")
     if any(key not in table.attrs for key in PAIR_METADATA):

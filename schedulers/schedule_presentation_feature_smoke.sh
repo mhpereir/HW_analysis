@@ -52,6 +52,7 @@ cd "${PROJECT_ROOT}"
   tests/test_build_stage2_baseline_features.py \
   tests/test_spatial_composite_shell_scripts.py \
   tests/test_plot_style.py \
+  tests/test_stage2_component_anomalies.py \
   tests/test_presentation_budget_comparisons.py \
   tests/test_selectors.py \
   tests/test_plot_adiabatic_advection_comparison.py \

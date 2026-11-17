@@ -145,8 +145,10 @@ def validate_stage2_season(
 ) -> None:
     """Reject incompatible provenance or dates before consuming a Stage-2 table.
 
-    ``require_full_event=None`` accepts either documented event rule, for a
-    consumer that will explicitly select complete events before matching.
+    ``require_full_event=None`` validates either documented event rule against
+    its stored metadata and dates. Use it for representation validation or
+    before explicitly selecting complete events for matching; consumers with
+    a requested rule must also validate that rule explicitly.
     Baseline membership is always anchor-only.
     """
     months = resolve_months(season_months, all_seasons=all_seasons)
