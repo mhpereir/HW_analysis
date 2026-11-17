@@ -259,6 +259,22 @@ primes and identify the reference period; lower-panel diagonals represent the
 anomalous total. Peak-TAS coloring and accepted population membership are
 unchanged. Absolute inputs retain their existing rendering.
 
+The two-panel component-anomaly `presentation` layout is the paper version.
+Retain its 7.5-by-9-inch portrait canvas and scoped single-column typography
+(18 pt labels, ticks and panel titles; 14 pt legends). Wrap the panel titles
+to fit the larger fonts. Omit the figure suptitle, population-count heading
+and supplemental footer; the manuscript caption supplies sample counts,
+region, integration window, climatological reference and the diagonal-line
+budget identity. Keep the primed axis labels and diagonal sum lines. Format
+both panel y-axes and the vertical severity colorbar with one decimal place,
+including after PNG/PDF export; x-axis ticks retain two decimals. This is a
+rendering-only change: preserve all points, severity normalization, limits,
+seasons and saved products. The full anomaly layout and absolute comparisons
+retain their existing annotations and precision. Verify scoped typography,
+exported precision, input immutability and readable artist bounds locally,
+then inspect authorized Venus rerenders of the accepted 96-hour and 21-day
+PNW Bartusek tables in a fresh output namespace before integration.
+
 The integration-window rank figure follows the
 [heating-rank product contract](../products/integration_window_ranks.md).
 It reads saved comparisons, uses `HEATING_RANK_STYLES`, displays one regional

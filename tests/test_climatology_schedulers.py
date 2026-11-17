@@ -199,10 +199,7 @@ def test_advection_anomaly_schedulers_publish_raw_and_smoothed_outputs():
         assert '--smoothing-window "${SMOOTHING_WINDOW}"' in text
         assert text.count('test ! -e "${SMOOTHED_OUTPUT_PATH}"') == 2
         assert 'test -s "${STAGED_SMOOTHED_OUTPUT}"' in text
-        assert (
-            'ln -T -- "${STAGED_SMOOTHED_OUTPUT}" '
-            '"${SMOOTHED_OUTPUT_PATH}"' in text
-        )
+        assert 'ln -T -- "${STAGED_SMOOTHED_OUTPUT}" "${SMOOTHED_OUTPUT_PATH}"' in text
         assert 'test -s "${SMOOTHED_OUTPUT_PATH}"' in text
         assert 'echo "[info] smoothed_output_sha256=' in text
         assert "pnw_bartusek" not in text

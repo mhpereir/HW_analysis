@@ -298,7 +298,14 @@ def test_anomaly_figures_use_correct_points_labels_and_colorbar(
     original = [d.copy(deep=True) for d in (ae, ab)]
     fig = plot_tendency_scatter(ab, ae, layout=layout)
     try:
-        assert "Heating Anomalies" in fig._suptitle.get_text()
+        presentation = layout == "presentation"
+        if presentation:
+            assert fig._suptitle is None
+            assert fig._supxlabel is None
+            np.testing.assert_allclose(fig.get_size_inches(), [7.5, 9.0])
+        else:
+            assert "Heating Anomalies" in fig._suptitle.get_text()
+            assert fig.axes[0].get_title() == "Advection vs Adiabatic Heating Anomalies"
         axes = fig.axes[:-1]
         assert all("I'" in ax.get_ylabel() for ax in axes)
         assert fig.axes[-1].get_ylabel() == "Peak TAS Anomaly (K)"
@@ -312,10 +319,27 @@ def test_anomaly_figures_use_correct_points_labels_and_colorbar(
         assert len(axes[0].collections[0].get_offsets()) == int(
             (baseline.event_adjacent == 0).sum()
         )
-        if layout == "presentation":
-            assert "I'_{dT/dt}" in fig._supxlabel.get_text()
-            assert "2019-2021 climatology" in fig._supxlabel.get_text()
-        plot_style.save_figure(fig, tmp_path / f"{layout}.png")
+        for extension in ("png", "pdf"):
+            plot_style.save_figure(fig, tmp_path / f"{layout}.{extension}")
+            for ax in fig.axes:
+                assert ax.yaxis.label.get_fontsize() == (18 if presentation else 14)
+                assert ax.yaxis.get_major_formatter()(1.0) == (
+                    "1.0" if presentation else "1.00"
+                )
+            assert axes[0].xaxis.get_major_formatter()(1.0) == "1.00"
+        assert plt.rcParams["axes.labelsize"] == 14
+        if presentation:
+            assert all(ax.title.get_fontsize() == 18 for ax in axes)
+            assert all(t.get_fontsize() == 14 for t in axes[0].get_legend().get_texts())
+            fig.canvas.draw()
+            renderer = fig.canvas.get_renderer()
+            for ax in fig.axes:
+                for artist in [ax.title, ax.xaxis.label, ax.yaxis.label]:
+                    box = artist.get_window_extent(renderer)
+                    assert box.x0 >= fig.bbox.x0
+                    assert box.x1 <= fig.bbox.x1
+                    assert box.y0 >= fig.bbox.y0
+                    assert box.y1 <= fig.bbox.y1
     finally:
         plt.close(fig)
     for actual, before in zip((ae, ab), original, strict=True):

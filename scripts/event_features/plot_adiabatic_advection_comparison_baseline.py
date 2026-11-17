@@ -495,7 +495,9 @@ def plot_presentation_tendency_scatter(
     )
     add_one_to_negative_one_line_from_panel(axes[0])
     axes[0].set_title(
-        "Advection vs Adiabatic Heating" + (" Anomalies" if anomaly else "")
+        "Advection vs Adiabatic\nHeating Anomalies"
+        if anomaly
+        else "Advection vs Adiabatic Heating"
     )
     axes[0].set_ylabel(variable_label(ADVECTION_VARIABLE, anomaly=anomaly))
     axes[0].set_xlabel(variable_label(X_VARIABLE, anomaly=anomaly))
@@ -517,7 +519,7 @@ def plot_presentation_tendency_scatter(
         show_counts=False,
     )
     axes[1].set_title(
-        r"Diabatic Residual Anomaly vs $I'_{dyn,net}$"
+        "Diabatic Residual Anomaly\n" + r"vs $I'_{dyn,net}$"
         if anomaly
         else r"Diabatic Residual vs $I_{dyn,net}$"
     )
@@ -534,22 +536,18 @@ def plot_presentation_tendency_scatter(
     colorbar = fig.colorbar(event_mappable, ax=axes, shrink=0.92)
     colorbar.set_label(variable_label(color_variable))
     plot_style.add_sum_reference_lines(axes[1])
-    fig.supxlabel(
-        (
-            plot_style.ANOMALY_BUDGET_REFERENCE_CAPTION + "\n" + context
-            if anomaly
-            else plot_style.BUDGET_REFERENCE_CAPTION
-        ),
-        fontsize=plot_style.legend_font_size(),
-    )
-    fig.suptitle(
-        (
-            "Events vs Clean Baseline-Day Heating Anomalies\n"
-            if anomaly
-            else "Events vs Clean Baseline-Day Tendencies\n"
+    if anomaly:
+        for ax in (*axes, colorbar.ax):
+            plot_style.set_tick_decimals(ax.yaxis, 1)
+    else:
+        fig.supxlabel(
+            plot_style.BUDGET_REFERENCE_CAPTION,
+            fontsize=plot_style.legend_font_size(),
         )
-        + f"Clean baseline n = {int(clean.sum())}; events n = {int(event_keep.sum())}"
-    )
+        fig.suptitle(
+            "Events vs Clean Baseline-Day Tendencies\n"
+            + f"Clean baseline n = {int(clean.sum())}; events n = {int(event_keep.sum())}"
+        )
     return fig
 
 

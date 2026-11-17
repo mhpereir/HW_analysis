@@ -93,6 +93,12 @@ and the reference period, and interpret diagonal sum lines as anomalous total
 heating. Reject mixed absolute/anomaly inputs or incompatible anomaly pairs.
 The plotter consumes saved products, not hourly source data.
 
+For the two-panel paper presentation, use the typography and caption rules in
+[the plotting workflow](../workflows/plotting.md). The figure omits its overall
+title and supplemental footer; place the reference period, population counts,
+region, window and diagonal-line identity in the manuscript caption instead.
+Existing tables and their scientific/provenance metadata remain unchanged.
+
 The comparison CLI accepts both raw and component-anomaly product markers and
 validates seasonal membership for either representation. Pass
 `--require-full-event` when plotting this campaign's saved tables. The raw

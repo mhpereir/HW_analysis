@@ -590,6 +590,13 @@ def use_default_numeric_formatter(axis) -> None:
     axis._plot_style_use_default_numeric_formatter = True
 
 
+def set_tick_decimals(axis, decimals: int) -> None:
+    """Set per-axis precision while retaining shared scaling during export."""
+    if not isinstance(decimals, int) or decimals < 0:
+        raise ValueError("decimals must be a nonnegative integer.")
+    axis._plot_style_tick_decimals = decimals
+
+
 def _format_numeric_axis(ax, axis_name: str) -> None:
     axis = ax.xaxis if axis_name == "x" else ax.yaxis
     if getattr(axis, "_plot_style_use_default_numeric_formatter", False):
@@ -602,7 +609,8 @@ def _format_numeric_axis(ax, axis_name: str) -> None:
         return
 
     exponent = _axis_scale_exponent(axis)
-    axis.set_major_formatter(FixedDecimalScaleFormatter(exponent))
+    decimals = getattr(axis, "_plot_style_tick_decimals", AXIS_TICK_DECIMALS)
+    axis.set_major_formatter(FixedDecimalScaleFormatter(exponent, decimals))
     axis.get_offset_text().set_visible(False)
     axis.set_label_text(_scale_label(_base_axis_label(axis), exponent))
 
