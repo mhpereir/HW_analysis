@@ -329,9 +329,7 @@ def test_extended_layout_preserves_separated_panels_without_removed_inputs(
         if anomaly:
             _assert_extended_anomaly_axis_labels(
                 fig,
-                temperature_label=(
-                    r"Δ$\langle T \rangle$ [K]" if family == "top" else "ΔT_mean [K]"
-                ),
+                temperature_label=r"Δ$\langle T \rangle$ [K]",
             )
             assert fig.axes[3].get_ylim()[0] < 0
         else:
@@ -359,7 +357,7 @@ def test_presentation_composite_uses_requested_six_panel_layout():
         assert [ax.get_ylabel() for ax in fig.axes] == [
             "LWA [m hPa]",
             "[K hr-1]",
-            "T_mean [K]",
+            r"$\langle T \rangle$ [K]",
             "[K hr-1]",
             "[K hr-1]",
             "[K hr-1]",
@@ -394,7 +392,7 @@ def test_presentation_anomaly_composite_uses_delta_axis_labels():
         assert [ax.get_ylabel() for ax in fig.axes] == [
             "ΔLWA [m hPa]",
             "Δ [K hr-1]",
-            "ΔT_mean [K]",
+            r"Δ$\langle T \rangle$ [K]",
             "Δ [K hr-1]",
             "Δ [K hr-1]",
             "Δ [K hr-1]",
@@ -435,7 +433,7 @@ def test_climatological_anomaly_composite_uses_delta_axis_labels():
     fig = plotting.plot_composite_timeseries(composite)
     try:
         assert "climatological-anomaly composite" in fig._suptitle.get_text()
-        assert fig.axes[0].get_ylabel() == "ΔT_mean [K]"
+        assert fig.axes[0].get_ylabel() == r"Δ$\langle T \rangle$ [K]"
         assert fig.axes[1].get_ylabel() == "Δ [K hr-1]"
         assert fig.axes[2].get_ylabel() == "Δ [K hr-1]"
         assert fig.axes[3].get_ylabel() == "ΔLWA [m hPa]"
@@ -707,7 +705,7 @@ def test_presentation_split_composite_uses_requested_six_panel_layout():
         assert [ax.get_ylabel() for ax in fig.axes] == [
             "LWA [m hPa]",
             "[K hr-1]",
-            "T_mean [K]",
+            r"$\langle T \rangle$ [K]",
             "[K hr-1]",
             "[K hr-1]",
             "[K hr-1]",
@@ -1226,7 +1224,7 @@ def test_presentation_top_event_anomaly_uses_delta_axis_labels_and_baseline_titl
         assert [ax.get_ylabel() for ax in fig.axes] == [
             "ΔLWA [m hPa]",
             "Δ [K hr-1]",
-            "ΔT_mean [K]",
+            r"Δ$\langle T \rangle$ [K]",
             "Δ [K hr-1]",
             "Δ [K hr-1]",
             "Δ [K hr-1]",
@@ -1435,7 +1433,7 @@ def _assert_all_spines_visible(fig) -> None:
 
 
 def _assert_extended_anomaly_axis_labels(
-    fig, *, temperature_label: str = "ΔT_mean [K]"
+    fig, *, temperature_label: str = r"Δ$\langle T \rangle$ [K]"
 ) -> None:
     """Require concise delta notation on every extended anomaly axis."""
     assert [ax.get_ylabel() for ax in fig.axes] == [

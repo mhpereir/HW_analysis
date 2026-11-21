@@ -554,11 +554,14 @@ paper figures through Venus PBS and inspect the saved axes at original resolutio
 
 ### Temporal anomaly climatology legends
 
-The first panel of extended 5x2 top-event figures uses the shared
-$\langle T\rangle$ symbol in its y-axis label: $\Delta\langle T\rangle$ [K] for
+Temperature axes in all-event, split-event and top-event figures use the shared
+$\langle T\rangle$ symbol in their y-axis labels: $\Delta\langle T\rangle$ [K] for
 climatological anomalies and $\langle T\rangle$ [K] for absolute values. Use
 the same notation as the variable legend instead of the internal `T_mean`
-name. This label change preserves the data, axis limits and other layouts.
+name in compact, extended and presentation layouts. This label change
+preserves the data, axis limits, legends and layout. Validate the shared
+notation in existing axis-label checks and inspect regenerated all/split
+absolute and anomaly previews on Venus.
 Paper top-event figures, both compact and extended, omit the overall figure
 title in hourly and smoothed outputs, for absolute and anomaly views.
 Presentation figures retain their event and baseline title. Event selection,
@@ -628,7 +631,7 @@ figures through Venus PBS into a fresh namespace and inspect their legends.
 The all-event and split-event climatological-anomaly composite figures use the
 symbol `Δ` in panel-axis labels instead of spelling out `anomaly`. Place `Δ`
 immediately before the plotted variable name when the axis identifies a
-variable, for example `ΔT_mean [K]` or `ΔLWA [m hPa]`. For a shared or
+variable, for example $\Delta\langle T\rangle$ [K] or `ΔLWA [m hPa]`. For a shared or
 units-only tendency axis, place the symbol immediately before the units, for
 example `Δ [K hr-1]`. Figure titles continue to identify the
 climatological-anomaly representation explicitly.

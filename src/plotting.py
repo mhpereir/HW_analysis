@@ -292,7 +292,7 @@ def _plot_presentation_composite_timeseries(composite: xr.Dataset) -> Figure:
         left[1],
         composite,
         "T_mean",
-        ylabel="T_mean [K]",
+        ylabel=f"{_variable_label('T_mean')} [K]",
         zero_reference=False,
     )
     _plot_composite_variable_panel(left[2], composite, "dTdt", ylabel="[K hr-1]")
@@ -357,7 +357,7 @@ def _plot_presentation_split_composite_timeseries(composite: xr.Dataset) -> Figu
         left[1],
         composite,
         "T_mean",
-        ylabel="T_mean [K]",
+        ylabel=f"{_variable_label('T_mean')} [K]",
         zero_reference=False,
     )
     _plot_split_single_variable_panel(left[2], composite, "dTdt", ylabel="[K hr-1]")
@@ -494,7 +494,7 @@ def _plot_extended_composite_timeseries(composite: xr.Dataset) -> Figure:
         left[0],
         composite,
         "T_mean",
-        ylabel="T_mean [K]",
+        ylabel=f"{_variable_label('T_mean')} [K]",
         zero_reference=_is_climatological_anomaly(composite),
     )
     _add_iqr_to_existing_legend(left[0])
@@ -586,7 +586,7 @@ def _plot_extended_split_composite_timeseries(composite: xr.Dataset) -> Figure:
         left[0],
         composite,
         "T_mean",
-        ylabel="T_mean [K]",
+        ylabel=f"{_variable_label('T_mean')} [K]",
         zero_reference=_is_climatological_anomaly(composite),
     )
     _add_split_style_legend(left[0], _split_bin_labels(composite))
@@ -818,7 +818,7 @@ def _plot_presentation_top_event_timeseries(
         event_window,
         event,
         "T_mean",
-        ylabel="T_mean [K]",
+        ylabel=f"{_variable_label('T_mean')} [K]",
         reference_composite=reference_composite,
         zero_reference=False,
     )
@@ -1138,7 +1138,7 @@ def _plot_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
     )
     _plot_event_percentile_band(ax, lag, ds, "T_mean", color=temperature_color)
     ax.set_ylabel(
-        _anomaly_axis_label(ds, "T_mean [K]"),
+        _anomaly_axis_label(ds, f"{_variable_label('T_mean')} [K]"),
         color=temperature_color,
     )
     ax.tick_params(axis="y", labelcolor=temperature_color)
@@ -1189,7 +1189,7 @@ def _plot_top_event_temperature_volume_panel(
             color=VARIABLE_COLORS["T_mean"],
         )
     ax.set_ylabel(
-        _anomaly_axis_label(event_window, "T_mean [K]"),
+        _anomaly_axis_label(event_window, f"{_variable_label('T_mean')} [K]"),
         color=VARIABLE_COLORS["T_mean"],
     )
     ax.tick_params(axis="y", labelcolor=VARIABLE_COLORS["T_mean"])
@@ -1235,7 +1235,7 @@ def _plot_split_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
         color=VARIABLE_COLORS["T_mean"],
     )
     ax.set_ylabel(
-        _anomaly_axis_label(ds, "T_mean [K]"),
+        _anomaly_axis_label(ds, f"{_variable_label('T_mean')} [K]"),
         color=VARIABLE_COLORS["T_mean"],
     )
     ax.tick_params(axis="y", labelcolor=VARIABLE_COLORS["T_mean"])
