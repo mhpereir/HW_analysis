@@ -196,7 +196,7 @@ def peak_aligned_composite(
         event_id_name=event_id_name,
     )
     variable_names = _event_window_variable_names(stacked, event_dim=event_dim)
-    composite = stacked[variable_names].mean(event_dim, skipna=skipna)
+    composite = stacked[variable_names].mean(event_dim, skipna=skipna, keep_attrs=True)
     if event_percentiles is not None:
         envelope = event_percentile_envelope(
             stacked,
@@ -280,7 +280,7 @@ def event_percentile_envelope(
     _validate_quantiles(q)
 
     variable_names = _event_window_variable_names(stacked, event_dim=event_dim)
-    out = stacked[variable_names].quantile(q, dim=event_dim, skipna=skipna)
+    out = stacked[variable_names].quantile(q, dim=event_dim, skipna=skipna, keep_attrs=True)
     if "quantile" in out.dims and quantile_dim != "quantile":
         out = out.rename({"quantile": quantile_dim})
     out.attrs.update(stacked.attrs)

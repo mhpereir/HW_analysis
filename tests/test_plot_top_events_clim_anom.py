@@ -117,7 +117,11 @@ def test_main_ranks_absolute_events_and_anomalizes_before_plotting(
         captured["top_n"] = n
         return selected_events
 
-    def fake_apply(source, baseline, *, variables):
+    def fake_apply(source, baseline, *, variables, include_jja_means):
+        assert include_jja_means is show_climatology
+        if include_jja_means:
+            for name in variables:
+                anomaly_source[name].attrs["climatology_jja_mean"] = -0.125
         captured["anomaly_source"] = source
         captured["climate"] = baseline
         captured["variables"] = variables
@@ -129,15 +133,6 @@ def test_main_ranks_absolute_events_and_anomalizes_before_plotting(
         captured["plot_kwargs"] = kwargs
         return [output_dir / "raw.png", output_dir / "smoothed.png"]
 
-    def fake_means(baseline, *, variables):
-        assert show_climatology
-        assert baseline is climate
-        assert variables == anomaly_plot.absolute_plot.EXTENDED_TOP_EVENT_VARIABLES
-        return {name: -0.125 for name in variables}
-
-    monkeypatch.setattr(
-        anomaly_plot.climatology, "jja_climatological_means", fake_means
-    )
     monkeypatch.setattr(
         anomaly_plot.absolute_plot, "select_top_tas_events", fake_select
     )

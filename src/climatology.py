@@ -147,6 +147,7 @@ def apply_regional_hourly_climatology(
     *,
     variables: Sequence[str],
     baseline_variables: Mapping[str, str] | None = None,
+    include_jja_means: bool = False,
     time_dim: str = TIME_DIM,
 ) -> xr.Dataset:
     """Return a shallow Stage-1 view with selected variables replaced by anomalies."""
@@ -183,6 +184,13 @@ def apply_regional_hourly_climatology(
     matched = climatology[list(dict.fromkeys(baseline_names.values()))].sel(
         {CLIMATOLOGY_DIM: selector}
     )
+    means = (
+        jja_climatological_means(
+            climatology, variables=tuple(dict.fromkeys(baseline_names.values()))
+        )
+        if include_jja_means
+        else {}
+    )
     out = ds.copy(deep=False)
     for name in names:
         baseline_name = baseline_names[name]
@@ -200,6 +208,8 @@ def apply_regional_hourly_climatology(
                 "climatology_baseline_variable": baseline_name,
             }
         )
+        if include_jja_means:
+            anomaly.attrs["climatology_jja_mean"] = means[baseline_name]
         out[name] = anomaly
 
     out.attrs = dict(ds.attrs)

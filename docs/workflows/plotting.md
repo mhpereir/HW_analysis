@@ -552,7 +552,7 @@ standard event window, while short windows retain distinct major labels.
 Before production acceptance, render representative presentation and extended
 paper figures through Venus PBS and inspect the saved axes at original resolution.
 
-### Top-event anomaly climatology legends
+### Temporal anomaly climatology legends
 
 The first panel of extended 5x2 top-event figures uses the shared
 $\langle T\rangle$ symbol in its y-axis label: $\Delta\langle T\rangle$ [K] for
@@ -564,7 +564,9 @@ title in hourly and smoothed outputs, for absolute and anomaly views.
 Presentation figures retain their event and baseline title. Event selection,
 ranking, metadata and output filenames remain unchanged.
 
-`scripts/plot_top_events_clim_anom.py` adds an absolute JJA climatological
+`scripts/plot_top_events_clim_anom.py`,
+`scripts/plot_composite_timeseries_all_clim_anom.py`, and
+`scripts/plot_composite_timeseries_split_clim_anom.py` add an absolute JJA climatological
 mean to each variable's legend by default, in compact, extended, and
 presentation layouts. The label `JJA clim. = ...` gives context for the
 quantity's typical summer magnitude and sign. It is not an event-conditioned
@@ -608,10 +610,16 @@ climatological mean as a horizontal line on an anomaly axis.
 
 No saved Stage-1 or climatology product changes are needed. Preserve event
 selection, ranking, reference population, smoothing, line data,
-colors, fonts, and output names. Other plot families and absolute top-event
-figures retain their existing legends. Validate the seasonal reduction,
-complete-coverage checks, units/signs, metadata survival through smoothing,
-unchanged curves and inputs, and all three layouts locally. Before production
+colors, fonts, and output names. Absolute figures retain their existing legends. Split figures show one
+climatological value per variable, shared by both bins, alongside the existing
+bin-style legend. Preserve these native-unit scalars through event averaging,
+percentile reduction, split concatenation, and display smoothing. The shared
+anomaly application accepts an opt-in JJA metadata flag; its other consumers
+retain the existing behavior. All three temporal anomaly CLIs enable that flag
+by default and support `--no-climatology-legend`. Validate the seasonal reduction,
+complete-coverage checks, units/signs, metadata survival through composites and smoothing,
+unchanged curves, inputs, selection and split membership, and all three layouts
+in every temporal family locally. Before production
 acceptance, render representative raw and smoothed extended/presentation
 figures through Venus PBS into a fresh namespace and inspect their legends.
 

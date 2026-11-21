@@ -107,7 +107,7 @@ def _display_scale(name: str) -> float:
     return 1.0
 
 
-def _top_event_variable_label(ds: xr.Dataset, name: str) -> str:
+def _temporal_variable_label(ds: xr.Dataset, name: str) -> str:
     """Add an absolute JJA mean to an anomaly trace's legend when supplied."""
     label = _variable_label(name)
     mean = ds[name].attrs.get("climatology_jja_mean")
@@ -115,20 +115,41 @@ def _top_event_variable_label(ds: xr.Dataset, name: str) -> str:
         return label
     value = float(mean) * _display_scale(name)
     units = plot_style.VARIABLE_UNIT_MAPPING[name]
-    precision = plot_style.TOP_EVENT_CLIMATOLOGY_VALUE_FORMATS.get(name, ".3g")
+    precision = plot_style.TEMPORAL_CLIMATOLOGY_VALUE_FORMATS.get(name, ".3g")
     formatted = format(value, precision)
     if float(formatted) == 0.0:
         formatted = format(0.0, precision)
     return f"{label}\nJJA clim. = {formatted} {units}".rstrip()
 
 
-def _align_top_event_right_legends(axes: Sequence[Axes], ds: xr.Dataset) -> None:
+def _align_anomaly_right_legends(axes: Sequence[Axes], ds: xr.Dataset) -> None:
     """Keep anomaly legends on the same side as their panel column."""
     if _is_climatological_anomaly(ds):
         for ax in axes:
             legend = ax.get_legend()
             if legend is not None:
                 legend.set_loc("upper right")
+
+
+def _extend_anomaly_legend_headroom(
+    left: Sequence[Axes], right: Sequence[Axes], ds: xr.Dataset
+) -> None:
+    """Reserve the documented space for climatology legends in ten-panel views."""
+    if _is_climatological_anomaly(ds):
+        for ax, name in (
+            (left[1], "dTdt"),
+            (left[2], "advection"),
+            (left[3], "adiabatic"),
+            (left[4], "diabatic"),
+            (right[3], "nslr_heating_rate_approx"),
+            (right[4], "sshf_heating_rate_approx"),
+        ):
+            if ds[name].attrs.get("climatology_jja_mean") is not None:
+                lower, upper = ax.get_ylim()
+                ax.set_ylim(
+                    lower,
+                    upper + plot_style.TEMPORAL_CLIMATOLOGY_HEADROOM * (upper - lower),
+                )
 
 
 def plot_composite_timeseries(
@@ -303,6 +324,7 @@ def _plot_presentation_composite_timeseries(composite: xr.Dataset) -> Figure:
         f"centered on peak tas "
         f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
+    _align_anomaly_right_legends(right, composite)
     left[-1].set_xlabel("Lag from event peak (hours)")
     right[-1].set_xlabel("Lag from event peak (hours)")
     _style_axes(axes.ravel())
@@ -374,6 +396,7 @@ def _plot_presentation_split_composite_timeseries(composite: xr.Dataset) -> Figu
         f"split by {split_variable} "
         f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
+    _align_anomaly_right_legends(right, composite)
     left[-1].set_xlabel("Lag from event peak (hours)")
     right[-1].set_xlabel("Lag from event peak (hours)")
     _style_axes(axes.ravel())
@@ -532,6 +555,8 @@ def _plot_extended_composite_timeseries(composite: xr.Dataset) -> Figure:
         f"centered on peak tas "
         f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
+    _extend_anomaly_legend_headroom(left, right, composite)
+    _align_anomaly_right_legends(right, composite)
     left[-1].set_xlabel("Lag from event peak (hours)")
     right[-1].set_xlabel("Lag from event peak (hours)")
     _style_axes(axes.ravel())
@@ -627,6 +652,8 @@ def _plot_extended_split_composite_timeseries(composite: xr.Dataset) -> Figure:
         f"split by {split_variable} "
         f"(n={n_events}, -{pre_days}/+{post_days} days{smoothing_label})"
     )
+    _extend_anomaly_legend_headroom(left, right, composite)
+    _align_anomaly_right_legends(right, composite)
     left[-1].set_xlabel("Lag from event peak (hours)")
     right[-1].set_xlabel("Lag from event peak (hours)")
     _style_axes(axes.ravel())
@@ -735,22 +762,8 @@ def _plot_extended_top_event_timeseries(
         reference_composite=reference_composite,
     )
 
-    if _is_climatological_anomaly(event_window):
-        for ax, name in (
-            (left[1], "dTdt"),
-            (left[2], "advection"),
-            (left[3], "adiabatic"),
-            (left[4], "diabatic"),
-            (right[3], "nslr_heating_rate_approx"),
-            (right[4], "sshf_heating_rate_approx"),
-        ):
-            if event_window[name].attrs.get("climatology_jja_mean") is not None:
-                lower, upper = ax.get_ylim()
-                ax.set_ylim(
-                    lower,
-                    upper + plot_style.TOP_EVENT_CLIMATOLOGY_HEADROOM * (upper - lower),
-                )
-    _align_top_event_right_legends(right, event_window)
+    _extend_anomaly_legend_headroom(left, right, event_window)
+    _align_anomaly_right_legends(right, event_window)
     _mark_top_event_times(axes.ravel(), event)
     left[-1].set_xlabel("Lag from event peak (days)")
     right[-1].set_xlabel("Lag from event peak (days)")
@@ -832,7 +845,7 @@ def _plot_presentation_top_event_timeseries(
             reference_composite=reference_composite,
         )
 
-    _align_top_event_right_legends(right, event_window)
+    _align_anomaly_right_legends(right, event_window)
     _mark_top_event_times(axes.ravel(), event)
     _set_top_event_title(fig, event_window, event)
     left[-1].set_xlabel("Lag from event peak (days)")
@@ -1121,7 +1134,7 @@ def _plot_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
         lag,
         ds["T_mean"].values,
         color=temperature_color,
-        label=_variable_label("T_mean"),
+        label=_temporal_variable_label(ds, "T_mean"),
     )
     _plot_event_percentile_band(ax, lag, ds, "T_mean", color=temperature_color)
     ax.set_ylabel(
@@ -1135,7 +1148,7 @@ def _plot_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
         lag,
         ds["volume"].values,
         color=volume_color,
-        label=_variable_label("volume"),
+        label=_temporal_variable_label(ds, "volume"),
     )
     _plot_event_percentile_band(ax_volume, lag, ds, "volume", color=volume_color)
     ax_volume.set_ylabel(
@@ -1165,7 +1178,7 @@ def _plot_top_event_temperature_volume_panel(
         event_window,
         "T_mean",
         color=VARIABLE_COLORS["T_mean"],
-        label=_top_event_variable_label(event_window, "T_mean"),
+        label=_temporal_variable_label(event_window, "T_mean"),
         linestyle="--",
     )
     if reference_composite is not None:
@@ -1188,7 +1201,7 @@ def _plot_top_event_temperature_volume_panel(
         event_window,
         "volume",
         color=VARIABLE_COLORS["volume"],
-        label=_top_event_variable_label(event_window, "volume"),
+        label=_temporal_variable_label(event_window, "volume"),
         linestyle="--",
     )
     if reference_composite is not None:
@@ -1243,8 +1256,8 @@ def _plot_split_temperature_volume_panel(ax: Axes, ds: xr.Dataset) -> None:
 
     ax.legend(
         handles=[
-            _variable_legend_handle("T_mean"),
-            _variable_legend_handle("volume"),
+            _variable_legend_handle(ds, "T_mean"),
+            _variable_legend_handle(ds, "volume"),
         ],
         loc="upper left",
     )
@@ -1264,7 +1277,7 @@ def _plot_single_variable_panel(
     ax.plot(
         ds["lag_hour"].values,
         ds[name].values * scale,
-        label=_variable_label(name),
+        label=_temporal_variable_label(ds, name),
         color=color,
     )
     _plot_event_percentile_band(
@@ -1295,7 +1308,7 @@ def _plot_composite_variable_panel(
     ax.plot(
         ds["lag_hour"].values,
         ds[name].values * scale,
-        label=_variable_label(name),
+        label=_temporal_variable_label(ds, name),
         color=color,
     )
     _plot_event_percentile_band(
@@ -1328,7 +1341,7 @@ def _plot_composite_multi_variable_panel(
         ax.plot(
             ds["lag_hour"].values,
             ds[name].values * scale,
-            label=_variable_label(name),
+            label=_temporal_variable_label(ds, name),
             color=color,
         )
         _plot_event_percentile_band(
@@ -1364,7 +1377,7 @@ def _plot_top_event_single_variable_panel(
         event_window,
         name,
         color=color,
-        label=_top_event_variable_label(event_window, name),
+        label=_temporal_variable_label(event_window, name),
         linestyle="--",
         scale=scale,
     )
@@ -1403,7 +1416,7 @@ def _plot_top_event_multi_variable_panel(
             event_window,
             name,
             color=color,
-            label=_top_event_variable_label(event_window, name),
+            label=_temporal_variable_label(event_window, name),
             linestyle="--",
             scale=scale,
         )
@@ -1443,7 +1456,7 @@ def _plot_split_single_variable_panel(
     ax.set_ylabel(_anomaly_axis_label(ds, ylabel))
     if absolute_ylim is not None and not _is_climatological_anomaly(ds):
         ax.set_ylim(*absolute_ylim)
-    ax.legend(handles=[_variable_legend_handle(name)], loc="upper left")
+    ax.legend(handles=[_variable_legend_handle(ds, name)], loc="upper left")
 
 
 def _plot_split_multi_variable_panel(
@@ -1467,7 +1480,7 @@ def _plot_split_multi_variable_panel(
     plot_style.zero_line(ax)
     ax.set_ylabel(_anomaly_axis_label(ds, ylabel))
     ax.legend(
-        handles=[_variable_legend_handle(name) for name in names],
+        handles=[_variable_legend_handle(ds, name) for name in names],
         loc="upper left",
     )
 
@@ -1479,7 +1492,7 @@ def _plot_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
         ax.plot(
             ds["lag_hour"].values,
             ds[name].values,
-            label=_variable_label(name),
+            label=_temporal_variable_label(ds, name),
             color=color,
         )
         _plot_event_percentile_band(
@@ -1512,7 +1525,7 @@ def _plot_top_event_tendency_panel(
             event_window,
             name,
             color=color,
-            label=_top_event_variable_label(event_window, name),
+            label=_temporal_variable_label(event_window, name),
             linestyle="--",
         )
         if reference_composite is not None:
@@ -1543,7 +1556,7 @@ def _plot_split_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
     _expand_yaxis(ax, factor=1.5)
     ax.legend(
         handles=[
-            _variable_legend_handle(name)
+            _variable_legend_handle(ds, name)
             for name in ("advection", "adiabatic", "diabatic")
         ],
         loc="upper left",
@@ -1558,7 +1571,7 @@ def _plot_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
         ax.plot(
             ds["lag_hour"].values,
             ds[name].values,
-            label=_variable_label(name),
+            label=_temporal_variable_label(ds, name),
             color=color,
         )
         _plot_event_percentile_band(
@@ -1589,7 +1602,7 @@ def _plot_top_event_lwa_panel(
             event_window,
             name,
             color=color,
-            label=_top_event_variable_label(event_window, name),
+            label=_temporal_variable_label(event_window, name),
             linestyle="--",
         )
         if reference_composite is not None:
@@ -1616,7 +1629,7 @@ def _plot_split_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
     ax.set_ylabel(_anomaly_axis_label(ds, "LWA [m hPa]"))
     ax.legend(
         handles=[
-            _variable_legend_handle(name) for name in ("lwa_a_region", "lwa_c_region")
+            _variable_legend_handle(ds, name) for name in ("lwa_a_region", "lwa_c_region")
         ],
         loc="upper left",
     )
@@ -1871,14 +1884,14 @@ def _variable_label(name: str) -> str:
     return plot_style.VARIABLE_NAME_MAPPING.get(name, name)
 
 
-def _variable_legend_handle(name: str) -> Line2D:
+def _variable_legend_handle(ds: xr.Dataset, name: str) -> Line2D:
     """Return a solid-line variable legend handle."""
     return Line2D(
         [0],
         [0],
         color=VARIABLE_COLORS[name],
         linestyle="-",
-        label=_variable_label(name),
+        label=_temporal_variable_label(ds, name),
     )
 
 

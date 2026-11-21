@@ -83,3 +83,38 @@ def _make_composite_dataset() -> xr.Dataset:
         },
         coords={"time": time, "event": event},
     )
+
+
+def test_composite_reductions_preserve_climatology_metadata_without_changing_values():
+    source = _make_composite_dataset()
+    original = source.copy(deep=True)
+    reference = composites.all_event_peak_aligned_composite(
+        source, variables=("T_mean",), pre_days=0, post_days=0
+    )
+    source["T_mean"].attrs.update(units="K", climatology_jja_mean=281.0)
+    annotated = source.copy(deep=True)
+    result = composites.all_event_peak_aligned_composite(
+        source, variables=("T_mean",), pre_days=0, post_days=0
+    )
+    for name in ("T_mean", "event_percentile_T_mean"):
+        np.testing.assert_array_equal(result[name].values, reference[name].values)
+        assert result[name].attrs["climatology_jja_mean"] == 281.0
+        assert result[name].attrs["units"] == "K"
+    xr.testing.assert_identical(source, annotated)
+    np.testing.assert_array_equal(source["T_mean"].values, original["T_mean"].values)
+
+
+def test_split_composite_preserves_shared_climatology_mean():
+    from HW_analysis.scripts.plot_composite_timeseries_split import (
+        build_split_quantile_composite,
+    )
+
+    source = _make_composite_dataset()
+    source["duration"] = ("event", [1., 2.])
+    source["T_mean"].attrs["climatology_jja_mean"] = 281.
+    result = build_split_quantile_composite(
+        source, event_table=source, split_variable="duration", split_quantiles=[0.5],
+        composite_kwargs={"variables": ("T_mean",), "pre_days": 0, "post_days": 0},
+    )
+    assert result.T_mean.attrs["climatology_jja_mean"] == 281.
+    np.testing.assert_array_equal(result.T_mean.values[:, 0], [281., 283.])

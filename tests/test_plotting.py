@@ -1474,3 +1474,42 @@ def _make_split_composite() -> xr.Dataset:
         }
     )
     return out
+
+
+@pytest.mark.parametrize("split", [False, True])
+@pytest.mark.parametrize("layout,extended", [("paper", False), ("paper", True), ("presentation", False)])
+@pytest.mark.parametrize("smoothed", [False, True])
+def test_composite_jja_legends_preserve_lines_and_split_styles(split, layout, extended, smoothed):
+    source = _make_split_composite() if split else _make_composite()
+    source.attrs["data_representation"] = "climatological_anomaly"
+    annotated = source.copy(deep=True)
+    variables = tuple(n for n in source if not n.startswith("event_percentile_"))
+    for name in variables:
+        annotated[name].attrs["climatology_jja_mean"] = -0.125
+    annotated["lwa_a_region"].attrs["climatology_jja_mean"] = 2.52e7
+    if smoothed:
+        source = plotting.smooth_composite_for_display(source, variables=variables, smoothing_window=3)
+        annotated = plotting.smooth_composite_for_display(annotated, variables=variables, smoothing_window=3)
+    original = annotated.copy(deep=True)
+    render = plotting.plot_split_composite_timeseries if split else plotting.plot_composite_timeseries
+    old = render(source, layout=layout, plot_extended_variables=extended)
+    new = render(annotated, layout=layout, plot_extended_variables=extended)
+    try:
+        for a, b in zip(old.axes, new.axes, strict=True):
+            for old_line, new_line in zip(a.lines, b.lines, strict=True):
+                np.testing.assert_array_equal(old_line.get_ydata(), new_line.get_ydata())
+                np.testing.assert_array_equal(old_line.get_xdata(), new_line.get_xdata())
+                assert old_line.get_linestyle() == new_line.get_linestyle()
+        legends = [artist for ax in new.axes for artist in ax.get_children() if isinstance(artist, Legend)]
+        labels = [text.get_text() for legend in legends for text in legend.get_texts()]
+        assert any("JJA clim. = -0.125 K hr-1" in label for label in labels)
+        assert any("JJA clim. = 2.5e+07 m hPa" in label for label in labels)
+        if extended:
+            assert any("JJA clim. = 0.12 K hr-1" in label for label in labels)
+        if split:
+            for bin_label in source.split_bin.values:
+                assert str(bin_label) in labels
+        xr.testing.assert_identical(annotated, original)
+    finally:
+        plt.close(old)
+        plt.close(new)

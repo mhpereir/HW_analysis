@@ -1,3 +1,4 @@
+import pytest
 import xarray as xr
 from HW_analysis.scripts import plot_composite_timeseries_all_clim_anom as all_plot
 from HW_analysis.scripts import plot_composite_timeseries_split_clim_anom as split_plot
@@ -20,9 +21,11 @@ RUN_ARGS = [
 ]
 
 
+@pytest.mark.parametrize("show_climatology", [True, False])
 def test_all_event_anomalies_are_applied_before_event_stacking(
     monkeypatch,
     tmp_path,
+    show_climatology,
 ):
     stage1 = xr.Dataset()
     climate = xr.Dataset()
@@ -36,6 +39,7 @@ def test_all_event_anomalies_are_applied_before_event_stacking(
         [
             "plot_composite_timeseries_all_clim_anom.py",
             *RUN_ARGS,
+            *([] if show_climatology else ["--no-climatology-legend"]),
             "--all-seasons",
             "--input-path",
             str(tmp_path / "stage1.nc"),
@@ -94,13 +98,16 @@ def test_all_event_anomalies_are_applied_before_event_stacking(
     assert captured["apply_kwargs"]["variables"] == (
         all_plot.absolute_plot.PRESENTATION_COMPOSITE_VARIABLES
     )
+    assert captured["apply_kwargs"]["include_jja_means"] is show_climatology
     assert captured["plot_kwargs"]["layout"] == "presentation"
     assert composite.attrs["data_representation"] == "climatological_anomaly"
 
 
+@pytest.mark.parametrize("show_climatology", [True, False])
 def test_split_anomalies_use_absolute_stage1_for_bin_membership(
     monkeypatch,
     tmp_path,
+    show_climatology,
 ):
     stage1 = xr.Dataset()
     climate = xr.Dataset()
@@ -114,6 +121,7 @@ def test_split_anomalies_use_absolute_stage1_for_bin_membership(
         [
             "plot_composite_timeseries_split_clim_anom.py",
             *RUN_ARGS,
+            *([] if show_climatology else ["--no-climatology-legend"]),
             "--all-seasons",
             "--input-path",
             str(tmp_path / "stage1.nc"),
@@ -177,6 +185,7 @@ def test_split_anomalies_use_absolute_stage1_for_bin_membership(
     assert captured["apply_kwargs"]["variables"] == (
         split_plot.absolute_plot.PRESENTATION_COMPOSITE_VARIABLES
     )
+    assert captured["apply_kwargs"]["include_jja_means"] is show_climatology
     assert captured["plot_kwargs"]["layout"] == "presentation"
     assert composite.attrs["data_representation"] == "climatological_anomaly"
 

@@ -242,3 +242,20 @@ def test_jja_climatological_mean_rejects_nonfinite_summer_values(value):
 
     with pytest.raises(ValueError, match="must be finite"):
         climatology.jja_climatological_means(climate, variables=("T_mean",))
+
+
+def test_apply_optional_jja_metadata_preserves_anomalies_and_inputs():
+    climate = _summer_climatology()
+    source = _source_dataset(["2000-06-15T00:00", "2000-08-31T23:00"], values=[10., 20.])
+    original = source.copy(deep=True)
+    baseline = climate.copy(deep=True)
+    plain = climatology.apply_regional_hourly_climatology(source, climate, variables=("T_mean",))
+    annotated = climatology.apply_regional_hourly_climatology(
+        source, climate, variables=("T_mean",), include_jja_means=True
+    )
+    np.testing.assert_array_equal(plain.T_mean.values, annotated.T_mean.values)
+    expected = climate.T_mean.where(climate.month.isin([6, 7, 8]), drop=True).values.mean()
+    assert annotated.T_mean.attrs["climatology_jja_mean"] == expected
+    assert "climatology_jja_mean" not in plain.T_mean.attrs
+    xr.testing.assert_identical(source, original)
+    xr.testing.assert_identical(climate, baseline)

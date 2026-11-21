@@ -228,3 +228,21 @@ and documents a composite dataset contract.
 
 Composite plotting should not perform raw loading, threshold generation,
 harmonization, feature extraction, or spatial-field loading.
+
+## JJA climatology context in anomaly legends
+
+All-event, split-event, and top-event anomaly plots use the same absolute JJA
+climatological summaries described in [the plotting workflow](plotting.md#temporal-anomaly-climatology-legends).
+These scalars describe the full reference population, not an event or split bin.
+They do not alter timestamp-matched subtraction, seasonal selection, absolute
+event metrics, splitting, composite reductions, or smoothing. Absolute figures
+retain their existing legends.
+
+For a regeneration, `schedulers/schedule_temporal_climatology_validation.sh`
+runs the focused synthetic checks and
+`scripts/validate_temporal_climatology.py` against an explicit region/input/hash
+manifest. The audit verifies immutable inputs, full-JJA membership and TAS
+ranks independently, timestamp subtraction, complete JJA means and their
+preservation through compositing/smoothing. It records the expected top-event
+filenames and legend text. Submit actual figure jobs only after that gate, and
+check their complete file matrix and representative visual layouts separately.

@@ -83,12 +83,9 @@ def main() -> int:
             stage1,
             climate,
             variables=variables,
+            include_jja_means=args.climatology_legend,
         )
         anomaly_source.attrs["climatology_path"] = str(args.climatology_path)
-        if args.climatology_legend:
-            means = climatology.jja_climatological_means(climate, variables=variables)
-            for name, value in means.items():
-                anomaly_source[name].attrs["climatology_jja_mean"] = value
         written = absolute_plot.write_top_event_plots(
             anomaly_source,
             selected_events,

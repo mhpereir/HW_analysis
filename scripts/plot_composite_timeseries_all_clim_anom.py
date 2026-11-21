@@ -38,6 +38,12 @@ def parse_args() -> argparse.Namespace:
     season_selection.add_season_arguments(parser, default_full_event=True)
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument("--climatology-path", type=Path, default=None)
+    parser.add_argument(
+        "--climatology-legend",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include absolute JJA climatological means in variable legends (default: on).",
+    )
     parser.add_argument("--output-path", type=Path, default=None)
     parser.add_argument(
         "--window-days", type=int, default=absolute_plot.DEFAULT_WINDOW_DAYS
@@ -94,6 +100,7 @@ def main() -> int:
             stage1,
             climate,
             variables=variables,
+            include_jja_means=args.climatology_legend,
         )
         event_table = stage1
         if args.season_months is not None:
