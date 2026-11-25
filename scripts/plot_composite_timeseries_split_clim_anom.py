@@ -14,6 +14,7 @@ if str(REPO_ROOT) not in sys.path:
 from scripts import plot_composite_timeseries_split as absolute_plot
 from src import (
     analysis_io,
+    budget_partition,
     climatology,
     plot_paths,
     plotting,
@@ -32,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot split peak-aligned climatological-anomaly HW composites."
     )
+    budget_partition.add_argument(parser)
     season_selection.add_season_arguments(parser, default_full_event=True)
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument("--climatology-path", type=Path, default=None)
@@ -61,6 +63,8 @@ def parse_args() -> argparse.Namespace:
     )
     parsed = season_selection.parse_args(parser)
     plot_name, default_output_filename = _default_plot_destination(parsed.layout)
+    if parsed.budget_partition != budget_partition.ORIGINAL:
+        plot_name += "_" + parsed.budget_partition
     args = plot_paths.finalize_stage1_plot_paths(
         parsed,
         parser,
@@ -95,6 +99,9 @@ def main() -> int:
             args.plot_extended_variables,
             args.layout,
         )
+        partition = getattr(args, "budget_partition", budget_partition.ORIGINAL)
+        budget_partition.select(stage1, partition)
+        variables = budget_partition.variable_names(variables, partition)
         anomaly_source = climatology.apply_regional_hourly_climatology(
             stage1,
             climate,
@@ -135,6 +142,7 @@ def main() -> int:
                 composite_kwargs=composite_kwargs,
             )
         composite.attrs.update(anomaly_source.attrs)
+        composite.attrs["budget_partition"] = partition
         composite.attrs["climatology_path"] = str(args.climatology_path)
         written = plotting.write_split_composite_timeseries_outputs(
             composite,

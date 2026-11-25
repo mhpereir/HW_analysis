@@ -130,7 +130,9 @@ def require_canonical_climatology_source(ds) -> None:
 def climatology_variables_for_source(ds) -> tuple[str, ...]:
     """Return standard variables plus an available lower-boundary face."""
     optional = ("advection_bottom",) if "advection_bottom" in ds else ()
-    return (*climatology.DEFAULT_VARIABLES, *optional)
+    from src.budget_partition import extension_variables
+
+    return (*climatology.DEFAULT_VARIABLES, *optional, *extension_variables(ds))
 
 
 def file_sha256(path: str | Path, *, chunk_bytes: int = 1024 * 1024) -> str:

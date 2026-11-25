@@ -291,3 +291,13 @@ and reference hashes, source and analysis years, EHB producer provenance,
 execution commit and PBS identity, validation metrics, and output hashes.
 Existing raw-source builds, surface products and downstream schemas remain
 unchanged. New filenames encode the fixed lower and upper pressure bounds.
+
+## Boundary-flux partition extension
+
+[Decision 011](../decisions/011_boundary_flux_budget_partition.md) defines the
+additive named-field extension, original-partition compatibility, consumer
+selection, and PNW Bartusek validation required for this product or workflow.
+
+The extension adds `adv_horizontal(time)` and `vertical_contribution(time)` in
+`K hr-1`, with boundary-flux formulas and global partition metadata. Existing
+Stage-1 variables retain their original values and definitions.

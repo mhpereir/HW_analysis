@@ -25,7 +25,13 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from . import advection_direction, diagnostics, preprocess, regional_temperature
+from . import (
+    advection_direction,
+    budget_partition,
+    diagnostics,
+    preprocess,
+    regional_temperature,
+)
 
 HEAT_BUDGET_VARIABLE_MAP: dict[str, str] = {
     "T_domain_avg": "T_mean",
@@ -125,13 +131,16 @@ def replace_heat_budget(reference: xr.Dataset, heat_budget: xr.Dataset) -> xr.Da
     """
     if not reference.indexes["time"].equals(heat_budget.indexes["time"]):
         raise ValueError("Reference and heat budget must have exactly matching times.")
-    replaced = set(HEAT_BUDGET_VARIABLE_MAP.values())
+    replaced = set(HEAT_BUDGET_VARIABLE_MAP.values()) | set(budget_partition.VARIABLES)
     replaced.update(
         f"advection_{face}" for face in (*advection_direction.REQUIRED_FACES, "bottom")
     )
     replaced.update(f"{name}_heating_rate_approx" for name in SURFACE_ENERGY_VARIABLES)
     replaced.add("surface_energy_heating_rate_approx")
     out = reference.drop_vars(sorted(replaced.intersection(reference.data_vars)))
+    out.attrs = {
+        k: v for k, v in out.attrs.items() if k not in budget_partition.METADATA
+    }
     out = out.assign(_prepare_heat_budget_variables(heat_budget, time_dim="time"))
     out = advection_direction.add_face_advection_tendencies(out, heat_budget)
     for name in SURFACE_ENERGY_VARIABLES:
@@ -164,7 +173,7 @@ def replace_heat_budget(reference: xr.Dataset, heat_budget: xr.Dataset) -> xr.Da
     out[total_name].attrs["physical_interpretation"] = out[rate_name].attrs[
         "physical_interpretation"
     ]
-    return out
+    return budget_partition.add_boundary_flux_fields(out)
 
 
 def build_regional_analysis_dataset(
@@ -252,7 +261,7 @@ def build_regional_analysis_dataset(
     if attrs is not None:
         ds.attrs.update(dict(attrs))
 
-    return ds
+    return budget_partition.add_boundary_flux_fields(ds)
 
 
 def project_daily_to_hourly(

@@ -137,6 +137,11 @@ def build_regional_hourly_climatology(
             "climatology_variables": ",".join(names),
         }
     )
+    from . import budget_partition
+
+    if all(name in names for name in budget_partition.VARIABLES):
+        budget_partition.extension_variables(ds)
+        out.attrs.update(budget_partition.METADATA)
     validate_regional_hourly_climatology(out, required_variables=names)
     return out
 
@@ -166,6 +171,13 @@ def apply_regional_hourly_climatology(
         required_variables=tuple(dict.fromkeys((*names, *baseline_names.values()))),
     )
     validate_climatology_source_compatibility(ds, climatology)
+    from . import budget_partition
+
+    if any(name in names for name in budget_partition.VARIABLES) and (
+        not budget_partition.extension_variables(ds)
+        or not budget_partition.extension_variables(climatology)
+    ):
+        raise ValueError("Boundary-flux anomalies require matching extended products.")
     keys = calendar_hour_keys(ds[time_dim], time_dim=time_dim)
     available = set(np.asarray(climatology[CLIMATOLOGY_DIM].values))
     missing = sorted(set(np.asarray(keys.values)).difference(available))
@@ -344,6 +356,11 @@ def validate_regional_hourly_climatology(
         raise ValueError("climatology_time must be unique and strictly increasing.")
     if np.any(index.year != REFERENCE_YEAR):
         raise ValueError(f"climatology_time must use reference year {REFERENCE_YEAR}.")
+    from .budget_partition import extension_variables
+
+    required_variables = tuple(
+        dict.fromkeys((*required_variables, *extension_variables(ds)))
+    )
     missing: list[str] = []
     for name in tuple(required_variables):
         for required in (name, f"{name}_std", f"{name}_count"):

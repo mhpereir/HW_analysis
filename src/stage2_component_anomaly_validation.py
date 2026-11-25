@@ -7,8 +7,8 @@ import pandas as pd
 import xarray as xr
 
 from src.stage2_component_anomalies import (
-    RAW_TO_ANOMALY,
-    TENDENCIES,
+    integral_mapping,
+    tendency_names,
     validate_component_anomalies,
 )
 
@@ -32,8 +32,9 @@ def validate_anomalies_against_sources(
     climate_keys = pd.Index(ct.month * 10000 + ct.day * 100 + ct.hour)
     source_keys = times.month * 10000 + times.day * 100 + times.hour
     climate_positions = climate_keys.get_indexer(source_keys)
-    source_values = {name: source[name].values for name in TENDENCIES}
-    climate_values = {name: climate[name].values for name in TENDENCIES}
+    tendencies = tendency_names(source)
+    source_values = {name: source[name].values for name in tendencies}
+    climate_values = {name: climate[name].values for name in tendencies}
     report = {}
     for kind, table, reference, anchor_name, dim in (
         ("event", events, reference_events, "peak_time", "event"),
@@ -42,10 +43,10 @@ def validate_anomalies_against_sources(
         validate_component_anomalies(table)
         xr.testing.assert_identical(table[dim], reference[dim])
         for name in reference.data_vars:
-            if name not in RAW_TO_ANOMALY:
+            if name not in integral_mapping(reference):
                 xr.testing.assert_identical(table[name], reference[name])
         hours = -int(reference.attrs["heat_budget_pre_window_hours"].split(",")[0])
-        maxima = {name: 0.0 for name in TENDENCIES}
+        maxima = {name: 0.0 for name in tendencies}
         for row, anchor in enumerate(reference[anchor_name].values):
             expected = anchor + np.arange(-hours, 1).astype("timedelta64[h]")
             positions = times.get_indexer(expected)
@@ -53,7 +54,7 @@ def validate_anomalies_against_sources(
                 raise ValueError(
                     "Independent validation found missing source/climatology hours."
                 )
-            for name in TENDENCIES:
+            for name in tendencies:
                 samples = (
                     source_values[name][positions]
                     - climate_values[name][climate_positions[positions]]

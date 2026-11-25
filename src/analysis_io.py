@@ -104,6 +104,10 @@ def open_stage2_features(
             from .stage2_component_anomalies import validate_component_anomalies
 
             validate_component_anomalies(ds)
+        else:
+            from .budget_partition import validate_integrals
+
+            validate_integrals(ds)
         season_selection.validate_stage2_season(ds, **season_options)
     except Exception:
         ds.close()
@@ -307,6 +311,10 @@ def _validate_harmonized_timeseries(ds: xr.Dataset) -> None:
                 "Stage-1 contract version 2 is missing required face variables: "
                 f"{', '.join(missing_v2)}."
             )
+
+    from .budget_partition import validate_stage1
+
+    validate_stage1(ds)
 
 
 def _validate_regional_hourly_climatology(ds: xr.Dataset) -> None:

@@ -74,6 +74,7 @@ echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v python scripts/plot_composite_timeseries_all.py \
+    --budget-partition "${BUDGET_PARTITION:-original}" \
   "${season_args[@]}" \
   --region "${REGION}" \
   --bottom-boundary "${BOTTOM_BOUNDARY}" \

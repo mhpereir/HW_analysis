@@ -208,3 +208,13 @@ Stage 2 does not perform PCA, clustering, composites, new event detection,
 adaptive `dTdt > 0` growth-window calculations, or persist one analysis-specific
 matched population. Matching workflows derive membership from `I_dyn_pre` and
 tracked settings using [decision 007](../decisions/007_idyn_sign_matching.md).
+
+## Boundary-flux partition extension
+
+[Decision 011](../decisions/011_boundary_flux_budget_partition.md) defines the
+additive named-field extension, original-partition compatibility, consumer
+selection, and PNW Bartusek validation required for this product or workflow.
+
+Extended sources add `I_adv_horizontal_pre(event)` and
+`I_vertical_contribution_pre(event)` in K. Their sum equals the unchanged
+`I_dyn_pre`; the original component integrals remain available.

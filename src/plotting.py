@@ -32,7 +32,7 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from . import plot_style
+from . import budget_partition, plot_style
 
 DEFAULT_COMPOSITE_WINDOW_DAYS = 7
 EVENT_PERCENTILE_PREFIX = "event_percentile_"
@@ -89,7 +89,13 @@ def _is_climatological_anomaly(ds: xr.Dataset) -> bool:
 
 def _representation_title_fragment(ds: xr.Dataset) -> str:
     """Return the title fragment for the dataset representation."""
-    return " climatological-anomaly" if _is_climatological_anomaly(ds) else ""
+    partition = (
+        " boundary-flux"
+        if ds.attrs.get("budget_partition") == budget_partition.BOUNDARY_FLUX
+        else ""
+    )
+    representation = " climatological-anomaly" if _is_climatological_anomaly(ds) else ""
+    return partition + representation
 
 
 def _anomaly_axis_label(ds: xr.Dataset, absolute_label: str) -> str:
@@ -109,6 +115,7 @@ def _display_scale(name: str) -> float:
 
 def _temporal_variable_label(ds: xr.Dataset, name: str) -> str:
     """Add an absolute JJA mean to an anomaly trace's legend when supplied."""
+    name = budget_partition.resolve(ds, name)
     label = _variable_label(name)
     mean = ds[name].attrs.get("climatology_jja_mean")
     if not _is_climatological_anomaly(ds) or mean is None:
@@ -144,7 +151,10 @@ def _extend_anomaly_legend_headroom(
             (right[3], "nslr_heating_rate_approx"),
             (right[4], "sshf_heating_rate_approx"),
         ):
-            if ds[name].attrs.get("climatology_jja_mean") is not None:
+            if (
+                ds[budget_partition.resolve(ds, name)].attrs.get("climatology_jja_mean")
+                is not None
+            ):
                 lower, upper = ax.get_ylim()
                 ax.set_ylim(
                     lower,
@@ -950,6 +960,7 @@ def _plot_line(
     scale: float = 1.0,
 ) -> None:
     """Plot one named variable from a dataset against an explicit x coordinate."""
+    name = budget_partition.resolve(ds, name)
     ax.plot(
         x,
         ds[name].values * scale,
@@ -968,6 +979,7 @@ def smooth_composite_for_display(
     lag_dim: str = "lag_hour",
 ) -> xr.Dataset:
     """Return a display-only rolling-mean copy of selected composite variables."""
+    variables = tuple(budget_partition.resolve(composite, name) for name in variables)
     if smoothing_window < 1:
         raise ValueError("smoothing_window must be >= 1.")
 
@@ -1272,6 +1284,7 @@ def _plot_single_variable_panel(
     ylabel: str,
 ) -> None:
     """Plot one composite variable."""
+    name = budget_partition.resolve(ds, name)
     color = VARIABLE_COLORS[name]
     scale = _display_scale(name)
     ax.plot(
@@ -1303,6 +1316,7 @@ def _plot_composite_variable_panel(
     absolute_ylim: tuple[float, float] | None = None,
 ) -> None:
     """Plot one composite variable using its configured color."""
+    name = budget_partition.resolve(ds, name)
     color = VARIABLE_COLORS[name]
     scale = _display_scale(name)
     ax.plot(
@@ -1335,6 +1349,7 @@ def _plot_composite_multi_variable_panel(
     ylabel: str,
 ) -> None:
     """Plot multiple composite variables on one axis."""
+    names = tuple(budget_partition.resolve(ds, name) for name in names)
     for name in names:
         color = VARIABLE_COLORS[name]
         scale = _display_scale(name)
@@ -1369,6 +1384,7 @@ def _plot_top_event_single_variable_panel(
     absolute_ylim: tuple[float, float] | None = None,
 ) -> None:
     """Plot one top-event variable with optional all-event reference."""
+    name = budget_partition.resolve(event_window, name)
     color = VARIABLE_COLORS[name]
     scale = _display_scale(name)
     _plot_line(
@@ -1406,6 +1422,7 @@ def _plot_top_event_multi_variable_panel(
     reference_composite: xr.Dataset | None,
 ) -> None:
     """Plot top-event variables with optional all-event reference."""
+    names = tuple(budget_partition.resolve(event_window, name) for name in names)
     lag_days = _top_event_lag_days(event_window, event)
     for name in names:
         color = VARIABLE_COLORS[name]
@@ -1442,6 +1459,7 @@ def _plot_split_single_variable_panel(
     absolute_ylim: tuple[float, float] | None = None,
 ) -> None:
     """Plot one split-bin composite variable."""
+    name = budget_partition.resolve(ds, name)
     scale = _display_scale(name)
     _plot_split_lines(
         ax,
@@ -1467,6 +1485,7 @@ def _plot_split_multi_variable_panel(
     ylabel: str,
 ) -> None:
     """Plot multiple split-bin composite variables on one axis."""
+    names = tuple(budget_partition.resolve(ds, name) for name in names)
     for name in names:
         scale = _display_scale(name)
         _plot_split_lines(
@@ -1487,7 +1506,8 @@ def _plot_split_multi_variable_panel(
 
 def _plot_tendency_panel(ax: Axes, ds: xr.Dataset) -> None:
     """Plot heat-budget tendency terms on one axis."""
-    for name in ("advection", "adiabatic", "diabatic"):
+    for role in ("advection", "adiabatic", "diabatic"):
+        name = budget_partition.resolve(ds, role)
         color = VARIABLE_COLORS[name]
         ax.plot(
             ds["lag_hour"].values,
@@ -1517,7 +1537,8 @@ def _plot_top_event_tendency_panel(
 ) -> None:
     """Plot top-event heat-budget terms with optional all-event reference."""
     lag_days = _top_event_lag_days(event_window, event)
-    for name in ("advection", "adiabatic", "diabatic"):
+    for role in ("advection", "adiabatic", "diabatic"):
+        name = budget_partition.resolve(event_window, role)
         color = VARIABLE_COLORS[name]
         _plot_line(
             ax,
@@ -1629,7 +1650,8 @@ def _plot_split_lwa_panel(ax: Axes, ds: xr.Dataset) -> None:
     ax.set_ylabel(_anomaly_axis_label(ds, "LWA [m hPa]"))
     ax.legend(
         handles=[
-            _variable_legend_handle(ds, name) for name in ("lwa_a_region", "lwa_c_region")
+            _variable_legend_handle(ds, name)
+            for name in ("lwa_a_region", "lwa_c_region")
         ],
         loc="upper left",
     )
@@ -1645,6 +1667,7 @@ def _plot_split_lines(
     scale: float = 1.0,
 ) -> None:
     """Plot split-bin mean traces and low-alpha event percentile bounds."""
+    name = budget_partition.resolve(ds, name)
     for index in range(ds.sizes[SPLIT_BIN_DIM]):
         style = _split_line_style(index)
         subset = ds.isel({SPLIT_BIN_DIM: index})
@@ -1676,6 +1699,7 @@ def _plot_event_percentile_band(
     scale: float = 1.0,
 ) -> None:
     """Shade the event percentile envelope for one variable."""
+    name = budget_partition.resolve(ds, name)
     bounds = _event_percentile_bounds(ds, name)
     if bounds is None:
         return
@@ -1706,6 +1730,7 @@ def _plot_event_percentile_bound_lines(
     scale: float = 1.0,
 ) -> None:
     """Draw event percentile bounds as faint lines for split overlays."""
+    name = budget_partition.resolve(ds, name)
     bounds = _event_percentile_bounds(ds, name)
     if bounds is None:
         return
@@ -1741,6 +1766,7 @@ def _plot_top_event_reference(
     color: str,
 ) -> None:
     """Plot an all-event composite reference in days relative to peak."""
+    name = budget_partition.resolve(reference_composite, name)
     lag_days = np.asarray(reference_composite["lag_hour"].values, dtype=float) / 24
     scale = _display_scale(name)
     _plot_line(
@@ -1825,6 +1851,7 @@ def _event_percentile_bounds(
     name: str,
 ) -> tuple[xr.DataArray, xr.DataArray] | None:
     """Return lower and upper event percentile traces for one variable."""
+    name = budget_partition.resolve(ds, name)
     envelope_name = f"{_event_percentile_prefix(ds)}{name}"
     if envelope_name not in ds:
         return None
@@ -1886,6 +1913,7 @@ def _variable_label(name: str) -> str:
 
 def _variable_legend_handle(ds: xr.Dataset, name: str) -> Line2D:
     """Return a solid-line variable legend handle."""
+    name = budget_partition.resolve(ds, name)
     return Line2D(
         [0],
         [0],
@@ -1910,6 +1938,7 @@ def _require_dataset_variables(
     plot_label: str = "Extended plot",
 ) -> None:
     """Raise a clear error when an extended plot input is missing variables."""
+    names = tuple(budget_partition.resolve(ds, name) for name in names)
     missing = [name for name in names if name not in ds]
     if missing:
         values = ", ".join(missing)
@@ -1934,6 +1963,7 @@ def _display_smoothing_variable_names(
     variables: Sequence[str],
 ) -> list[str]:
     """Return requested variables plus matching percentile envelope variables."""
+    variables = tuple(budget_partition.resolve(composite, name) for name in variables)
     percentile_prefix = _event_percentile_prefix(composite)
     names: list[str] = []
     for name in variables:

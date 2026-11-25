@@ -681,3 +681,9 @@ errors. Then render the unchanged accepted Stage-2 inputs through the existing
 event-only and baseline-comparison schedulers into fresh commit-scoped paths.
 Record input/output checksums, counts, clean logs and original-resolution
 inspection; a successful PBS job alone does not establish visual acceptance.
+
+## Boundary-flux partition extension
+
+[Decision 011](../decisions/011_boundary_flux_budget_partition.md) defines the
+additive named-field extension, original-partition compatibility, consumer
+selection, and PNW Bartusek validation required for this product or workflow.

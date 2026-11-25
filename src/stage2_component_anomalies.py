@@ -7,7 +7,7 @@ import pandas as pd
 import xarray as xr
 
 from scripts.event_features.fixed_window_features import WindowReducer
-from src import climatology, season_selection
+from src import budget_partition, climatology, season_selection
 
 TENDENCIES = ("dTdt", "advection", "adiabatic", "diabatic")
 RAW_TO_ANOMALY = {
@@ -27,6 +27,17 @@ PAIR_METADATA = (
 )
 
 
+def tendency_names(source: xr.Dataset) -> tuple[str, ...]:
+    return (*TENDENCIES, *budget_partition.extension_variables(source))
+
+
+def integral_mapping(table: xr.Dataset, *, anomaly=False) -> dict[str, str]:
+    suffix = "_anom_pre" if anomaly else "_pre"
+    extended = budget_partition.extension_variables(table, prefix="I_", suffix=suffix)
+    names = (*TENDENCIES, *budget_partition.VARIABLES) if extended else TENDENCIES
+    return {f"I_{name}_pre": f"I_{name}_anom_pre" for name in (*names, "dyn")}
+
+
 def _window_hours(table: xr.Dataset) -> int:
     try:
         start, end = map(int, table.attrs["heat_budget_pre_window_hours"].split(","))
@@ -39,7 +50,9 @@ def _window_hours(table: xr.Dataset) -> int:
     return -start
 
 
-def _validate_reference(table: xr.Dataset, kind: str, hours: int) -> None:
+def _validate_reference(
+    table: xr.Dataset, kind: str, hours: int, *, require_full_event=True
+) -> None:
     required = {
         "pipeline_stage": f"stage_2_{kind}_features",
         "heat_budget_pre_window_hours": f"{-hours},0",
@@ -52,7 +65,9 @@ def _validate_reference(table: xr.Dataset, kind: str, hours: int) -> None:
             raise ValueError(f"Reference {kind} requires {key}={expected!r}.")
     if table.attrs.get("heat_budget_representation", "absolute") != "absolute":
         raise ValueError("The reference must be an accepted absolute Stage-2 table.")
-    season_selection.validate_stage2_season(table, require_full_event=True)
+    season_selection.validate_stage2_season(
+        table, require_full_event=require_full_event
+    )
     dim, anchor = (
         ("event", "peak_time")
         if kind == "event"
@@ -62,7 +77,8 @@ def _validate_reference(table: xr.Dataset, kind: str, hours: int) -> None:
         raise ValueError(f"Invalid {kind} reference population.")
     if not pd.Index(table[dim].values).is_unique:
         raise ValueError("Reference row identities must be unique.")
-    for name in RAW_TO_ANOMALY:
+    budget_partition.validate_integrals(table)
+    for name in integral_mapping(table):
         if name not in table or table[name].dims != (dim,):
             raise ValueError(f"Missing reference budget feature {name}.")
         for key, expected in {
@@ -81,7 +97,7 @@ def _validate_reference(table: xr.Dataset, kind: str, hours: int) -> None:
 
 def _validate_climate(source: xr.Dataset, climate: xr.Dataset) -> None:
     climatology.validate_regional_hourly_climatology(
-        climate, required_variables=TENDENCIES
+        climate, required_variables=tendency_names(source)
     )
     climatology.validate_climatology_source_compatibility(source, climate)
     for key in (
@@ -104,7 +120,11 @@ def _validate_climate(source: xr.Dataset, climate: xr.Dataset) -> None:
         - int(climate.attrs["climatology_start_year"])
         + 1
     )
-    for name in TENDENCIES:
+    if budget_partition.extension_variables(
+        source
+    ) != budget_partition.extension_variables(climate):
+        raise ValueError("Source and climatology partition extensions disagree.")
+    for name in tendency_names(source):
         for ds, dim in ((source, "time"), (climate, "climatology_time")):
             if ds[name].dims != (dim,) or ds[name].attrs.get("units") not in {
                 "K hr-1",
@@ -134,7 +154,7 @@ def _complete_windows(anomalies: xr.Dataset, anchors: np.ndarray, hours: int) ->
         a, b = np.searchsorted(times, [expected[0], expected[-1]])
         if not np.array_equal(times[a : b + 1], expected):
             raise ValueError(f"Incomplete hourly window ending at {anchor}.")
-        for name in TENDENCIES:
+        for name in tendency_names(anomalies):
             if not np.isfinite(anomalies[name].values[a : b + 1]).all():
                 raise ValueError(
                     f"Nonfinite {name} samples in window ending at {anchor}."
@@ -142,20 +162,31 @@ def _complete_windows(anomalies: xr.Dataset, anchors: np.ndarray, hours: int) ->
 
 
 def build_component_anomaly_pair(
-    source: xr.Dataset, climate: xr.Dataset, events: xr.Dataset, baseline: xr.Dataset
+    source: xr.Dataset,
+    climate: xr.Dataset,
+    events: xr.Dataset,
+    baseline: xr.Dataset,
+    *,
+    require_full_event: bool = True,
 ) -> tuple[xr.Dataset, xr.Dataset]:
     """Integrate tendency anomalies without recalculating raw totals or selections."""
     hours = _window_hours(events)
+    tendencies = tendency_names(source)
+    mapping = integral_mapping(events)
+    if integral_mapping(baseline) != mapping or len(mapping) != len(tendencies) + 1:
+        raise ValueError("Source and reference partition extensions disagree.")
     _validate_climate(source, climate)
     for kind, reference in (("event", events), ("baseline", baseline)):
-        _validate_reference(reference, kind, hours)
+        _validate_reference(
+            reference, kind, hours, require_full_event=require_full_event
+        )
     if not pd.Index(events.event_id.values).is_unique:
         raise ValueError("Reference event IDs must be unique.")
     for name in ("event_id", "peak_time", "start_time", "end_time"):
         if not np.array_equal(events[name], source[name].sel(event=events.event)):
             raise ValueError(f"Reference event {name} does not match Stage 1.")
     anomalies = climatology.apply_regional_hourly_climatology(
-        source, climate, variables=TENDENCIES
+        source, climate, variables=tendencies
     )
     windows = {"heat_budget_pre": (-hours, 0)}
     reducer = WindowReducer(anomalies, windows=windows)
@@ -166,8 +197,8 @@ def build_component_anomaly_pair(
     ):
         anchors = reference[anchor_name].values.astype("datetime64[ns]")
         _complete_windows(anomalies, anchors, hours)
-        out = reference.drop_vars(list(RAW_TO_ANOMALY)).copy(deep=True)
-        for name in TENDENCIES:
+        out = reference.drop_vars(list(mapping)).copy(deep=True)
+        for name in tendencies:
             feature = f"I_{name}_anom_pre"
             out[feature] = (dim, reducer.sums(name, anchors, "heat_budget_pre"))
             out[feature].attrs = dict(reference[f"I_{name}_pre"].attrs)
@@ -190,10 +221,10 @@ def build_component_anomaly_pair(
             reference_pipeline_stage=reference.attrs["pipeline_stage"],
             heat_budget_representation=REPRESENTATION,
             anomaly_method="subtract calendar-hour tendency climatology before inclusive hourly sum",
-            active_integral_sources=",".join(TENDENCIES),
-            derived_budget_variables=",".join(RAW_TO_ANOMALY.values()),
+            active_integral_sources=",".join(tendencies),
+            derived_budget_variables=",".join(mapping.values()),
             copied_reference_variables=",".join(
-                reference.drop_vars(list(RAW_TO_ANOMALY)).data_vars
+                reference.drop_vars(list(mapping)).data_vars
             ),
         )
         for key in (
@@ -209,7 +240,7 @@ def build_component_anomaly_pair(
             "climatology_event_exclusion",
         ):
             out.attrs[key] = climate.attrs[key]
-        for name in RAW_TO_ANOMALY.values():
+        for name in mapping.values():
             for key in (
                 "climatology_start_year",
                 "climatology_end_year",
@@ -237,7 +268,8 @@ def validate_component_anomalies(table: xr.Dataset) -> None:
             "Missing component-anomaly representation or contract version."
         )
     season_selection.validate_stage2_season(table, require_full_event=None)
-    if any(name in table for name in RAW_TO_ANOMALY):
+    mapping = integral_mapping(table, anomaly=True)
+    if any(name in table for name in mapping):
         raise ValueError("Anomaly products must not contain raw budget features.")
     if any(key not in table.attrs for key in PAIR_METADATA):
         raise ValueError("Incomplete component-anomaly provenance.")
@@ -251,7 +283,7 @@ def validate_component_anomalies(table: xr.Dataset) -> None:
     hours = _window_hours(table)
     if not np.all(table.n_samples_heat_budget_pre.values == hours + 1):
         raise ValueError("Invalid anomaly sample counts.")
-    for name in RAW_TO_ANOMALY.values():
+    for name in mapping.values():
         if (
             name not in table
             or table[name].dims != (dim,)
@@ -273,6 +305,8 @@ def validate_component_anomalies(table: xr.Dataset) -> None:
     ):
         if not np.allclose(residual, 0, atol=1e-8, rtol=0):
             raise ValueError("Anomalous heat budget does not close.")
+
+    budget_partition.validate_integrals(table, anomaly=True)
 
 
 def comparison_plot_views(
@@ -304,5 +338,8 @@ def comparison_plot_views(
     for key in PAIR_METADATA:
         if baseline.attrs[key] != events.attrs[key]:
             raise ValueError(f"Anomaly comparison inputs disagree on {key}.")
-    names = {value: key for key, value in RAW_TO_ANOMALY.items()}
+    mapping = integral_mapping(events, anomaly=True)
+    if integral_mapping(baseline, anomaly=True) != mapping:
+        raise ValueError("Comparison tables have different partition extensions.")
+    names = {value: key for key, value in mapping.items()}
     return baseline.rename(names), events.rename(names), True

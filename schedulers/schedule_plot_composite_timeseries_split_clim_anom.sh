@@ -112,6 +112,7 @@ cd "${PROJECT_ROOT}"
 for split_variable in "${split_variable_list[@]}"; do
   echo "[info] split_variable=${split_variable}"
   /usr/bin/time -v python scripts/plot_composite_timeseries_split_clim_anom.py \
+    --budget-partition "${BUDGET_PARTITION:-original}" \
     "${season_args[@]}" \
     --region "${REGION}" \
     --bottom-boundary "${BOTTOM_BOUNDARY}" \
@@ -135,6 +136,7 @@ done
 
 echo "[info] split_variable=peak_time"
 /usr/bin/time -v python scripts/plot_composite_timeseries_split_clim_anom.py \
+    --budget-partition "${BUDGET_PARTITION:-original}" \
   "${season_args[@]}" \
   --region "${REGION}" \
   --bottom-boundary "${BOTTOM_BOUNDARY}" \

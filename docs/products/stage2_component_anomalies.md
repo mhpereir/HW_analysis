@@ -98,8 +98,8 @@ complete JJA events or peak-in-JJA events. The accepted eight-region 48/96-hour
 campaign uses the latter. Validate its metadata and actual peak timestamps
 without requiring all event intervals to remain in JJA or dropping rows.
 The plotting CLI still requires its requested seasonal rule to match the
-saved table. The window-sensitivity builder and its full-JJA reference
-requirement remain unchanged; this reader compatibility does not authorize
+saved table. The window-sensitivity builder retains its full-JJA reference
+requirement by default; this reader compatibility does not authorize
 rebuilding or relabeling either accepted population.
 
 For the two-panel paper presentation, use the typography and caption rules in
@@ -139,3 +139,14 @@ Venus smoke and scientific/visual acceptance for the exact deployed commit.
 Inspect both layouts, source/output hashes, scheduler accounting and logs.
 Retain immutable manifests, validation reports, PNG/PDF figures and a README
 in fresh external artifact paths.
+
+## Boundary-flux partition extension
+
+[Decision 011](../decisions/011_boundary_flux_budget_partition.md) defines the
+additive named-field extension, original-partition compatibility, consumer
+selection, and PNW Bartusek validation required for this product or workflow.
+
+Extended reference pairs additionally replace the two raw partition integrals
+with `I_adv_horizontal_anom_pre` and `I_vertical_contribution_anom_pre`.
+Compute each from source-minus-climatology hourly samples. Their sum equals
+the unchanged `I_dyn_anom_pre`. Reject mixed or incomplete extensions.

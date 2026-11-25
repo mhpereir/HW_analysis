@@ -129,6 +129,7 @@ a figure.
 | Spatial ERA5 preparation and composites | [Spatial composite workflow](workflows/spatial_composites.md) |
 | Figure conventions and shared style | [Plotting workflow](workflows/plotting.md) |
 | Scientific defaults | [Decision records](decisions/) |
+| Original and boundary-flux budgets | [Partition contract and pilot](decisions/011_boundary_flux_budget_partition.md) |
 | Inactive PCA and clustering material | [Legacy index](legacy/README.md) |
 
 ## Active entrypoint families

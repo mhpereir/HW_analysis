@@ -67,6 +67,7 @@ echo "[info] started=$(date -Is)"
 
 cd "${PROJECT_ROOT}"
 /usr/bin/time -v python scripts/event_features/plot_adiabatic_advection_comparison_baseline.py \
+    --budget-partition "${BUDGET_PARTITION:-original}" \
   "${season_args[@]}" \
   --input-path "${BASELINE_INPUT_PATH}" \
   --event-input-path "${EVENT_INPUT_PATH}" \

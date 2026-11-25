@@ -467,12 +467,14 @@ def test_main_forwards_arguments_and_closes_both_datasets(monkeypatch, tmp_path)
         path,
         *,
         layout,
+        partition,
         color_variable,
         point_size,
         alpha,
         event_point_size,
         event_alpha,
     ):
+        assert partition == "original"
         assert baseline_features is baseline
         assert event_features is events
         written.append(

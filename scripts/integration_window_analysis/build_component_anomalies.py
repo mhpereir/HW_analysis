@@ -20,7 +20,7 @@ import xarray as xr
 from scripts.event_features.plot_adiabatic_advection_comparison_baseline import (
     write_tendency_scatter_plot,
 )
-from src import analysis_io
+from src import analysis_io, budget_partition
 from src.stage2_component_anomalies import build_component_anomaly_pair
 from src.stage2_component_anomaly_validation import validate_anomalies_against_sources
 
@@ -47,6 +47,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reference-dir", type=Path, required=True)
     parser.add_argument("--integration-hours", type=int, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    budget_partition.add_argument(parser)
+    parser.add_argument(
+        "--require-full-event", action=argparse.BooleanOptionalAction, default=True
+    )
     args = parser.parse_args(argv)
     if args.integration_hours <= 0:
         parser.error("integration-hours must be positive")
@@ -100,7 +104,11 @@ def main(argv: list[str] | None = None) -> int:
                     "Requested window does not match the accepted reference."
                 )
         events, baseline = build_component_anomaly_pair(
-            source, climate, refs["event"], refs["baseline"]
+            source,
+            climate,
+            refs["event"],
+            refs["baseline"],
+            require_full_event=args.require_full_event,
         )
         args.output_dir.mkdir(parents=True, exist_ok=False)
         for name, table in (("event", events), ("baseline", baseline)):
@@ -134,6 +142,7 @@ def main(argv: list[str] | None = None) -> int:
                         args.output_dir
                         / f"event_vs_clean_baseline_clim_anom_{layout}.{extension}",
                         layout=layout,
+                        partition=args.budget_partition,
                     )
         if any(sha256(path) != hashes[name] for name, path in paths.items()):
             raise ValueError("An input changed during the run.")

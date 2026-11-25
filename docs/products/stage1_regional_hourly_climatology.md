@@ -87,8 +87,11 @@ Every calendar-hour key still contains at most one value per source year, so
 the stored count represents years rather than treating within-day replicas as
 independent samples.
 
-Grouped zonal, meridional, horizontal, vertical, and all-face terms are derived
-from the five face means. They are not stored redundantly.
+Face-diagnostic grouped zonal, meridional, horizontal, vertical and all-face
+terms retain their existing derived names. The additive budget-partition
+extension stores `adv_horizontal` and `vertical_contribution` explicitly,
+including their sample-based means, standard deviations and counts; see
+[decision 011](../decisions/011_boundary_flux_budget_partition.md).
 
 ## Scientific method
 
@@ -155,3 +158,9 @@ product path.
   subtraction.
 - Units and signs are preserved and anomaly metadata is explicit.
 - Existing absolute products and figures are not overwritten.
+
+## Boundary-flux partition extension
+
+[Decision 011](../decisions/011_boundary_flux_budget_partition.md) defines the
+additive named-field extension, original-partition compatibility, consumer
+selection, and PNW Bartusek validation required for this product or workflow.

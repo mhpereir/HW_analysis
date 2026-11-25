@@ -62,10 +62,16 @@ ANOMALY_BUDGET_REFERENCE_CAPTION = (
 )
 HEAT_BUDGET_ANOMALY_LABELS = {
     "I_advection_pre": r"$I'_{advective}$ (K)",
+    "I_adv_horizontal_pre": r"$I'_{adv,h}$ (K)",
+    "I_vertical_contribution_pre": r"$I'_{vertical}$ (K)",
     "I_adiabatic_pre": r"$I'_{adiabatic}$ (K)",
     "I_dyn_pre": r"$I'_{dyn,net}$ (K)",
     "I_dTdt_pre": r"$I'_{dT/dt}$ (K)",
     "I_diabatic_pre": r"$I'_{diabatic}$ (K)",
+}
+BOUNDARY_FLUX_INTEGRAL_LABELS = {
+    "I_adv_horizontal_pre": r"$I_{adv,h}$ (K)",
+    "I_vertical_contribution_pre": r"$I_{vertical}$ (K)",
 }
 THREE_PANEL_STACK_ASPECT = 0.62
 SQUARE_PANEL_ASPECT = 0.95
@@ -75,6 +81,8 @@ VARIABLE_NAME_MAPPING = {
     "volume": "V",
     "dTdt": r"d$\langle T \rangle$/dt",
     "advection": "Advection",
+    "adv_horizontal": "Horizontal advection",
+    "vertical_contribution": "Total vertical contribution",
     "adiabatic": "Adiabatic",
     "diabatic": "Diabatic",
     "lwa_a_region": "Anticyclonic",
@@ -94,6 +102,8 @@ VARIABLE_UNIT_MAPPING = {
     "volume": "m2 Pa",
     "dTdt": "K hr-1",
     "advection": "K hr-1",
+    "adv_horizontal": "K hr-1",
+    "vertical_contribution": "K hr-1",
     "adiabatic": "K hr-1",
     "diabatic": "K hr-1",
     "lwa_a_region": "m hPa",
@@ -109,6 +119,8 @@ VARIABLE_UNIT_MAPPING = {
 TEMPORAL_CLIMATOLOGY_VALUE_FORMATS = {
     "dTdt": ".3f",
     "advection": ".3f",
+    "adv_horizontal": ".3f",
+    "vertical_contribution": ".3f",
     "adiabatic": ".3f",
     "diabatic": ".3f",
     "lwa_a_region": ".1e",
@@ -127,6 +139,8 @@ VARIABLE_COLORS = {
     "volume": "#0072B2",
     "dTdt": "#D55E00",
     "advection": "#2636CA",
+    "adv_horizontal": "#2636CA",
+    "vertical_contribution": "#0DAF43",
     "adiabatic": "#0DAF43",
     "diabatic": "#D55E00",
     "lwa_a_region": "#EC6205",

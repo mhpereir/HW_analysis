@@ -20,7 +20,7 @@ import matplotlib
 import numpy as np
 import xarray as xr
 
-from src import analysis_io, plot_style, season_selection
+from src import analysis_io, budget_partition, plot_style, season_selection
 from src.artifact_paths import artifact_root
 
 matplotlib.use("Agg")
@@ -107,6 +107,7 @@ def parse_args() -> argparse.Namespace:
             "adiabatic/advection net dynamical comparison."
         )
     )
+    budget_partition.add_argument(parser)
     season_selection.add_season_arguments(parser, default_full_event=False)
     parser.add_argument(
         "--input-path",
@@ -187,12 +188,19 @@ def validate_layout(layout: str) -> None:
         raise ValueError(f"layout must be one of: {choices}.")
 
 
-def default_output_path(layout: str) -> Path:
+def default_output_path(
+    layout: str, partition: str = budget_partition.ORIGINAL
+) -> Path:
     """Return the non-overlapping default output for a figure layout."""
     validate_layout(layout)
-    if layout == PRESENTATION_LAYOUT:
-        return DEFAULT_PRESENTATION_OUTPUT_PATH
-    return DEFAULT_OUTPUT_PATH
+    output = (
+        DEFAULT_PRESENTATION_OUTPUT_PATH
+        if layout == PRESENTATION_LAYOUT
+        else DEFAULT_OUTPUT_PATH
+    )
+    if partition != budget_partition.ORIGINAL:
+        output = output.with_name(f"{output.stem}_{partition}{output.suffix}")
+    return output
 
 
 def main() -> int:
@@ -208,12 +216,15 @@ def main() -> int:
             args.event_input_path, **season_selection.season_kwargs(args)
         )
         try:
-            output_path = args.output_path or default_output_path(args.layout)
+            output_path = args.output_path or default_output_path(
+                args.layout, args.budget_partition
+            )
             written = write_tendency_scatter_plot(
                 baseline_features,
                 event_features,
                 output_path,
                 layout=args.layout,
+                partition=getattr(args, "budget_partition", budget_partition.ORIGINAL),
                 color_variable=args.color_variable,
                 point_size=args.point_size,
                 alpha=args.alpha,
@@ -256,6 +267,7 @@ def write_tendency_scatter_plot(
     output_path: str | Path,
     *,
     layout: str = FULL_LAYOUT,
+    partition: str = budget_partition.ORIGINAL,
     color_variable: str = COLOR_VARIABLE,
     point_size: float = 24.0,
     alpha: float = 0.2,
@@ -269,6 +281,7 @@ def write_tendency_scatter_plot(
         baseline_features,
         event_features,
         layout=layout,
+        partition=partition,
         color_variable=color_variable,
         point_size=point_size,
         alpha=alpha,
@@ -285,6 +298,7 @@ def plot_tendency_scatter(
     event_features: xr.Dataset,
     *,
     layout: str = FULL_LAYOUT,
+    partition: str = budget_partition.ORIGINAL,
     color_variable: str = COLOR_VARIABLE,
     point_size: float = 24.0,
     alpha: float = 0.2,
@@ -296,6 +310,12 @@ def plot_tendency_scatter(
     baseline_features, event_features, anomaly = comparison_plot_views(
         baseline_features, event_features
     )
+    baseline_features = budget_partition.select(
+        baseline_features, partition, integrated=True
+    )
+    event_features = budget_partition.select(event_features, partition, integrated=True)
+    for table in (baseline_features, event_features):
+        budget_partition.validate_integrals(table)
     context = anomaly_context(event_features) if anomaly else ""
     validate_feature_variables(
         baseline_features,
@@ -322,6 +342,7 @@ def plot_tendency_scatter(
             color_variable=color_variable,
             anomaly=anomaly,
             context=context,
+            partition=partition,
             point_size=point_size,
             alpha=alpha,
             event_point_size=event_point_size,
@@ -362,10 +383,10 @@ def plot_tendency_scatter(
         show_legend=True,
     )
     add_one_to_negative_one_line_from_panel(axes[0])
-    axes[0].set_title(
-        "Advection vs Adiabatic Heating" + (" Anomalies" if anomaly else "")
+    axes[0].set_title(comparison_title(partition) + (" Anomalies" if anomaly else ""))
+    axes[0].set_ylabel(
+        variable_label(ADVECTION_VARIABLE, anomaly=anomaly, partition=partition)
     )
-    axes[0].set_ylabel(variable_label(ADVECTION_VARIABLE, anomaly=anomaly))
 
     plot_comparison_panel(
         axes[1],
@@ -384,7 +405,7 @@ def plot_tendency_scatter(
     )
     axes[1].set_title("Net Dynamical Contribution" + (" Anomaly" if anomaly else ""))
     axes[1].set_ylabel(variable_label(DYNAMICAL_VARIABLE, anomaly=anomaly))
-    axes[1].set_xlabel(variable_label(X_VARIABLE, anomaly=anomaly))
+    axes[1].set_xlabel(variable_label(X_VARIABLE, anomaly=anomaly, partition=partition))
 
     plot_comparison_panel(
         axes[2],
@@ -454,6 +475,7 @@ def plot_presentation_tendency_scatter(
     color_variable: str,
     anomaly: bool = False,
     context: str = "",
+    partition: str = budget_partition.ORIGINAL,
     point_size: float,
     alpha: float,
     event_point_size: float,
@@ -495,9 +517,11 @@ def plot_presentation_tendency_scatter(
     )
     add_one_to_negative_one_line_from_panel(axes[0])
     if not anomaly:
-        axes[0].set_title("Advection vs Adiabatic Heating")
-    axes[0].set_ylabel(variable_label(ADVECTION_VARIABLE, anomaly=anomaly))
-    axes[0].set_xlabel(variable_label(X_VARIABLE, anomaly=anomaly))
+        axes[0].set_title(comparison_title(partition))
+    axes[0].set_ylabel(
+        variable_label(ADVECTION_VARIABLE, anomaly=anomaly, partition=partition)
+    )
+    axes[0].set_xlabel(variable_label(X_VARIABLE, anomaly=anomaly, partition=partition))
 
     event_mappable = plot_comparison_panel(
         axes[1],
@@ -654,6 +678,7 @@ def validate_required_variables(
     table_label: str,
 ) -> None:
     """Fail clearly when a feature table lacks required variables."""
+    required = [budget_partition.resolve(features, name) for name in required]
     missing = [name for name in dict.fromkeys(required) if name not in features]
     if missing:
         raise ValueError(
@@ -693,7 +718,7 @@ def tendency_values(features: xr.Dataset) -> dict[str, np.ndarray]:
 
 def feature_values(features: xr.Dataset, variable: str) -> np.ndarray:
     """Return a feature variable as a float array."""
-    values = features[variable].values
+    values = features[budget_partition.resolve(features, variable)].values
     if np.issubdtype(values.dtype, np.timedelta64):
         out = values / np.timedelta64(1, "D")
     else:
@@ -730,11 +755,24 @@ def set_y_data_limits(ax: Axes, y_values: np.ndarray) -> None:
         ax.set_ylim(*limits)
 
 
-def variable_label(variable: str, *, anomaly: bool = False) -> str:
+def variable_label(
+    variable: str, *, anomaly: bool = False, partition: str = budget_partition.ORIGINAL
+) -> str:
     """Return a readable axis label."""
+    variable = budget_partition.variable_name(variable, partition)
     if anomaly and variable in plot_style.HEAT_BUDGET_ANOMALY_LABELS:
         return plot_style.HEAT_BUDGET_ANOMALY_LABELS[variable]
-    return VARIABLE_LABELS.get(variable, variable)
+    return plot_style.BOUNDARY_FLUX_INTEGRAL_LABELS.get(
+        variable, VARIABLE_LABELS.get(variable, variable)
+    )
+
+
+def comparison_title(partition: str) -> str:
+    return (
+        "Horizontal Advection vs\nTotal Vertical Contribution"
+        if partition == budget_partition.BOUNDARY_FLUX
+        else "Advection vs Adiabatic Heating"
+    )
 
 
 def anomaly_context(features: xr.Dataset) -> str:

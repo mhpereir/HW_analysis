@@ -103,6 +103,8 @@ EVENT_SUMMARY_FEATURES = (
 DEFAULT_FEATURE_NAMES = {
     "dTdt": "I_dTdt_pre",
     "advection": "I_advection_pre",
+    "adv_horizontal": "I_adv_horizontal_pre",
+    "vertical_contribution": "I_vertical_contribution_pre",
     "adiabatic": "I_adiabatic_pre",
     "diabatic": "I_diabatic_pre",
     "lwa_a_region": "I_lwa_a_pre_peak",

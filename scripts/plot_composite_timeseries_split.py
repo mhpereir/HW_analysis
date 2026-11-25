@@ -16,6 +16,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from src import (
     analysis_io,
+    budget_partition,
     composites,
     plot_paths,
     plotting,
@@ -67,6 +68,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot peak-aligned composite time series for all HW events."
     )
+    budget_partition.add_argument(parser)
     season_selection.add_season_arguments(parser, default_full_event=True)
     plot_paths.add_stage1_path_arguments(parser)
     parser.add_argument(
@@ -121,6 +123,8 @@ def parse_args() -> argparse.Namespace:
     )
     args = season_selection.parse_args(parser)
     plot_name, default_output_filename = _default_plot_destination(args.layout)
+    if args.budget_partition != budget_partition.ORIGINAL:
+        plot_name += "_" + args.budget_partition
     return plot_paths.finalize_stage1_plot_paths(
         args,
         parser,
@@ -169,6 +173,9 @@ def main() -> int:
     ds = analysis_io.open_harmonized_timeseries(args.input_path)
     try:
         variables = _composite_variables(args.plot_extended_variables, args.layout)
+        partition = getattr(args, "budget_partition", budget_partition.ORIGINAL)
+        budget_partition.select(ds, partition)
+        variables = budget_partition.variable_names(variables, partition)
         smoothed_variables = _smoothed_variables(
             args.plot_extended_variables,
             args.layout,
@@ -208,6 +215,7 @@ def main() -> int:
                 composite_kwargs=composite_kwargs,
             )
         output_path = _split_output_path(args.output_path, args.split_variable)
+        composite.attrs["budget_partition"] = partition
         written = plotting.write_split_composite_timeseries_outputs(
             composite,
             output_path,

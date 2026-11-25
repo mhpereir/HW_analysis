@@ -246,3 +246,9 @@ ranks independently, timestamp subtraction, complete JJA means and their
 preservation through compositing/smoothing. It records the expected top-event
 filenames and legend text. Submit actual figure jobs only after that gate, and
 check their complete file matrix and representative visual layouts separately.
+
+## Boundary-flux partition extension
+
+[Decision 011](../decisions/011_boundary_flux_budget_partition.md) defines the
+additive named-field extension, original-partition compatibility, consumer
+selection, and PNW Bartusek validation required for this product or workflow.

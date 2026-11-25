@@ -163,3 +163,13 @@ remain compatible.
 - exploratory fixed-window feature diagnostics.
 
 The baseline product is not an input to the current spatial-composite builder.
+
+## Boundary-flux partition extension
+
+[Decision 011](../decisions/011_boundary_flux_budget_partition.md) defines the
+additive named-field extension, original-partition compatibility, consumer
+selection, and PNW Bartusek validation required for this product or workflow.
+
+Extended sources add `I_adv_horizontal_pre(baseline_day)` and
+`I_vertical_contribution_pre(baseline_day)` in K. Use the same reference times,
+windows, adjacency flags and sample masks as the original integrals.

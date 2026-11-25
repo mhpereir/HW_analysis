@@ -42,7 +42,10 @@ cd "${PROJECT_ROOT}"
 if [[ "${RUN_TESTS}" = "1" ]]; then
     python -m pytest -q -W error tests/test_stage2_component_anomalies.py tests/test_plot_adiabatic_advection_comparison_baseline.py
 fi
+full_event_option=--require-full-event
+if [[ "${REQUIRE_FULL_EVENT:-1}" == "0" ]]; then full_event_option=--no-require-full-event; fi
 /usr/bin/time -v python scripts/integration_window_analysis/build_component_anomalies.py \
+    --budget-partition "${BUDGET_PARTITION:-original}" "${full_event_option}" \
     --input-path "${INPUT_PATH}" --climatology-path "${CLIMATOLOGY_PATH}" \
     --reference-dir "${REFERENCE_DIR}" --integration-hours "${INTEGRATION_HOURS}" \
     --output-dir "${OUTPUT_DIR}"

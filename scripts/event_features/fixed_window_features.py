@@ -9,6 +9,7 @@ import numpy as np
 import xarray as xr
 
 from scripts.event_features import event_feature_config as config
+from src import budget_partition
 
 SURFACE_FLUX_FEATURES = frozenset({"I_sshf_pre", "I_slhf_pre"})
 
@@ -44,6 +45,9 @@ def active_feature_spec(
         "mean": dict(config.DEFAULT_MEAN_FEATURES),
         "change": {},
     }
+    budget_partition.validate_stage1(ds)
+    for name in budget_partition.extension_variables(ds):
+        spec["integral"][name] = "heat_budget_pre"
     if not use_extended_variables:
         return spec
 
@@ -304,6 +308,8 @@ def add_window_features(
     sample_count_name_for_window: Callable[[str], str] | None = None,
 ) -> None:
     """Add configured sample counts and reductions to a feature table."""
+    if budget_partition.extension_variables(ds):
+        out.attrs.update(budget_partition.METADATA)
     for window_name in active_window_names(feature_spec):
         feature_name = (
             f"n_samples_{window_name}"
@@ -436,6 +442,7 @@ def add_integrated_dynamical_feature(
     if isinstance(units, str) and units:
         attrs["units"] = units
     out[feature_name].attrs = attrs
+    budget_partition.validate_integrals(out)
 
 
 def add_days_from_solstice(
