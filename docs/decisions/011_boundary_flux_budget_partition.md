@@ -96,3 +96,10 @@ integral, reference fields and anomaly reductions independently. It writes
 64 PNGs (56 temporal, eight integration), eight PDFs and six NetCDF products.
 The four temporal PBS wrappers and baseline-comparison wrapper also accept
 `BUDGET_PARTITION=original|boundary_flux`, with explicit fresh output paths.
+
+The complete pilot requests one CPU, 40 GB and 30 minutes. The initial PNW
+attempt exceeded its 8 GB allocation while rendering temporal figures, reaching
+about 27 GiB; retain that cancelled attempt and use a fresh output namespace
+for the larger allocation. Smoke-only submissions can override this with one
+CPU, 4 GB and five minutes. Compare measured peak memory with the allocation
+before expanding the campaign.

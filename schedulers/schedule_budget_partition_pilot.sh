@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N budget_partition_pilot
-#PBS -l select=1:ncpus=1:mem=8gb
+#PBS -l select=1:ncpus=1:mem=40gb
 #PBS -l walltime=00:30:00
 #PBS -j oe
 #PBS -o /dev/null
